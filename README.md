@@ -230,7 +230,9 @@ sudo apt update -y && sudo apt upgrade -y
    tlmgr update --self && tlmgr install babel-spanish hyphen-spanish booktabs
    ```
 
-5. Dependencias adicionales: `gfortran`, `redis-server`, `gmt`, `ps2eps`, `csh`. Ejecute:
+5. Dependencias adicionales: `gfortran`, `redis-server`, `gmt`[^1], `ps2eps`, `csh`. Ejecute:
+
+[^1]: GMT 6.0.0 está en APT, pero `pygmt` necesita >=6.4.0. Compila los ejecutables con esta guía: https://github.com/GenericMappingTools/gmt/blob/master/BUILDING.md
 
    ```bash
    sudo apt install -y gfortran redis-server gmt gmt-dcw gmt-gshhg ps2eps csh
