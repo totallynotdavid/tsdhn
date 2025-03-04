@@ -207,7 +207,10 @@ if $NEED_PYENV; then
         export PYENV_ROOT="$HOME/.pyenv"
         export PATH="$PYENV_ROOT/bin:$PATH"
 
-        # Detect if running under WSL
+        # Detect if running under WSL because:
+        # WSL appends Windows path to the PATH variable, 
+        # which can cause issues with pyenv if pyenv is
+        # installed in both Windows and WSL
         if [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]]; then
             log_info "WSL environment detected"
             WSL_MODE=true
