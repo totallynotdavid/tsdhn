@@ -326,6 +326,7 @@ if $NEED_REDIS_CONFIG && sudo test -f "$REDIS_CONF"; then
     log_info "Configuring Redis for systemd"
     safe_exec sudo cp "$REDIS_CONF" "${REDIS_CONF}.bak"
     safe_exec sudo sed -i -E 's/^(# ?)?supervised .*/supervised systemd/' "$REDIS_CONF"
+    safe_exec service --status-all
     safe_exec sudo systemctl restart redis-server
 fi
 
