@@ -25,6 +25,33 @@ safe_exec() {
     return 0
 }
 
+has_python_version() {
+    local required_version="$1"
+    local python_cmd
+
+    if cmd_exists "python3"; then
+        python_cmd="python3"
+        local py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        if [[ "$py_version" == "$required_version" ]]; then
+            return 0
+        fi
+    fi
+
+
+    if cmd_exists "python$required_version"; then
+        return 0
+    fi
+    
+    # Check if pyenv has the required version
+    if cmd_exists "pyenv"; then
+        if pyenv versions 2>/dev/null | grep -q "$required_version"; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
 log_info "Checking system status"
 
 REQUIRED_PKGS=(
@@ -42,6 +69,8 @@ NEED_TEXLIVE=false
 NEED_REDIS_CONFIG=false
 NEED_GMT_CONFIG=false
 
+REQUIRED_PYTHON_VERSION="3.12"
+
 missing_pkgs=()
 for pkg in "${REQUIRED_PKGS[@]}"; do
     if ! is_pkg_installed "$pkg"; then
@@ -56,28 +85,27 @@ else
     log_success "All required packages are installed"
 fi
 
-if ! cmd_exists "pyenv"; then
-    log_warn "pyenv command not found"
-    NEED_PYENV=true
-else
-    log_success "pyenv is available ($(pyenv --version 2>/dev/null || echo "unknown version"))"
-fi
-
-if cmd_exists "pyenv"; then
-    PYENV_VERSION_OUTPUT=$(pyenv versions 2>/dev/null)
-    
-    if ! echo "$PYENV_VERSION_OUTPUT" | grep -q "3\.12"; then
-        log_warn "Python 3.12.x not found in pyenv"
-        NEED_PYTHON312=true
-    else
-        PYTHON312_VERSION=$(echo "$PYENV_VERSION_OUTPUT" | grep "3\.12" | 
+if has_python_version "$REQUIRED_PYTHON_VERSION"; then
+    if cmd_exists "python$REQUIRED_PYTHON_VERSION"; then
+        log_success "Python $REQUIRED_PYTHON_VERSION is available in the system ($(python$REQUIRED_PYTHON_VERSION --version 2>&1))"
+    elif cmd_exists "python3" && [[ $(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")') == "$REQUIRED_PYTHON_VERSION" ]]; then
+        log_success "Python $REQUIRED_PYTHON_VERSION is available as the default python3 ($(python3 --version 2>&1))"
+    elif cmd_exists "pyenv"; then
+        PYTHON312_VERSION=$(pyenv versions 2>/dev/null | grep "$REQUIRED_PYTHON_VERSION" | 
                            sed -E 's/^[[:space:]]*\*?[[:space:]]*([3]\.12[0-9.]*).*/\1/' | 
                            head -1)
-        log_success "Python ${PYTHON312_VERSION} is installed via pyenv"
+        log_success "Python ${PYTHON312_VERSION} is available via pyenv"
     fi
 else
-    log_warn "Cannot check Python versions - pyenv not available"
+    log_warn "Python $REQUIRED_PYTHON_VERSION not found in system"
     NEED_PYTHON312=true
+
+    if ! cmd_exists "pyenv"; then
+        log_warn "pyenv command not found"
+        NEED_PYENV=true
+    else
+        log_success "pyenv is available ($(pyenv --version 2>/dev/null || echo "unknown version"))"
+    fi
 fi
 
 if ! cmd_exists "poetry"; then
@@ -98,7 +126,6 @@ if ! path_exists "$HOME/texlive"; then
     log_warn "TeXLive not found in $HOME/texlive"
     NEED_TEXLIVE=true
 else
-    # Additional check to ensure it's working
     if ! cmd_exists "tex" && ! cmd_exists "pdflatex"; then
         if ! echo "$PATH" | grep -q "$HOME/texlive/bin"; then
             log_warn "TeXLive is installed but not in PATH"
@@ -146,7 +173,7 @@ fi
 log_info "Installation plan:"
 $NEED_SYSTEM_PKGS && echo "- System packages will be installed/updated"
 $NEED_PYENV && echo "- Pyenv will be installed"
-$NEED_PYTHON312 && echo "- Python 3.12 will be installed"
+$NEED_PYTHON312 && echo "- Python $REQUIRED_PYTHON_VERSION will be installed"
 $NEED_POETRY && echo "- Poetry will be installed"
 $NEED_TTT_SDK && echo "- TTT SDK will be installed"
 $NEED_TEXLIVE && echo "- TeXLive will be installed"
@@ -161,61 +188,68 @@ if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
     exit 1
 fi
 
-# Update system packages if needed
 if $NEED_SYSTEM_PKGS; then
     log_info "Updating system packages"
     safe_exec sudo apt update -y
     safe_exec sudo apt upgrade -y
-    
+
     if (( ${#missing_pkgs[@]} > 0 )); then
         log_info "Installing missing packages"
         safe_exec sudo apt install -y "${missing_pkgs[@]}"
     fi
 fi
 
-# Install Pyenv if needed
 if $NEED_PYENV; then
     log_info "Installing Pyenv"
     safe_exec curl -fsSL https://pyenv.run | bash
-    
-    # Set up path for current session
-    if [[ -d "$HOME/.pyenv/bin" ]]; then
+
+    if [[ -d "$HOME/.pyenv" ]]; then
         export PYENV_ROOT="$HOME/.pyenv"
         export PATH="$PYENV_ROOT/bin:$PATH"
-        
-        # Add to bashrc only if not already working
+
+        # Detect if running under WSL
+        if [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]]; then
+            log_info "WSL environment detected"
+            WSL_MODE=true
+            PYENV_INIT_CMD="eval \"\$(pyenv init -)\""
+        else
+            log_info "Native Linux environment detected"
+            WSL_MODE=false
+            PYENV_INIT_CMD="eval \"\$(pyenv init - bash)\""
+        fi
         if ! grep -q "PYENV_ROOT" "$HOME/.bashrc"; then
             log_info "Adding pyenv to PATH in bashrc"
             echo -e '\n# Pyenv configuration' >> "$HOME/.bashrc"
             echo 'export PYENV_ROOT="$HOME/.pyenv"' >> "$HOME/.bashrc"
-            echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> "$HOME/.bashrc"
-            echo 'eval "$(pyenv init -)"' >> "$HOME/.bashrc"
+
+            if $WSL_MODE; then
+                echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> "$HOME/.bashrc"
+                echo 'eval "$(pyenv init -)"' >> "$HOME/.bashrc"
+            else
+                echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> "$HOME/.bashrc"
+                echo 'eval "$(pyenv init - bash)"' >> "$HOME/.bashrc"
+            fi
         fi
 
-        # Initialize for current session
-        eval "$(pyenv init -)"
+        eval "$PYENV_INIT_CMD"
     else
         log_warn "Pyenv installation directory not found"
     fi
 fi
 
-# Install Python if needed
-if $NEED_PYTHON312 && cmd_exists "pyenv"; then
-    log_info "Installing Python 3.12"
-    safe_exec pyenv install -s 3.12
-    safe_exec pyenv global 3.12
+if $NEED_PYTHON312 && (cmd_exists "pyenv" || $NEED_PYENV); then
+    log_info "Installing Python $REQUIRED_PYTHON_VERSION using pyenv"
+    safe_exec pyenv install -s $REQUIRED_PYTHON_VERSION
+    safe_exec pyenv global $REQUIRED_PYTHON_VERSION
 fi
 
-# Install Poetry if needed
 if $NEED_POETRY; then
     log_info "Installing Poetry"
     safe_exec curl -sSL https://install.python-poetry.org | python3 -
-    
-    # Add to PATH for current session
+
     if [[ -d "$HOME/.local/bin" ]]; then
         export PATH="$HOME/.local/bin:$PATH"
         
-        # Add to bashrc only if not already in PATH
         if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
             log_info "Adding poetry to PATH in bashrc"
             echo -e '\n# Poetry path' >> "$HOME/.bashrc"
@@ -224,7 +258,6 @@ if $NEED_POETRY; then
     fi
 fi
 
-# Install TTT SDK if needed
 if $NEED_TTT_SDK; then
     log_info "Installing TTT SDK"
     TMP_DIR=$(mktemp -d)
@@ -243,15 +276,14 @@ if $NEED_TTT_SDK; then
     fi
 fi
 
-# Install TeXLive if needed
 if $NEED_TEXLIVE; then
     log_info "Installing TeXLive"
     TMP_TL=$(mktemp -d)
     pushd "$TMP_TL" > /dev/null || exit 1
-    
+
     safe_exec wget -q https://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz
     safe_exec tar -xzf install-tl-unx.tar.gz
-    
+
     if [[ -d "$TMP_TL/install-tl-"* ]]; then
         cd install-tl-* || exit 1
         cat > texlive.profile <<EOF
@@ -265,35 +297,31 @@ EOF
             --texdir="$HOME/texlive" \
             --texuserdir="$HOME/.texlive" \
             --no-interaction
-            
+
         if [[ -d "$HOME/texlive/bin" ]]; then
-            # Find the actual binary directory
             TEXLIVE_BIN_DIR=$(find "$HOME/texlive/bin" -type d -name "x86_64*" | head -1)
-            
+            log_info "TeXLive installed at $TEXLIVE_BIN_DIR"
+
             if [[ -n "$TEXLIVE_BIN_DIR" ]]; then
-                # Add to path for current session
                 export PATH="$TEXLIVE_BIN_DIR:$PATH"
                 
-                # Add to bashrc if not already there
                 if ! grep -q "texlive/bin" "$HOME/.bashrc"; then
                     log_info "Adding TeXLive to PATH in bashrc"
                     echo -e '\n# TeXLive path' >> "$HOME/.bashrc"
                     echo "export PATH=\"$TEXLIVE_BIN_DIR:\$PATH\"" >> "$HOME/.bashrc"
                 fi
-                
-                # Install additional packages
+
                 if cmd_exists "tlmgr"; then
                     safe_exec tlmgr install babel-spanish hyphen-spanish booktabs --verify-repo=none --quiet
                 fi
             fi
         fi
     fi
-    
+
     popd >/dev/null || exit 1
     rm -rf "$TMP_TL"
 fi
 
-# Configure Redis if needed
 if $NEED_REDIS_CONFIG && sudo test -f "$REDIS_CONF"; then
     log_info "Configuring Redis for systemd"
     safe_exec sudo cp "$REDIS_CONF" "${REDIS_CONF}.bak"
@@ -301,7 +329,6 @@ if $NEED_REDIS_CONFIG && sudo test -f "$REDIS_CONF"; then
     safe_exec sudo systemctl restart redis-server
 fi
 
-# Configure GMT library if needed
 if $NEED_GMT_CONFIG; then
     log_info "Setting up GMT library symlink"
     if sudo test -f "/lib/x86_64-linux-gnu/libgmt.so.6"; then
@@ -311,7 +338,6 @@ if $NEED_GMT_CONFIG; then
     fi
 fi
 
-# Final verification after installation
 log_info "Verifying installation"
 
 VERIFICATION_FAILED=false
@@ -333,9 +359,9 @@ if $NEED_PYENV; then
     fi
 fi
 
-if $NEED_PYTHON312 && cmd_exists "pyenv"; then
-    if ! pyenv versions 2>/dev/null | grep -q "3\.12"; then
-        log_warn "Python 3.12 verification failed - not installed with pyenv"
+if $NEED_PYTHON312; then
+    if ! has_python_version "$REQUIRED_PYTHON_VERSION"; then
+        log_warn "Python $REQUIRED_PYTHON_VERSION verification failed - not installed"
         VERIFICATION_FAILED=true
     fi
 fi
