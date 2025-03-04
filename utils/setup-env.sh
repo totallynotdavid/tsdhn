@@ -336,6 +336,8 @@ if $NEED_GMT_CONFIG; then
     fi
 fi
 
+source "$HOME/.bashrc"
+
 log_info "Verifying installation"
 
 VERIFICATION_FAILED=false
