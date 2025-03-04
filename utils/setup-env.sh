@@ -305,7 +305,7 @@ if $NEED_TEXLIVE; then
                 export PATH="$TEXLIVE_BIN_DIR:$PATH"
                 
                 if ! grep -q "texlive/bin" "$HOME/.bashrc"; then
-                    echo -e '\n# TeXLive path\nexport PATH="'"$TEXLIVE_BIN_DIR"':\$PATH"' >> "$HOME/.bashrc"
+                    echo -e '\n# TeXLive path\nexport PATH="'"$TEXLIVE_BIN_DIR"':$PATH"' >> "$HOME/.bashrc"
                 fi
 
                 if command -v tlmgr >/dev/null 2>&1; then
