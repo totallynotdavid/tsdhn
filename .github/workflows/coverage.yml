@@ -23,9 +23,8 @@ jobs:
         with:
           python-version: "3.12.3"
 
-      - name: Install GMT and create symbolic link
+      - name: gmt (#33) fix for libgmt symlink
         run: |
-          sudo apt-get update
           sudo apt-get install -y gmt libgmt-dev
           sudo find /usr -name "libgmt.so.*" -exec sudo ln -sf {} $(dirname {})/libgmt.so \;
 
@@ -52,6 +51,6 @@ jobs:
           filename: covbadge.json
           label: Coverage
           message: ${{ env.total }}%
-          minColorRange: 50
+          minColorRange: 40
           maxColorRange: 90
           valColorRange: ${{ env.total }}
