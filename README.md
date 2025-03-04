@@ -300,7 +300,7 @@ picv-2025/
 │   ├── core/
 │   │   ├── calculator.py        # Clase TsunamiCalculator y lógica del cálculo inicial
 │   │   ├── config.py            # Constantes globales y configuración del pipeline
-│   │   └── queue.py             # Gestión de cola de simulaciones y pipeline del procesamiento principal
+│   │   └── queue.py             # Gestión de cola de simulaciones
 │   ├── main.py                  # Punto de entrada de la API y definiciones de endpoints
 │   ├── models/
 │   │   └── schemas.py           # Schemas de validación y transformación de datos
