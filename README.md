@@ -564,4 +564,4 @@ La(s) etapa(s) omitida(s) se guardan en `configuracion_simulacion.json` en el ca
 
   para formatear el código y asegurarte de todo sigue funcionando correctamente.
 
-[^1]: GMT 6.0.0 está en APT, pero `pygmt` necesita >=6.4.0. Compila los ejecutables con esta guía: https://github.com/GenericMappingTools/gmt/blob/master/BUILDING.md
+[^1]: GMT 6.0.0 está en APT, pero `pygmt` requiere ≥6.4.0. Ubuntu 24.04 incluye la versión 6.5.0. Actualiza o compila los ejecutables siguiendo: https://github.com/GenericMappingTools/gmt/blob/master/BUILDING.md.
