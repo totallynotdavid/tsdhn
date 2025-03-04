@@ -309,7 +309,7 @@ if $NEED_TEXLIVE; then
                 fi
 
                 if command -v tlmgr >/dev/null 2>&1; then
-                    safe_exec "$TEXLIVE_BIN_DIR/tlmgr" install babel-spanish hyphen-spanish booktabs --verify-repo=none --quiet
+                    safe_exec "$TEXLIVE_BIN_DIR/tlmgr" install babel-spanish hyphen-spanish booktabs --verify-repo=none
                 fi
             fi
         fi
