@@ -232,8 +232,6 @@ sudo apt update -y && sudo apt upgrade -y
 
 5. Dependencias adicionales: `gfortran`, `redis-server`, `gmt`[^1], `ps2eps`, `csh`. Ejecute:
 
-[^1]: GMT 6.0.0 está en APT, pero `pygmt` necesita >=6.4.0. Compila los ejecutables con esta guía: https://github.com/GenericMappingTools/gmt/blob/master/BUILDING.md
-
    ```bash
    sudo apt install -y gfortran redis-server gmt gmt-dcw gmt-gshhg ps2eps csh
    ```
@@ -565,3 +563,5 @@ La(s) etapa(s) omitida(s) se guardan en `configuracion_simulacion.json` en el ca
   ```
 
   para formatear el código y asegurarte de todo sigue funcionando correctamente.
+
+[^1]: GMT 6.0.0 está en APT, pero `pygmt` necesita >=6.4.0. Compila los ejecutables con esta guía: https://github.com/GenericMappingTools/gmt/blob/master/BUILDING.md
