@@ -284,35 +284,32 @@ if $NEED_TEXLIVE; then
     safe_exec wget -q https://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz
     safe_exec tar -xzf install-tl-unx.tar.gz
 
-    if [[ -d "$TMP_TL/install-tl-"* ]]; then
-        cd install-tl-* || exit 1
-        cat > texlive.profile <<EOF
-selected_scheme scheme-basic
-tlpdbopt_autobackup 0
-tlpdbopt_install_docfiles 0
-tlpdbopt_install_srcfiles 0
-EOF
+    INSTALL_TL_DIR=$(find . -maxdepth 1 -type d -name "install-tl-*" | head -1)
+
+    if [[ -n "$INSTALL_TL_DIR" ]]; then
+        cd "$INSTALL_TL_DIR" || exit 1
+
+        echo -e "selected_scheme scheme-basic\ntlpdbopt_autobackup 0\ntlpdbopt_install_docfiles 0\ntlpdbopt_install_srcfiles 0" > texlive.profile
+
+        TEXLIVE_INSTALL_DIR="$HOME/texlive"
         safe_exec perl ./install-tl \
             --profile=texlive.profile \
-            --texdir="$HOME/texlive" \
+            --texdir="$TEXLIVE_INSTALL_DIR" \
             --texuserdir="$HOME/.texlive" \
             --no-interaction
 
-        if [[ -d "$HOME/texlive/bin" ]]; then
-            TEXLIVE_BIN_DIR=$(find "$HOME/texlive/bin" -type d -name "x86_64*" | head -1)
-            log_info "TeXLive installed at $TEXLIVE_BIN_DIR"
+        if [[ -d "$TEXLIVE_INSTALL_DIR/bin" ]]; then
+            TEXLIVE_BIN_DIR=$(find "$TEXLIVE_INSTALL_DIR/bin" -type d -name "x86_64*" | head -1)
 
             if [[ -n "$TEXLIVE_BIN_DIR" ]]; then
                 export PATH="$TEXLIVE_BIN_DIR:$PATH"
                 
                 if ! grep -q "texlive/bin" "$HOME/.bashrc"; then
-                    log_info "Adding TeXLive to PATH in bashrc"
-                    echo -e '\n# TeXLive path' >> "$HOME/.bashrc"
-                    echo "export PATH=\"$TEXLIVE_BIN_DIR:\$PATH\"" >> "$HOME/.bashrc"
+                    echo -e '\n# TeXLive path\nexport PATH="'"$TEXLIVE_BIN_DIR"':\$PATH"' >> "$HOME/.bashrc"
                 fi
 
-                if cmd_exists "tlmgr"; then
-                    safe_exec tlmgr install babel-spanish hyphen-spanish booktabs --verify-repo=none --quiet
+                if command -v tlmgr >/dev/null 2>&1; then
+                    safe_exec "$TEXLIVE_BIN_DIR/tlmgr" install babel-spanish hyphen-spanish booktabs --verify-repo=none --quiet
                 fi
             fi
         fi
