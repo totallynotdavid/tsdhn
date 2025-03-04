@@ -6,7 +6,7 @@
 | [![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/totallynotdavid/fb9b3bc6236ef7e8a1560403b5c58186/raw/0863f15304b1fc1ec06bf788befc3d11604bf110/covbadge.json)](https://github.com/totallynotdavid/picv-2025/actions/workflows/coverage.yml) | [![CodeQL](https://github.com/totallynotdavid/picv-2025/actions/workflows/codeql.yml/badge.svg)](https://github.com/totallynotdavid/picv-2025/actions/workflows/codeql.yml) [![Security Report](https://github.com/totallynotdavid/picv-2025/actions/workflows/security.yml/badge.svg)](https://github.com/totallynotdavid/picv-2025/actions/workflows/security.yml) |
 <!-- prettier-ignore-end -->
 
-El Orchestrator-TSDHN es una herramienta para la estimación de parámetros de tsunamis de origen lejano mediante simulaciones numéricas. Combina el **modelo TSDHN escrito en Fortran** (en la carpeta [`/model`](/model/)) con una **API escrita en Python** (en la carpeta [`/orchestrator`](/orchestrator/)) que procesa datos sísmicos iniciales, como ubicación y magnitud de terremotos, para calcular variables como: dimensiones de ruptura sísmica, momento sísmico y desplazamiento de la corteza. Estas variables son utilizadas finalmente en la simulación principal, cuyo resultado incluye un informe en formato PDF con mapas de propagación, gráficos de mareógrafos y datos técnicos, además de un archivo de texto con tiempos de arribo a estaciones costeras.
+El Orchestrator-TSDHN es una herramienta para la estimación de parámetros de tsunamis de origen lejano mediante simulaciones numéricas. Combina el **modelo TSDHN escrito en Fortran** (en la carpeta [`/model`](/model/)) con una **API escrita en Python** (en la carpeta [`/orchestrator`](/orchestrator/)) que procesa datos sísmicos iniciales, como la ubicación y la magnitud de un terremoto, para calcular variables como: dimensiones de ruptura sísmica, momento sísmico y desplazamiento de la corteza. Estos valores son utilizados finalmente en la simulación principal, cuyo resultado incluye un informe en formato PDF con mapas de propagación, gráficos de mareógrafos y datos técnicos, además de un archivo de texto con tiempos de arribo a estaciones costeras predefinidas.
 
 > [!IMPORTANT]
 > La lógica de los cálculos numéricos reside en este repositorio, mientras que la [interfaz web](https://github.com/totallynotdavid/picv-2025-web) (que gestiona solicitudes y entrega el informe al usuario final) opera en un entorno separado.
@@ -14,52 +14,98 @@ El Orchestrator-TSDHN es una herramienta para la estimación de parámetros de t
 A continuación, se muestra un diagrama que ilustra el flujo general del Orchestrator-TSDHN:
 
 ```mermaid
-flowchart TB
-    subgraph "Orchestrator-TSDHN v0.1.0"
-        subgraph Endpoints["Endpoints de la API"]
-            Calculate["/calculate
-            Cálculo de parámetros sísmicos"]
-            TravelTimes["/tsunami-travel-times
-            Tiempos de arribo"]
-            RunModel["/run-tsdhn
-            Ejecución de simulación"]
+flowchart LR
+    classDef client fill:#e8f4ff,stroke:#3a7dbd,stroke-width:1px;
+    classDef api fill:#f0f7ff,stroke:#3a7dbd,stroke-width:1px;
+    classDef job fill:#e6f4f9,stroke:#2d7d9a,stroke-width:1px;
+    classDef core fill:#e8f7e9,stroke:#2e7d32,stroke-width:1px;
+    classDef storage fill:#f5f0ff,stroke:#5e4d9b,stroke-width:1px;
+    classDef orchestrator fill:#fff4e6,stroke:#cc7a00,stroke-width:1px;
+    classDef queue fill:#ffe6e6,stroke:#b71c1c,stroke-width:1px;
+    linkStyle default stroke:#666,stroke-width:1.5px
+
+    subgraph ClientLayer["Client Layer"]
+        WebApp["**Aplicación web (Next.js)**<br>- Dashboard<br>- Configuración de la simulación<br>- Visualización de los resultados"]
+        ExternalClient["**Sistemas externos**<br>- Monitoreo<br>- Alertas"]
+    end
+
+    subgraph APILayer["**API Gateway Layer** (FastAPI)"]
+        APIEndpoints["**Endpoints REST API**"]
+
+        subgraph ModelAPIs["**APIs de cálculo numérico**"]
+            Calculate["`**POST /calculate**
+            Calcula parámetros sísmicos
+            Retorna: JobID`"]
+            TravelTimes["`**POST /tsunami-travel-times**
+            Calcula tiempos de llegada
+            Retorna: JobID`"]
+            RunModel["`**POST /run-tsdhn**
+            Inicia la simulación
+            Retorna: JobID`"]
         end
 
-        subgraph Core["Procesamiento"]
-            Calculator["Class TsunamiCalculator"]
-            ModelFiles["Modelo
-            (hypo.dat + job.run)"]
-        end
-
-        subgraph Output["Resultados"]
-            Files["PDF + salida.txt"]
+        subgraph JobAPIs["**APIs de gestión de tareas**"]
+            JobStatus["`**GET /job-status/{job_id}**
+            Retorna: Estado`"]
+            Download["`**GET /job-result/{job_id}**
+            Retorna: Resultados (PDF)`"]
         end
     end
 
-    Calculate --> Calculator
-    TravelTimes --> Calculator
-    Calculator --> ModelFiles
-    RunModel --> ModelFiles
-    ModelFiles --> Files
+    subgraph Orchestrator["**Orchestration Layer**<br>(RQ, Python)"]
+        Queue["**Redis Queue**<br>(Gestión de simulaciones)"]:::queue
+        ModelRunner["**main.py**<br>(Ejecuta secuencialmente los pasos de la simulación)"]
+
+        subgraph PreCalc["**Procesamiento inicial**"]
+            TsunamiCalc["**calculator.py**<br>- calculate_earthquake()<br>- calculate_travel_times()<br>- validate_input()"]
+        end
+
+        subgraph CoreEngine["**Procesamiento principal**"]
+            TSDHN_Engine["**Modelo TSDHN**<br>- fault_plane<br>- deformación<br>- tsunami"]
+            Visualization["**Visualización**<br>- maxola<br>- ttt_inverso<br>- point_ttt<br>- ttt_max"]
+            Reporting["**Reportes**<br>- generate_reports"]
+        end
+    end
+
+    subgraph StorageLayer["**Storage Layer**"]
+        JobStorage["**Workspace de tareas**<br>(/jobs/{job_id})<br>- entrada/<br>- salida/"]
+        ResultsDB["**Base de datos de resultados**<br>- Metadatos<br>- Métricas<br>- Historial"]
+    end
+
+    WebApp --> APIEndpoints
+    ExternalClient --> APIEndpoints
+    APIEndpoints --> ModelAPIs & JobAPIs
+
+    Calculate --> TsunamiCalc
+    TravelTimes --> TsunamiCalc
+    RunModel --> Queue
+    Queue --> ModelRunner
+    ModelRunner --> TSDHN_Engine
+    TsunamiCalc --> TSDHN_Engine
+    TSDHN_Engine --> Visualization
+    Visualization --> Reporting
+    Reporting --> JobStorage
+    JobStorage --> ResultsDB
+    JobStatus --> Queue
+    Download --> JobStorage
 ```
 
 ## Instalación
 
-> [!WARNING]
-> El proyecto requiere **Ubuntu 20.04** o superior. Usuarios de Windows deben configurar Windows Subsystem for Linux (WSL 2.0 o superior) siguiendo la [<kbd>guía oficial</kbd>](https://learn.microsoft.com/es-es/windows/wsl/install) de Microsoft antes de continuar.
-
-> [!TIP]
-> Ejecuta `bash utils/setup-env.sh` para instalar todos las dependencias mencionados en la sección de prerrequisitos. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`.
+El proyecto requiere **Ubuntu 20.04** o superior. Usuarios de Windows deben configurar Windows Subsystem for Linux (WSL 2.0 o superior) siguiendo la [<kbd>guía oficial</kbd>](https://learn.microsoft.com/es-es/windows/wsl/install) de Microsoft antes de continuar.
 
 ### Prerrequisitos
 
-Actualice los paquetes del sistema antes de iniciar:
+> [!TIP]
+> Ejecuta `bash utils/setup-env.sh` para instalar todas las dependencias mencionadas en esta sección. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`.
+
+Actualiza los paquetes del sistema antes de iniciar:
 
 ```bash
 sudo apt update -y && sudo apt upgrade -y
 ```
 
-1. **Python** (con [pyenv](https://github.com/pyenv/pyenv)): Usamos pyenv porque nos permite gestionar múltiples versiones de Python. Ejecute:
+1. **Python** (con [pyenv](https://github.com/pyenv/pyenv)): Usamos pyenv porque nos permite gestionar múltiples versiones de Python. Ejecuta:
 
    ```bash
    curl -fsSL https://pyenv.run | bash
@@ -203,7 +249,7 @@ sudo apt update -y && sudo apt upgrade -y
    sudo systemctl restart redis-server
    ```
 
-6. Si necesitas ejecutar la interfaz gráfica original ([<kbd>tsunami.m</kbd>](model/tsunami.m)), puedes instalar [MATLAB R2014](https://drive.google.com/file/d/1VhLnwXX78Y7O8huwlRuE-shOW2LKlVpd/view?usp=drive_link).
+6. **Opcional**: Si necesitas ejecutar la interfaz gráfica original ([<kbd>tsunami.m</kbd>](model/tsunami.m)), puedes instalar [MATLAB R2014](https://drive.google.com/file/d/1VhLnwXX78Y7O8huwlRuE-shOW2LKlVpd/view?usp=drive_link).
 
 ### Iniciar el proyecto
 
@@ -215,7 +261,7 @@ sudo apt update -y && sudo apt upgrade -y
    poetry self add 'poethepoet[poetry_plugin]'
    ```
 
-2. Valide la instalación con:
+2. Valida la instalación con:
 
    ```bash
    poetry run pytest # Todos los tests deben pasar
@@ -235,7 +281,7 @@ sudo apt update -y && sudo apt upgrade -y
    poetry poe dev
    ```
 
-   En un terminal diferente, ejecuta el siguiente comando para iniciar el RQ worker:
+   En un nuevo terminal, ejecuta el siguiente comando para iniciar el RQ worker:
 
    ```bash
    poetry run rq worker tsdhn_queue
@@ -252,21 +298,26 @@ El repositorio se organiza en dos componentes principales:
 picv-2025/
 ├── orchestrator/
 │   ├── core/
-│   │   ├── calculator.py         # Class TsunamiCalculator y la lógica central de los cálculos.
-│   │   └── config.py             # Define constantes globales y la configuración del logging.
-│   ├── main.py                   # Punto de entrada de la API y definición de los endpoints.
+│   │   ├── calculator.py        # Clase TsunamiCalculator y lógica del cálculo inicial
+│   │   ├── config.py            # Constantes globales y configuración del pipeline
+│   │   └── queue.py             # Gestión de cola de simulaciones
+│   ├── main.py                  # Punto de entrada de la API y definiciones de endpoints
 │   ├── models/
-│   │   └── schemas.py            # Schema para la validación y transformación de los datos.
+│   │   └── schemas.py           # Schemas de validación y transformación de datos
+│   ├── modules/
+│   │   ├── maxola.py            # Generación de mapa de máxima altura de propagación del tsunami
+│   │   ├── point_ttt.py         # Generación del mapa de tiempos de arribo
+│   │   ├── reporte.py           # Generación del informe final
+│   │   ├── ttt_inverso.py       #
+│   │   └── ttt_max.py           # Generación de los mareogramas
 │   └── utils/
-│       └── geo.py                # Funciones para cálculos geográficos (distancias, formatos, etc.).
-└── model/
-    ├── pacifico.mat              # Datos de batimetría del océano Pacífico.
-    ├── maper1.mat                # Datos de puntos costeros.
-    ├── mecfoc.dat                # Base de datos de mecanismos focales históricos.
-    ├── puertos.txt               # Lista de puertos utilizados en el cálculo de tiempos de arribo.
-    ├── job.run                   # Script C Shell para ejecutar la simulación.
-    ├── reporte.pdf               # Reporte generado con el mapa de tiempos y mareogramas.
-    └── salida.txt                # Archivo de salida con datos del epicentro y tiempos de arribo.
+│       └── geo.py               # Cálculos geográficos (distancias, formatos, etc.)
+└── model/                       # Archivos de datos y recursos del modelo
+    ├── pacifico.mat             # Datos de batimetría del Océano Pacífico
+    ├── maper1.mat               # Datos de puntos costeros
+    ├── mecfoc.dat               # Base de datos histórica de mecanismos focales
+    ├── puertos.txt              # Lista de puertos para cálculos de tiempo de llegada
+    └── job.run                  # (Deprecated) Script de ejecución de simulación en C Shell
 ```
 
 ## Endpoints de la API
