@@ -97,7 +97,7 @@ El proyecto requiere **Ubuntu 20.04** o superior. Usuarios de Windows deben conf
 ### Prerrequisitos
 
 > [!TIP]
-> Ejecuta `bash utils/setup-env.sh` para instalar todas las dependencias mencionadas esta sección. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`.
+> Ejecuta `bash utils/setup-env.sh` para instalar todas las dependencias mencionadas en esta sección. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`.
 
 Actualiza los paquetes del sistema antes de iniciar:
 
@@ -249,7 +249,7 @@ sudo apt update -y && sudo apt upgrade -y
    sudo systemctl restart redis-server
    ```
 
-6. Si necesitas ejecutar la interfaz gráfica original ([<kbd>tsunami.m</kbd>](model/tsunami.m)), puedes instalar [MATLAB R2014](https://drive.google.com/file/d/1VhLnwXX78Y7O8huwlRuE-shOW2LKlVpd/view?usp=drive_link).
+6. **Opcional**: Si necesitas ejecutar la interfaz gráfica original ([<kbd>tsunami.m</kbd>](model/tsunami.m)), puedes instalar [MATLAB R2014](https://drive.google.com/file/d/1VhLnwXX78Y7O8huwlRuE-shOW2LKlVpd/view?usp=drive_link).
 
 ### Iniciar el proyecto
 
