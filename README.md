@@ -321,23 +321,25 @@ picv-2025/
 
 ## Endpoints de la API
 
-El servicio expone los siguientes endpoints para la gestión de simulaciones de tsunami. Toda solicitud debe incluir la cabecera `Content-Type: application/json`.
+El servicio expone varios endpoints para la gestión de simulaciones. Todas las solicitudes deben incluir la cabecera `Content-Type: application/json`. El sistema utiliza identificadores UUIDv4 (`job_id`), para gestionar las simulaciones.
 
 > [!WARNING]
 > El rango válido para el parámetro `Mw` es de 6.5 a 9.5 (escala de magnitud momento).
 
-1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30): Inicia una nueva simulación. Recibe parámetros sísmicos en formato JSON y devuelve un identificado único (UUIDv4) para monitear el progreso. Los parámetros se validan mediante modelos Pydantic definidos en [`schemas.py`](orchestrator/models/schemas.py), que realizan transformaciones automáticas cuando corresponde.
+1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) permite iniciar una nueva simulación. Este endpoint recibe parámetros sísmicos en formato JSON y devuelve un identificador único (UUIDv4) que puedes utilizar luego para monitorear el progreso. Los parámetros se validan mediante modelos Pydantic definidos en `orchestrator/models/schemas.py`, que realizan transformaciones automáticas cuando corresponde.
 
    Parámetros requeridos:
 
-   - `Mw` (decimal): Magnitud momento sísmico
-   - `h` (decimal >0): Profundidad hipocentral en kilómetros
-   - `lat0` (decimal [-90,90]): Latitud epicentral en grados decimales
-   - `lon0` (decimal [-180,180]): Longitud epicentral en grados decimales
-   - `dia` (string): Día del evento en formato DD con cero inicial (ej. "07")
-   - `hhmm` (string): Hora del evento en formato HHMM (ej. "1430" para 2:30 PM UTC)
+   | Parámetro | Tipo                                 | Descripción                                     |
+   | --------- | ------------------------------------ | ----------------------------------------------- |
+   | `Mw`      | decimal                              | Magnitud momento sísmica, valor entre 6.5 y 9.5 |
+   | `h`       | decimal (>0)                         | Profundidad hipocentral en kilómetros           |
+   | `lat0`    | decimal (-90 a 90)                   | Latitud epicentral en grados decimales          |
+   | `lon0`    | decimal (-180 a 180)                 | Longitud epicentral en grados decimales         |
+   | `dia`     | string (formato DD con cero inicial) | Día del evento (ej. "07")                       |
+   | `hhmm`    | string (formato HHMM)                | Hora del evento (ej. "1430" para 2:30 PM UTC)   |
 
-   Ejemplo de solicitud:
+   Un ejemplo de solicitud sería:
 
    <details>
    <summary>Ejemplo de solicitud</summary>
@@ -355,6 +357,7 @@ El servicio expone los siguientes endpoints para la gestión de simulaciones de 
 
    </details>
 
+   La respuesta esperada para esta solicitud sería:
    <details>
    <summary>Ejemplo de respuesta esperada (HTTP 201)</summary>
 
@@ -366,54 +369,11 @@ El servicio expone los siguientes endpoints para la gestión de simulaciones de 
 
    </details>
 
-2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47): Consulta el estado actual de una simulación. Proporciona metadatos de ejecución, resultados intermedios y enlaces de descarga cuando la simulación ha finalizado. La respuesta incluye:
+2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) permite consultar el estado actual de una simulación. Este endpoint proporciona metadatos de ejecución, resultados intermedios y enlaces de descarga cuando la simulación ha finalizado. La respuesta incluye el estado de la simulación trabajo e información sobre los parámetros de ruptura, tiempos de arribo en estaciones predefinidas en [puertos.txt](model/puertos.txt) y coordenadas del plano de falla (puede ser utilizado en conjunto con la API de Google Maps o Leafleft para visualizar la información). Los posibles valores de `status` son `queued`, `running`, `completed` y `failed`.
 
-   - `status`: Estado del trabajo (queued|running|completed|failed)
-   - `calculation`: Parámetros iniciales (longitud/ancho de falla, momento sísmico, alerta tsunamigénica)
-   - `travel_times`: Tiempos de llegada a costas específicas en formato `HH:mm DDMMM`
-   - `details`: Mensaje de progreso (ej. "Processing maxola"). Se actualiza en cada etapa
-   - `*_at`: Marcas temporales ISO 8601 de cada fase
-   - `download_url`: URL válida por 72 horas para GET /job-result
+   Un ejemplo de solicitud sería:
 
-   Ejemplo de subcampos de `calculation`:
-
-   ```json
-   {
-     "length": 575.44,
-     "width": 144.54,
-     "dislocation": 10.64,
-     "seismic_moment": 3.98e22,
-     "tsunami_warning": "Genera un tsunami grande...",
-     "distance_to_coast": 10439.47,
-     "rectangle_corners": [
-       {"lat": 56.44, "lon": -153.34},
-       ...
-     ]
-   }
-   ```
-
-   Ejemplo de subcampos de `travel_times`:
-
-   ```json
-   {
-     "arrival_times": {
-       "-80.58, -03.0": "12:09 23Mar",
-       ...
-     },
-     "distances": {
-       "-80.58, -03.0": 9445.79,
-       ...
-     },
-     "epicenter_info": {
-       "date": "23",
-       "time": "0000",
-       "latitude": "56.00",
-       "longitude": "-156.00"
-     }
-   }
-   ```
-
-   <details>
+    <details>
    <summary>Ejemplo de solicitud</summary>
 
    ```json
@@ -424,14 +384,42 @@ El servicio expone los siguientes endpoints para la gestión de simulaciones de 
 
    </details>
 
+   Un ejemplo de respuesta esperada sería:
+
    <details>
    <summary>Ejemplo de respuesta esperada</summary>
 
    ```json
    {
      "status": "completed",
-     "calculation": { ... },
-     "travel_times": { ... },
+     "calculation": {
+       "length": 575.44,
+       "width": 144.54,
+       "dislocation": 10.64,
+       "seismic_moment": 3.98e22,
+       "tsunami_warning": "Genera un tsunami grande...",
+       "distance_to_coast": 10439.47,
+       "rectangle_corners": [
+         { "lat": 56.44, "lon": -153.34 }
+         // ... más esquinas ...
+       ]
+     },
+     "travel_times": {
+       "arrival_times": {
+         "-80.58, -03.0": "12:09 23Mar"
+         // ... más tiempos de llegada ...
+       },
+       "distances": {
+         "-80.58, -03.0": 9445.79
+         // ... más distancias ...
+       },
+       "epicenter_info": {
+         "date": "23",
+         "time": "0000",
+         "latitude": "56.00",
+         "longitude": "-156.00"
+       }
+     },
      "details": "Job completed successfully",
      "error": null,
      "created_at": "2025-02-17T19:46:08.171522",
@@ -443,15 +431,15 @@ El servicio expone los siguientes endpoints para la gestión de simulaciones de 
 
    </details>
 
-3. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L61): Descarga el informe técnico en PDF. Requiere estado `completed` y acepta cabecera `Accept: application/pdf`. Los recursos se almacenan por 72 horas desde su generación.
+3. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L61)permite descargar el informe técnico en formato PDF. Este endpoint requiere que el estado de la simulación sea `completed` y acepta la cabecera `Accept: application/pdf`. Los recursos están disponibles por 72 horas desde su generación.
 
-   Ejemplo de uso directo:
+   Un ejemplo de uso directo:
 
    ```
    http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e
    ```
 
-4. [`GET /health`](orchestrator/main.py?plain=1#L204): Verifica el estado operativo del servicio y su conexión con Redis.
+4. [`GET /health`](orchestrator/main.py?plain=1#L204)verifica el estado operativo del servicio y su conexión con Redis. Una respuesta esperada sería:
 
     <details>
     <summary>Ejemplo de respuesta esperada</summary>
