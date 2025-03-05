@@ -323,7 +323,7 @@ picv-2025/
 
 El servicio expone varios endpoints para la gestión de simulaciones. Todas las solicitudes deben incluir la cabecera `Content-Type: application/json`. El sistema utiliza identificadores UUIDv4 (`job_id`), para gestionar las simulaciones.
 
-1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) permite iniciar una nueva simulación. Este endpoint recibe parámetros sísmicos en formato JSON y devuelve un identificador único que puedes utilizar luego para monitorear el progreso. Los parámetros se validan mediante modelos Pydantic definidos en [`schemas.py`](orchestrator/models/schemas.py), que realizan transformaciones automáticas cuando corresponde.
+1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) permite iniciar una nueva simulación. Este endpoint recibe parámetros sísmicos en formato JSON y devuelve un identificador único que puedes utilizar luego para monitorear el progreso de la simulación. Los parámetros se validan mediante modelos Pydantic definidos en [`schemas.py`](orchestrator/models/schemas.py), que realizan transformaciones automáticas cuando corresponde.
 
    Parámetros requeridos:
 
@@ -355,6 +355,7 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
    </details>
 
    La respuesta esperada para esta solicitud sería:
+
    <details>
    <summary>Ejemplo de respuesta esperada (HTTP 201)</summary>
 
@@ -366,11 +367,18 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
 
    </details>
 
-2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) permite consultar el estado actual de una simulación. Este endpoint proporciona metadatos de ejecución, resultados intermedios y enlaces de descarga cuando la simulación ha finalizado. La respuesta incluye el estado de la simulación trabajo e información sobre los parámetros de ruptura, tiempos de arribo en estaciones predefinidas en [puertos.txt](model/puertos.txt) y coordenadas del plano de falla (puede ser utilizado en conjunto con la API de Google Maps o Leafleft para visualizar la información). Los posibles valores de `status` son `queued`, `running`, `completed` y `failed`.
+2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) permite consultar el estado actual de una simulación, proporcionando metadatos de ejecución, resultados intermedios y enlaces de descarga cuando la simulación ha finalizado.
+
+   La respuesta incluye:
+
+   - Estado de la simulación (queued, running, completed o failed)
+   - Parámetros de ruptura
+   - Tiempos de arribo en las estaciones definidas en [puertos.txt](model/puertos.txt)
+   - Coordenadas de las esquinas del rectángulo del plano de falla. Puedes utilizar estos valores para visualizar la ruptura en un mapa utilizando Leaflet o Google Maps API.
 
    Un ejemplo de solicitud sería:
 
-    <details>
+   <details>
    <summary>Ejemplo de solicitud</summary>
 
    ```json
@@ -436,10 +444,12 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
    http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e
    ```
 
-4. [`GET /health`](orchestrator/main.py?plain=1#L204)verifica el estado operativo del servicio y su conexión con Redis. Una respuesta esperada sería:
+4. [`GET /health`](orchestrator/main.py?plain=1#L204) verifica el estado operativo del servicio y su conexión con Redis.
 
-    <details>
-    <summary>Ejemplo de respuesta esperada</summary>
+   Una respuesta esperada sería:
+
+   <details>
+   <summary>Ejemplo de respuesta esperada</summary>
 
    ```json
    {
@@ -449,7 +459,7 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
    }
    ```
 
-    </details>
+   </details>
 
 ## Pruebas personalizadas
 
