@@ -33,11 +33,15 @@ pytest-asyncio = "^0.21.0"
 httpx = "^0.25.0"
 pytest-cov = "^4.1.0"
 
-
 [tool.poetry.group.dev.dependencies]
 aiohttp = "^3.11.12"
 ruff = "^0.9.6"
 rich = "^13.9.4"
+pre-commit = "^4.1.0"
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
+poethepoet = ">=0.33.0"
 
 [tool.pytest.ini_options]
 log_cli = false
@@ -74,3 +78,4 @@ dev = { shell = "uvicorn orchestrator.main:app --reload --reload-dir orchestrato
 db = { shell = "rq worker tsdhn_queue" }
 clean = { shell = "rm -rf jobs configuracion_simulacion.json informe*.pdf" }
 format = { shell = "ruff format && ruff check --fix" }
+export = { shell = "poetry export -f requirements.txt --output requirements.txt --without-hashes" }
