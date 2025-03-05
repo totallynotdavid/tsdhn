@@ -7,7 +7,7 @@ import pygmt
 logger = logging.getLogger(__name__)
 
 
-def read_meca_spec(meca_file: Path) -> Dict[str, float]:
+def read_meca_spec(meca_file: Path) -> Dict[str, object]:
     with meca_file.open("r") as f:
         line = f.readline().strip()
     values = line.split()

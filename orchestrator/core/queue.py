@@ -94,14 +94,12 @@ def execute_pipeline(data_dict: dict, skip_steps: List[str]):
     """Main pipeline executor"""
     job = get_current_job()
     job_id = job.id
-    work_dir: Optional[Path] = None
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    work_dir = repo_root / "jobs" / job_id
     data = EarthquakeInput(**data_dict)
     calculator = TsunamiCalculator()
 
     try:
-        # Initialize workspace
-        repo_root = Path(__file__).resolve().parent.parent.parent
-        work_dir = repo_root / "jobs" / job_id
         setup_workspace(repo_root / MODEL_DIR, work_dir)
 
         def update_meta(details: str, **kwargs):
@@ -147,7 +145,7 @@ def execute_pipeline(data_dict: dict, skip_steps: List[str]):
 
     except Exception as e:
         logger.exception(f"Pipeline failed for job {job_id}")
-        if work_dir and work_dir.exists():
+        if work_dir.exists():
             shutil.rmtree(work_dir, ignore_errors=True)
         if job:
             job.meta.update(

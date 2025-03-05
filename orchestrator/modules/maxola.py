@@ -61,7 +61,7 @@ def load_stations(config_dir: Path) -> List[TidalStation]:
         raise FileNotFoundError(f"Stations file not found: {stations_path}")
 
     try:
-        with open(stations_path, "r") as f:
+        with open(stations_path) as f:
             data = yaml.safe_load(f)
 
         if not data or "stations" not in data:
@@ -143,7 +143,7 @@ def process_grid(work_dir: Path, grid_config: GridConfig) -> Path:
         write_grid_file(output_grid, normalized, grid_config)
         return output_grid
 
-    except (ValueError, IOError) as e:
+    except (ValueError, OSError) as e:
         logger.error(f"Grid processing failed: {str(e)}")
         raise RuntimeError("Grid processing error") from e
 
@@ -164,7 +164,7 @@ def write_grid_file(
         with open(output_path, "w") as f:
             f.write(header)
             np.savetxt(f, data, fmt="%8.2f", delimiter="", newline="\n")
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Grid write failed: {str(e)}")
         raise RuntimeError("Grid file I/O error") from e
 

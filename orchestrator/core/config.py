@@ -1,5 +1,6 @@
 import shutil
 from pathlib import Path
+from typing import Any, Dict
 
 from orchestrator.models.schemas import CompilerConfig, ProcessingStep
 from orchestrator.modules.maxola import generate_maxola_plot
@@ -14,7 +15,7 @@ EARTH_RADIUS: float = 6370.8  # km
 MODEL_DIR: Path = Path("model")
 
 # Logging configuration
-LOGGING_CONFIG = {
+LOGGING_CONFIG: Dict[str, Any] = {
     "filename": "tsunami_api.log",
     "level": "DEBUG",
     "format": "%(asctime)s - %(levelname)s - %(message)s",
