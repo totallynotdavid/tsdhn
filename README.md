@@ -322,7 +322,7 @@ picv-2025/
 ## Endpoints de la API
 
 > [!WARNING]
-> El modelo solo procesa magnitudes entre **Mw 6.5 y Mw 9.5**. Valores fuera de este rango resultarán en un error. Los siguientes endpoints deben invocarse en **orden secuencial estricto**:  
+> El modelo solo procesa magnitudes entre **Mw 6.5 y Mw 9.5**. Valores fuera de este rango resultarán en un error. Los siguientes endpoints deben invocarse en **orden secuencial estricto**:
 > `/calculate` → `/tsunami-travel-times` → `/run-tsdhn`.
 
 El proceso inicia cuando el usuario envía datos sísmicos desde la [interfaz web](https://github.com/totallynotdavid/picv-2025-web).
@@ -484,7 +484,7 @@ El proceso inicia cuando el usuario envía datos sísmicos desde la [interfaz we
 
    </details>
 
-5. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L163) retorna el informe generado. Ejemplo de uso:  
+5. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L163) retorna el informe generado. Ejemplo de uso:
    `http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e`
 
 6. [`GET /health`](orchestrator/main.py?plain=1#L204) verifica la disponibilidad de la API.

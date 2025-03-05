@@ -42,7 +42,7 @@ c     DIMENSION ZA(IA,JA)
       IA=IDE-IDS+1
       JA=JDE-JDS+1
       allocate(ZA(IA,JA))
-      
+
       OPEN(2,FILE='pfalla.inp',STATUS='OLD')
       READ(2,*)I0,J0,D0,L0,W0,TH,DL,RD,HH
         IF (ST.EQ.0.0) ST=ST+0.001

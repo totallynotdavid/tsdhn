@@ -7,7 +7,7 @@ set grdfile = pacifico.grd
 set i2file = cortado.i2
 set int = 4m
 
-#gmt grdcut $BATHYFILE0 -G$grdfile -R$REGION -V 
+#gmt grdcut $BATHYFILE0 -G$grdfile -R$REGION -V
 
 gmt grdlandmask -Gsea.grd -I$int -R$REGION -Df -N1/NaN -V
 
@@ -18,4 +18,3 @@ rm tmp2.grd
 rm sea.grd
 rm $grdfile
 #rm cortado.grd
-

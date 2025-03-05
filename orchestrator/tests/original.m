@@ -6,7 +6,7 @@
 Mw = 9.0;       % Magnitude
 h = 12;         % Depth in km
 lat0 = 56;      % Latitude
-lon0 = -156;    % Longitude 
+lon0 = -156;    % Longitude
 hhmm = '0000';  % Time in HHMM format
 dia = 23;       % Day
 
@@ -23,7 +23,7 @@ fprintf(log_fid, 'hhmm=%s\n', hhmm);
 fprintf(log_fid, 'dia=%d\n', dia);
 
 % Adjust longitude if needed
-if lon0 > 0 
+if lon0 > 0
     lon0 = lon0 - 360;
 end
 fprintf(log_fid, 'adjusted_lon0=%f\n', lon0);
@@ -74,12 +74,12 @@ end
 fprintf(log_fid, '\nEARTHQUAKE_PARAMETERS\n');
 L = 10^(0.55*Mw-2.19);  % (km) Papazachos 2004
 W = 10^(0.31*Mw-0.63);  % (km)
-M0 = 10^(1.5*Mw+9.1);   % Momento sismico (N*m) 
+M0 = 10^(1.5*Mw+9.1);   % Momento sismico (N*m)
 u = 4.5e10;             % (N/m2) coeficiente de rigidez
 D = M0/(u*(L*1000)*(W*1000));
 S = 10^(0.86*Mw-2.82);  % (km2)
-a = 1.11*0.5642*W;  
-b = 0.90*0.5642*L;  
+a = 1.11*0.5642*W;
+b = 0.90*0.5642*L;
 
 fprintf(log_fid, 'L=%f\n', L);
 fprintf(log_fid, 'W=%f\n', W);
@@ -102,11 +102,11 @@ end
 for k = 1:m
     lonm(k) = A1(k,1);
     latm(k) = A1(k,2);
-    if lonm(k) > 0 
+    if lonm(k) > 0
         lonm(k) = lonm(k)-360;
-    end 
+    end
     dist(k) = sqrt((lonm(k)-lon0)^2+(latm(k)-lat0)^2);
-end 
+end
 [minimo, pos] = min(dist);
 azimut = A1(pos,3); % strike
 echado = 18;        % dip
@@ -140,7 +140,7 @@ fprintf(log_fid, 'xo=%f\n', xo);
 fprintf(log_fid, 'yo=%f\n', yo);
 
 % Calculate rectangle corners
-dip = echado*pi/180; 
+dip = echado*pi/180;
 a1 = -(azimut-90)*pi/180;
 a2 = -(azimut)*pi/180;
 r1 = L1/(60*1853);
@@ -157,7 +157,7 @@ end
 m = length(lon);
 for k = 1:m
     dist(k) = sqrt((lon(k)-lon0)^2+(lat(k)-lat0)^2);
-end 
+end
 [minimo, pos] = min(dist);
 dist_min = deg2km(minimo);
 

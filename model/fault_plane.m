@@ -7,7 +7,7 @@
   M0 = 10^(1.5*Mw+9.1);
   u = 4.0e10; % (N/m2) coeficiente de rigidez promedio
   slip = M0/(u*L*W);
-% Calcular el mecanismo focal  
+% Calcular el mecanismo focal
   A = load('mecfoc.dat');
   [m n] = size(A);
   lon = A(:,1);
@@ -19,7 +19,7 @@
   [minimo pos] = min(dist);
   Az = A(pos,3); % strike
   echado = A(pos,4); %dip
-  rake = 90; % A(pos,5); 
+  rake = 90; % A(pos,5);
 % *************************************************************
    W1 = W*cos(echado*pi/180); % **********************************************
    beta = atan(W1/L)*180/pi; % ***********************************************
@@ -40,7 +40,7 @@ J0=find(abs(ya-yo) == min(abs(ya-yo))); J0=J0(1)
 %text(282.8520 ,  -12.052,' Callao');
 %axis equal; grid on;
 
-dip=echado*pi/180; 
+dip=echado*pi/180;
 a1=-(Az-90)*pi/180; a2=-(Az)*pi/180;
 r1=L; r2=W*cos(dip);
 r1=r1/(60*1853); r2=r2/(60*1853);
@@ -75,7 +75,7 @@ end
   fid = fopen (fname, 'w');
   fprintf (fid,'%3.0f \n',I0);
   fprintf (fid,'%3.0f \n',J0);
-  fprintf (fid,'%2.1f \n',slip); 
+  fprintf (fid,'%2.1f \n',slip);
   fprintf (fid,'%6.1f \n',L);
   fprintf (fid,'%6.1f \n',W);
   fprintf (fid,'%3.1f \n',Az);
@@ -83,11 +83,11 @@ end
   fprintf (fid,'%3.1f \n',rake);
   fprintf (fid,'%3.1f \n',h*1e3);
   fclose all;
-  
+
 % Calculo de la grilla de deformacion: IDS IDE JDS JDE
 fname2 = 'xyo.txt';
 fid2 = fopen (fname2, 'w');
-disp ('Creando parametros: IDS IDE JDS JDE') 
+disp ('Creando parametros: IDS IDE JDS JDE')
 IDS = xep - km2deg(1.0*L/1000);
 I0=find(abs(xa-IDS) == min(abs(xa-IDS))); IDS=I0(1);
 fprintf ('%s %4.0f \n','IDS = ',IDS);

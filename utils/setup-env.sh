@@ -41,14 +41,14 @@ has_python_version() {
     if cmd_exists "python$required_version"; then
         return 0
     fi
-    
+
     # Check if pyenv has the required version
     if cmd_exists "pyenv"; then
         if pyenv versions 2>/dev/null | grep -q "$required_version"; then
             return 0
         fi
     fi
-    
+
     return 1
 }
 
@@ -91,8 +91,8 @@ if has_python_version "$REQUIRED_PYTHON_VERSION"; then
     elif cmd_exists "python3" && [[ $(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")') == "$REQUIRED_PYTHON_VERSION" ]]; then
         log_success "Python $REQUIRED_PYTHON_VERSION is available as the default python3 ($(python3 --version 2>&1))"
     elif cmd_exists "pyenv"; then
-        PYTHON312_VERSION=$(pyenv versions 2>/dev/null | grep "$REQUIRED_PYTHON_VERSION" | 
-                           sed -E 's/^[[:space:]]*\*?[[:space:]]*([3]\.12[0-9.]*).*/\1/' | 
+        PYTHON312_VERSION=$(pyenv versions 2>/dev/null | grep "$REQUIRED_PYTHON_VERSION" |
+                           sed -E 's/^[[:space:]]*\*?[[:space:]]*([3]\.12[0-9.]*).*/\1/' |
                            head -1)
         log_success "Python ${PYTHON312_VERSION} is available via pyenv"
     fi
@@ -154,7 +154,7 @@ else
 fi
 
 # Check GMT library configuration (symlink)
-if ! sudo test -L "/lib/x86_64-linux-gnu/libgmt.so" || 
+if ! sudo test -L "/lib/x86_64-linux-gnu/libgmt.so" ||
    ! sudo test -f "/lib/x86_64-linux-gnu/libgmt.so.6"; then
     log_warn "GMT library symlink not properly configured"
     NEED_GMT_CONFIG=true
@@ -163,7 +163,7 @@ else
 fi
 
 # Installation plan
-if ! $NEED_SYSTEM_PKGS && ! $NEED_PYENV && ! $NEED_PYTHON312 && 
+if ! $NEED_SYSTEM_PKGS && ! $NEED_PYENV && ! $NEED_PYTHON312 &&
    ! $NEED_POETRY && ! $NEED_TTT_SDK && ! $NEED_TEXLIVE &&
    ! $NEED_REDIS_CONFIG && ! $NEED_GMT_CONFIG; then
     log_success "All components are already installed and configured!"
@@ -208,7 +208,7 @@ if $NEED_PYENV; then
         export PATH="$PYENV_ROOT/bin:$PATH"
 
         # Detect if running under WSL because:
-        # WSL appends Windows path to the PATH variable, 
+        # WSL appends Windows path to the PATH variable,
         # which can cause issues with pyenv if pyenv is
         # installed in both Windows and WSL
         if [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]]; then
@@ -252,7 +252,7 @@ if $NEED_POETRY; then
 
     if [[ -d "$HOME/.local/bin" ]]; then
         export PATH="$HOME/.local/bin:$PATH"
-        
+
         if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
             log_info "Adding poetry to PATH in bashrc"
             echo -e '\n# Poetry path' >> "$HOME/.bashrc"
@@ -265,7 +265,7 @@ if $NEED_TTT_SDK; then
     log_info "Installing TTT SDK"
     TMP_DIR=$(mktemp -d)
     safe_exec git clone -q https://gitlab.com/totallynotdavid/tttapi/ "$TMP_DIR/tttapi"
-    
+
     if [[ -d "$TMP_DIR/tttapi" ]]; then
         (
             cd "$TMP_DIR/tttapi" || exit 1
@@ -306,7 +306,7 @@ if $NEED_TEXLIVE; then
 
             if [[ -n "$TEXLIVE_BIN_DIR" ]]; then
                 export PATH="$TEXLIVE_BIN_DIR:$PATH"
-                
+
                 if ! grep -q "texlive/bin" "$HOME/.bashrc"; then
                     echo -e '\n# TeXLive path\nexport PATH="'"$TEXLIVE_BIN_DIR"':$PATH"' >> "$HOME/.bashrc"
                 fi

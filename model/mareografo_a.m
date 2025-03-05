@@ -7,7 +7,7 @@ disp ('Posicion de los Mareografos Virtuales')
 disp ('Elegir una opcion: ')
 s = input ('Click en Mapa (1) o Por Teclado (2): ','s');
 disp (' ');
-A = load ('./bathy/grid_a.grd'); 
+A = load ('./bathy/grid_a.grd');
 [m n] = size(A);
 if s == '1'
     contour (A',[0,0],'k'), axis equal, grid, zoom

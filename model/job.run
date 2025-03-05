@@ -1,9 +1,9 @@
 #!/bin/csh -f
-#mkdir zfolder 
+#mkdir zfolder
 clear
 echo 'Estimación rápida de parámetros de tsunami de origen lejano'
 # compilar con gfortran: fault_plane.f90 -> fault_plane
-chmod 775 fault_plane 
+chmod 775 fault_plane
 ./fault_plane
 # ./fault_plane genera pfalla.inp
 # compilar con gfortran: def_oka.f -> deform
