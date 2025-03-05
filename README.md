@@ -398,17 +398,17 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
        "distance_to_coast": 10439.47,
        "rectangle_corners": [
          { "lat": 56.44, "lon": -153.34 }
-         // ... más esquinas ...
+         { "__comment": "Otras coordenadas, omitidas por brevedad" }
        ]
      },
      "travel_times": {
        "arrival_times": {
-         "-80.58, -03.0": "12:09 23Mar"
-         // ... más tiempos de llegada ...
+         "-80.58, -03.0": "12:09 23Mar",
+         "__comment": "Otras estaciones, omitidas por brevedad"
        },
        "distances": {
-         "-80.58, -03.0": 9445.79
-         // ... más distancias ...
+         "-80.58, -03.0": 9445.79,
+         "__comment": "Otras distancias, omitidas por brevedad"
        },
        "epicenter_info": {
          "date": "23",
