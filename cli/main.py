@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 
 from cli.config import ConfigManager
@@ -18,4 +19,7 @@ async def main(args):
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="CLI de Orchestrator-TSDHN")
+    parser.add_argument("--dev", action="store_true", help="Enable developer mode")
+    args = parser.parse_args()
+    asyncio.run(main(args))
