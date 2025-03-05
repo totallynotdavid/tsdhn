@@ -323,9 +323,6 @@ picv-2025/
 
 El servicio expone varios endpoints para la gestión de simulaciones. Todas las solicitudes deben incluir la cabecera `Content-Type: application/json`. El sistema utiliza identificadores UUIDv4 (`job_id`), para gestionar las simulaciones.
 
-> [!WARNING]
-> El rango válido para el parámetro `Mw` es de 6.5 a 9.5 (escala de magnitud momento).
-
 1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) permite iniciar una nueva simulación. Este endpoint recibe parámetros sísmicos en formato JSON y devuelve un identificador único (UUIDv4) que puedes utilizar luego para monitorear el progreso. Los parámetros se validan mediante modelos Pydantic definidos en `orchestrator/models/schemas.py`, que realizan transformaciones automáticas cuando corresponde.
 
    Parámetros requeridos:
