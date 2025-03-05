@@ -22,6 +22,7 @@ def handle_command_step(step: ProcessingStep, working_dir: Path) -> None:
     for exe in step.extra_executables:
         make_executable(working_dir / exe)
 
-    cmd_path = working_dir / step.command[0]
-    make_executable(cmd_path)
-    subprocess.run(step.command, cwd=working_dir, check=True)
+    if step.command is not None:
+        cmd_path = working_dir / step.command[0]
+        make_executable(cmd_path)
+        subprocess.run(step.command, cwd=working_dir, check=True)
