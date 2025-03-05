@@ -98,7 +98,7 @@ class TsunamiCalculator:
 
             # Load port locations
             puertos_path = MODEL_DIR / "puertos.txt"
-            with open(puertos_path, "r") as f:
+            with open(puertos_path) as f:
                 cls.ports = f.readlines()
 
             cls._static_loaded = True
