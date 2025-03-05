@@ -18,7 +18,7 @@ def ttt_inverso_python(working_dir: Path) -> None:
     if not meca_path.exists():
         raise FileNotFoundError(f"Required file {meca_path} not found.")
 
-    with open(meca_path, "r") as f:
+    with open(meca_path) as f:
         parts = f.readline().strip().split()
         if len(parts) < 2:
             raise ValueError(

@@ -228,8 +228,13 @@ class JobMonitor:
         }
         return status_map.get(raw_status.lower(), raw_status.capitalize())
 
-    async def _finalizar(self, client: APIClient, estado: dict) -> None:
+    async def _finalizar(self, client: APIClient, estado: Optional[dict]) -> None:
         duration = self._format_elapsed(int(time.time() - self.start_time))
+
+        if estado is None:
+            SimpleUI.show_error("Simulación fallida - No se pudo obtener estado")
+            return
+
         if estado.get("status") == "completed":
             SimpleUI.show_info("")
             SimpleUI.show_success(f"Simulación completada - Duración total: {duration}")

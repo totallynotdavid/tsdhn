@@ -111,7 +111,7 @@ def process_tsunami_data(working_dir: Path) -> None:
                     )
         except Exception as e:
             logger.error(f"Error writing green_rev.dat: {e}")
-            raise IOError(f"Failed to write green_rev.dat: {e}") from e
+            raise OSError(f"Failed to write green_rev.dat: {e}") from e
 
         # Find first non-zero readings and maximum values
         first_nonzero = {}
@@ -133,7 +133,7 @@ def process_tsunami_data(working_dir: Path) -> None:
                     f.write(f"{index_val:6.1f}{max_val:6.2f}\n")
         except Exception as e:
             logger.error(f"Error writing ttt_max.dat: {e}")
-            raise IOError(f"Failed to write ttt_max.dat: {e}") from e
+            raise OSError(f"Failed to write ttt_max.dat: {e}") from e
 
         # Find the overall maximum value
         maxmax = max(max_values.values())

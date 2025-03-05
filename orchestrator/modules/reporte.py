@@ -3,7 +3,9 @@ import shutil
 import subprocess
 from pathlib import Path
 from string import Template
-from typing import Dict, List, Tuple
+from typing import Dict
+
+from orchestrator.models.reporte import DatetimeInfo, EarthquakeData, TsunamiTravelData
 
 MONTH_MAP = {
     1: "Ene",
@@ -53,7 +55,7 @@ def generate_reports(working_dir: Path) -> None:
     write_salida_txt(coords, ttt_data, datetime_info, working_dir)
 
 
-def read_meca_dat(working_dir: Path) -> Tuple[float, ...]:
+def read_meca_dat(working_dir: Path) -> EarthquakeData:
     filepath = working_dir / "meca.dat"
     content = filepath.read_text(encoding="utf-8")
     tokens = content.split()
@@ -72,10 +74,21 @@ def read_meca_dat(working_dir: Path) -> Tuple[float, ...]:
     if xep > 180.0:
         xep -= 360.0
 
-    return (xep, yep, zep, az, dip, rake, mw, int(values[7]), int(values[8]), t0)
+    return EarthquakeData(
+        longitude=xep,
+        latitude=yep,
+        depth=zep,
+        azimuth=az,
+        dip=dip,
+        rake=rake,
+        magnitude=mw,
+        param1=int(values[7]),
+        param2=int(values[8]),
+        origin_time=t0,
+    )
 
 
-def read_ttt_max_dat(working_dir: Path) -> Tuple[List[float], ...]:
+def read_ttt_max_dat(working_dir: Path) -> TsunamiTravelData:
     filepath = working_dir / "ttt_max.dat"
     lines = filepath.read_text(encoding="utf-8").splitlines()
     data = []
@@ -92,40 +105,46 @@ def read_ttt_max_dat(working_dir: Path) -> Tuple[List[float], ...]:
     hours = [int(t // 60) for t in ttt]
     minutes = [int(round(t % 60)) for t in ttt]
 
-    return (list(ttt), list(max_vals), hours, minutes)
+    return TsunamiTravelData(
+        travel_times=list(ttt), max_heights=list(max_vals), hours=hours, minutes=minutes
+    )
 
 
-def get_current_datetime_info() -> Tuple[str, str, Tuple[int, int, int], str]:
+def get_current_datetime_info() -> DatetimeInfo:
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
     year_month_day = (now.year, now.month, now.day)
-    return (date_str, time_str, year_month_day, MONTH_MAP[now.month])
+    return DatetimeInfo(
+        date_str=date_str,
+        time_str=time_str,
+        year_month_day=year_month_day,
+        month_abbr=MONTH_MAP[now.month],
+    )
 
 
 def build_template_context(
-    coords: Tuple[float, ...], ttt_data: Tuple[List[float], ...]
+    coords: EarthquakeData, ttt_data: TsunamiTravelData
 ) -> Dict[str, str]:
-    _, max_vals, hours, minutes = ttt_data
     return {
         "title": "REPORTE: ESTIMACIÓN DE PARÁMETROS DE TSUNAMI DE ORIGEN LEJANO",
         "author": "Cesar Jimenez",
-        "lat": f"{coords[1]:.2f}",
-        "lon": f"{coords[0]:.2f}",
-        "depth": f"{coords[2]:.1f}",
-        "magnitude": f"{coords[6]:.1f}",
-        "strike": f"{coords[3]:.1f}",
-        "dip": f"{coords[4]:.1f}",
-        "rake": f"{coords[5]:.1f}",
+        "lat": f"{coords.latitude:.2f}",
+        "lon": f"{coords.longitude:.2f}",
+        "depth": f"{coords.depth:.1f}",
+        "magnitude": f"{coords.magnitude:.1f}",
+        "strike": f"{coords.azimuth:.1f}",
+        "dip": f"{coords.dip:.1f}",
+        "rake": f"{coords.rake:.1f}",
         "station1_name": "Talara",
-        "station1_time": f"{hours[1]}:{minutes[1]:02d}",
-        "station1_max": f"{max_vals[1]:6.2f}",
+        "station1_time": f"{ttt_data.hours[1]}:{ttt_data.minutes[1]:02d}",
+        "station1_max": f"{ttt_data.max_heights[1]:6.2f}",
         "station2_name": "Callao",
-        "station2_time": f"{hours[8]}:{minutes[8]:02d}",
-        "station2_max": f"{max_vals[8]:6.2f}",
+        "station2_time": f"{ttt_data.hours[8]}:{ttt_data.minutes[8]:02d}",
+        "station2_max": f"{ttt_data.max_heights[8]:6.2f}",
         "station3_name": "Matarani",
-        "station3_time": f"{hours[14]}:{minutes[14]:02d}",
-        "station3_max": f"{max_vals[14]:6.2f}",
+        "station3_time": f"{ttt_data.hours[14]}:{ttt_data.minutes[14]:02d}",
+        "station3_max": f"{ttt_data.max_heights[14]:6.2f}",
     }
 
 
@@ -146,14 +165,14 @@ def write_reporte_tex(context: Dict[str, str], working_dir: Path) -> None:
 
 
 def write_salida_txt(
-    coords: Tuple[float, ...],
-    ttt_data: Tuple[List[float], ...],
-    datetime_info: Tuple[str, str, Tuple[int, int, int], str],
+    coords: EarthquakeData,
+    ttt_data: TsunamiTravelData,
+    datetime_info: DatetimeInfo,
     working_dir: Path,
 ) -> None:
-    yep, xep, zep, _, _, _, mw, _, _, t0 = coords
-    date_str, time_str, (year, month, day), mes = datetime_info
-    _, max_list, hours, minutes = ttt_data
+    date_str, time_str = datetime_info.date_str, datetime_info.time_str
+    year, month, day = datetime_info.year_month_day
+    mes = datetime_info.month_abbr
 
     stations = [
         ("Tumbes", "La Cruz", 0),
@@ -179,19 +198,19 @@ def write_salida_txt(
         f"{'ESTIMACION DEL TIEMPO DE ARRIBO DE TSUNAMIS':^43}",
         f"{'Coordenadas del epicentro: ':26}",
         f"Fecha    = {day:2d} {mes} {year}",
-        f"Hora     = {t0}",
-        f"Latitud  =  {yep:7.2f}",
-        f"Longitud =  {xep:7.2f}",
-        f"Profund  =  {zep:5.1f} km",
-        f"Magnitud =  {mw:3.1f}",
+        f"Hora     = {coords.origin_time}",
+        f"Latitud  =  {coords.latitude:7.2f}",
+        f"Longitud =  {coords.longitude:7.2f}",
+        f"Profund  =  {coords.depth:5.1f} km",
+        f"Magnitud =  {coords.magnitude:3.1f}",
         f"Tiempo actual: {date_str} {time_str}",
         f"{'Departamento Puertos    Hora_llegada  Hmax(m)  T_arribo':55}",
     ]
 
     for dept, port, idx in stations:
-        h = hours[idx]
-        m = minutes[idx]
-        val = max_list[idx]
+        h = ttt_data.hours[idx]
+        m = ttt_data.minutes[idx]
+        val = ttt_data.max_heights[idx]
         lines.append(f"{f'{dept} {port}':27}{h}:{m:02d}   {val:6.2f}     {h}:{m:02d}")
 
     lines.append("* La altura estimada NO considera la fase lunar ni oleaje anomalo")
