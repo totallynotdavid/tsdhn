@@ -125,39 +125,40 @@ class SimulationManager:
                 )
 
     async def _execute_calculation_steps(self, client: APIClient) -> Optional[str]:
-        pasos = [(1, "Iniciando simulación completa", "run-simulation")]
-        resultados = {}
-        total = len(pasos)
+        description = "Iniciando simulación completa"
+        endpoint = "run-simulation"
 
-        for num, descripcion, endpoint in pasos:
-            t0 = time.time()
+        t0 = time.time()
 
-            payload = {
-                "data": self.config["simulation_params"],
-                "skip_steps": self.config.get("skip_steps", None),
-            }
+        payload = {
+            "data": self.config["simulation_params"],
+            "skip_steps": self.config.get("skip_steps", None),
+        }
 
-            try:
-                resultado = await client.call_endpoint(
-                    "run-simulation",
-                    payload,
-                    timeout=DEFAULT_TIMEOUTS.get("run-simulation", 30),
-                )
-                dt = time.time() - t0
-                SimpleUI.show_success(
-                    f"[Endpoint {num}/{total}] {descripcion}... ({dt:.1f}s)",
-                    add_separator=False,
-                )
-                resultados[endpoint] = resultado
-            except Exception as e:
-                SimpleUI.show_error(f"Error en el paso {num}: {str(e)}")
-                raise
+        timeout = DEFAULT_TIMEOUTS.get(endpoint, 30)
 
-        SimpleUI.show_info("")
-        job_id = resultados.get("run-simulation", {}).get("job_id")
-        if job_id:
-            SimpleUI.show_success(f"ID de simulación: {job_id}")
-        return job_id
+        try:
+            result = await client.call_endpoint(
+                endpoint,
+                payload,
+                timeout=timeout,
+            )
+
+            elapsed_time = time.time() - t0
+            SimpleUI.show_success(
+                f"[Endpoint 1/1] {description}... ({elapsed_time:.1f}s)",
+                add_separator=False,
+            )
+
+            SimpleUI.show_info("")
+            job_id = result.get("job_id")
+            if job_id:
+                SimpleUI.show_success(f"ID de simulación: {job_id}")
+            return job_id
+
+        except Exception as e:
+            SimpleUI.show_error(f"Error en el paso 1: {str(e)}")
+            raise
 
 
 class JobMonitor:
