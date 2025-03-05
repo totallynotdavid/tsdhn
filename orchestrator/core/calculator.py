@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -26,15 +26,15 @@ NM_CONVERSION = 60 * 1853  # Nautical miles to meters conversion
 
 
 class TsunamiCalculator:
-    _data_loaded = False
-    _static_loaded = False
-    vlon = None
-    vlat = None
-    bathymetry = None
-    bathy_interpolator = None
-    maper1 = None
-    mechanism_data = None
-    ports = None
+    _data_loaded: bool = False
+    _static_loaded: bool = False
+    vlon: Optional[np.ndarray] = None
+    vlat: Optional[np.ndarray] = None
+    bathymetry: Optional[np.ndarray] = None
+    bathy_interpolator: Optional[RegularGridInterpolator] = None
+    maper1: Optional[np.ndarray] = None
+    mechanism_data: Optional[np.ndarray] = None
+    ports: Optional[List[str]] = None
 
     def __init__(self):
         """Initialize calculator with preloaded data"""
@@ -89,6 +89,7 @@ class TsunamiCalculator:
             # Load focal mechanism data
             mech_path = MODEL_DIR / "mecfoc.dat"
             cls.mechanism_data = np.loadtxt(mech_path)
+
             # Adjust longitude values
             cls.mechanism_data[:, 0] = np.where(
                 cls.mechanism_data[:, 0] > 0,
@@ -129,9 +130,15 @@ class TsunamiCalculator:
                 L, W, data.lon0, data.lat0, azimuth, dip
             )
 
+            assert self.maper1 is not None, "Coastal data not loaded"
+
             # Location analysis
             distance_to_coast = calculate_distance_to_coast(
                 self.maper1[:, :2], data.lon0, data.lat0
+            )
+
+            assert self.bathy_interpolator is not None, (
+                "Bathymetry interpolator not loaded"
             )
 
             # Get bathymetry at epicenter
@@ -157,7 +164,6 @@ class TsunamiCalculator:
                 rectangle_parameters=rect_params,
                 rectangle_corners=rect_corners,
             )
-
         except Exception as e:
             logger.exception("Earthquake parameter calculation failed")
             raise RuntimeError("Earthquake calculation error") from e
@@ -166,11 +172,14 @@ class TsunamiCalculator:
         self, data: EarthquakeInput
     ) -> TsunamiTravelResponse:
         """
-        Calculate tsunami arrival times at monitored locations.
+        Calculate tsunami arrival times at monitored locations
         """
         try:
-            arrival_times = {}
-            distances = {}
+            assert self.ports is not None, "Port data not loaded"
+            assert data.hhmm is not None, "hhmm must be provided"
+
+            arrival_times: Dict[str, str] = {}
+            distances: Dict[str, float] = {}
             time0 = float(data.hhmm[:2]) + float(data.hhmm[2:]) / 60  # Decimal hours
 
             for port in self.ports:
@@ -192,7 +201,7 @@ class TsunamiCalculator:
                     )
 
                     arrival_times[port_name] = format_arrival_time(
-                        travel_time, data.dia
+                        travel_time, cast(str, data.dia)
                     )
                     distances[port_name] = distance
                 except (ValueError, IndexError):
@@ -210,7 +219,6 @@ class TsunamiCalculator:
                     "magnitude": f"{data.Mw:.1f}",
                 },
             )
-
         except Exception as e:
             logger.exception("Travel time calculation failed")
             raise RuntimeError("Tsunami travel time error") from e
@@ -226,6 +234,8 @@ class TsunamiCalculator:
         Returns:
             Tuple of (azimuth, dip)
         """
+        assert self.mechanism_data is not None, "Mechanism data not loaded"
+
         distances = np.sqrt(
             (self.mechanism_data[:, 0] - lon0) ** 2
             + (self.mechanism_data[:, 1] - lat0) ** 2
@@ -331,11 +341,16 @@ class TsunamiCalculator:
             vu = np.array([port_lon - lon0, port_lat - lat0]) / distance * 110
 
             indices = np.arange(n_points + 1)[:, None]
+
             # Each row: P = P0 + (i * delta) * vu
             path_points = (
                 np.array([lon0, lat0]) + indices * delta * vu
             )  # shape (n+1, 2)
             bath_points = path_points[:, [1, 0]]  # Swap to (lat, lon)
+
+            assert self.bathy_interpolator is not None, (
+                "Bathymetry interpolator not loaded"
+            )
 
             # Bathymetry interpolation
             h = np.abs(self.bathy_interpolator(bath_points))
@@ -369,7 +384,7 @@ class TsunamiCalculator:
                 f.write(
                     "\n".join(
                         [
-                            data.hhmm,
+                            data.hhmm or "0000",
                             f"{data.lon0:.2f}",
                             f"{data.lat0:.2f}",
                             f"{data.h:.0f}",
