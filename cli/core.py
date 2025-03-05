@@ -125,30 +125,23 @@ class SimulationManager:
                 )
 
     async def _execute_calculation_steps(self, client: APIClient) -> Optional[str]:
-        pasos = [
-            (1, "Parámetros iniciales", "calculate"),
-            (2, "Tiempos de arribo", "tsunami-travel-times"),
-            (3, "Simulación TSDHN", "run-tsdhn"),
-        ]
+        pasos = [(1, "Iniciando simulación completa", "run-simulation")]
         resultados = {}
         total = len(pasos)
+
         for num, descripcion, endpoint in pasos:
             t0 = time.time()
 
-            # Prepare the payload based on the endpoint:
-            if endpoint == "run-tsdhn":
-                payload = {
-                    **self.config["simulation_params"],
-                    "skip_steps": self.config.get("skip_steps", []),
-                }
-            else:
-                payload = self.config["simulation_params"]
+            payload = {
+                "data": self.config["simulation_params"],
+                "skip_steps": self.config.get("skip_steps", None),
+            }
 
             try:
                 resultado = await client.call_endpoint(
-                    endpoint,
+                    "run-simulation",
                     payload,
-                    timeout=DEFAULT_TIMEOUTS.get(endpoint, 30),
+                    timeout=DEFAULT_TIMEOUTS.get("run-simulation", 30),
                 )
                 dt = time.time() - t0
                 SimpleUI.show_success(
@@ -161,7 +154,7 @@ class SimulationManager:
                 raise
 
         SimpleUI.show_info("")
-        job_id = resultados.get("run-tsdhn", {}).get("job_id")
+        job_id = resultados.get("run-simulation", {}).get("job_id")
         if job_id:
             SimpleUI.show_success(f"ID de simulación: {job_id}")
         return job_id

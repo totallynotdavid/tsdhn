@@ -120,9 +120,7 @@ def execute_pipeline(data: EarthquakeInput, skip_steps: List[str]):
 
         # Phase 2: Tsunami travel times
         update_meta("Calculating tsunami travel times")
-        tsunami_result = TsunamiCalculator().calculate_tsunami_travel_times(
-            data, work_dir
-        )
+        tsunami_result = TsunamiCalculator().calculate_tsunami_travel_times(data)
         update_meta(
             "Tsunami calculations complete",
             travel_times=tsunami_result.dict(),
