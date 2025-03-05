@@ -22,7 +22,6 @@ class TSDHNQueue:
     def __init__(self, redis_conn: Redis):
         self.redis = redis_conn
         self.queue = Queue("tsdhn_queue", connection=redis_conn)
-        self.calculator = TsunamiCalculator()
 
     def enqueue_job(
         self, data: EarthquakeInput, skip_steps: Optional[List[str]] = None
@@ -34,14 +33,14 @@ class TSDHNQueue:
             job_id = str(uuid.uuid4())
             self.queue.enqueue(
                 execute_pipeline,
-                data,
+                data.model_dump(),
                 skip_steps,
                 job_id=job_id,
                 job_timeout="2h",
                 meta={
                     "status": JobStatus.QUEUED.value,
                     "details": "Initializing simulation pipeline",
-                    "data": data.dict(),
+                    "data": data.model_dump(),
                 },
                 result_ttl=86400,
             )
@@ -91,11 +90,13 @@ class TSDHNQueue:
             raise ValueError(f"Invalid steps to skip: {', '.join(invalid)}")
 
 
-def execute_pipeline(data: EarthquakeInput, skip_steps: List[str]):
+def execute_pipeline(data_dict: dict, skip_steps: List[str]):
     """Main pipeline executor"""
     job = get_current_job()
     job_id = job.id
     work_dir: Optional[Path] = None
+    data = EarthquakeInput(**data_dict)
+    calculator = TsunamiCalculator()
 
     try:
         # Initialize workspace
@@ -109,9 +110,7 @@ def execute_pipeline(data: EarthquakeInput, skip_steps: List[str]):
 
         # Phase 1: Initial calculations
         update_meta("Running earthquake calculations")
-        calc_result = TsunamiCalculator().calculate_earthquake_parameters(
-            data, work_dir
-        )
+        calc_result = calculator.calculate_earthquake_parameters(data, work_dir)
         update_meta(
             "Earthquake calculations complete",
             calculation=calc_result.dict(),
@@ -120,7 +119,7 @@ def execute_pipeline(data: EarthquakeInput, skip_steps: List[str]):
 
         # Phase 2: Tsunami travel times
         update_meta("Calculating tsunami travel times")
-        tsunami_result = TsunamiCalculator().calculate_tsunami_travel_times(data)
+        tsunami_result = calculator.calculate_tsunami_travel_times(data)
         update_meta(
             "Tsunami calculations complete",
             travel_times=tsunami_result.dict(),

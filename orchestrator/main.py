@@ -8,7 +8,6 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from orchestrator.core.calculator import TsunamiCalculator
 from orchestrator.core.config import LOGGING_CONFIG
 from orchestrator.core.queue import JobStatus, tsdhn_queue
 from orchestrator.models.schemas import EarthquakeInput
@@ -27,8 +26,6 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-calculator = TsunamiCalculator()
-
 
 @app.post("/run-simulation", status_code=status.HTTP_201_CREATED)
 async def run_simulation(
@@ -42,7 +39,8 @@ async def run_simulation(
     except Exception as e:
         logger.exception("Job queuing failed")
         raise HTTPException(
-            status_code=500, detail="Failed to start simulation pipeline"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to start simulation pipeline",
         ) from e
 
 
@@ -51,11 +49,12 @@ async def get_job_status(job_id: str) -> Dict:
     try:
         return tsdhn_queue.get_job_status(job_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Status check failed for {job_id}: {str(e)}")
         raise HTTPException(
-            status_code=500, detail="Job status retrieval failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Job status retrieval failed",
         ) from e
 
 
@@ -76,7 +75,9 @@ async def get_job_result(job_id: str):
         report_path = job_dir / "reporte.pdf"
 
         if not await anyio.to_thread.run_sync(report_path.exists):
-            raise HTTPException(status_code=404, detail="Report not generated")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Report not generated"
+            )
 
         return FileResponse(
             report_path,
@@ -85,9 +86,12 @@ async def get_job_result(job_id: str):
         )
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         logger.exception("Result retrieval failed")
-        raise HTTPException(status_code=500, detail="Result retrieval error") from None
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Result retrieval error",
+        ) from e
 
 
 @app.get("/health")

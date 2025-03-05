@@ -21,97 +21,107 @@ from orchestrator.utils.geo import (
 
 logger = logging.getLogger(__name__)
 
-# Define a constant for converting rupture dimensions to nautical miles
 # This constant is used in rectangle corner calculations
 NM_CONVERSION = 60 * 1853  # Nautical miles to meters conversion
 
 
 class TsunamiCalculator:
-    def __init__(self):
-        """Initialize with preloaded data and configuration"""
-        self.data_path = MODEL_DIR
-        self.g = GRAVITY
-        self.R = EARTH_RADIUS
-        self._load_data()
-        self._load_static_files()
+    _data_loaded = False
+    _static_loaded = False
+    vlon = None
+    vlat = None
+    bathymetry = None
+    bathy_interpolator = None
+    maper1 = None
+    mechanism_data = None
+    ports = None
 
-    def _load_data(self):
-        """Load bathymetry and geographic data"""
+    def __init__(self):
+        """Initialize calculator with preloaded data"""
+        self._ensure_data_loaded()
+
+    @classmethod
+    def _ensure_data_loaded(cls):
+        """Lazy-load required data once"""
+        if not cls._data_loaded:
+            cls._load_geographic_data()
+        if not cls._static_loaded:
+            cls._load_static_files()
+
+    @classmethod
+    def _load_geographic_data(cls):
         try:
-            # Load Pacific bathymetry data
-            pacifico_path = self.data_path / "pacifico.mat"
+            # Load Pacific bathymetry matrix
+            pacifico_path = MODEL_DIR / "pacifico.mat"
             pacifico = loadmat(pacifico_path)
 
-            self.xa = pacifico["xa"].flatten()
-            self.ya = pacifico["ya"].flatten()
-            self.bathymetry = pacifico["A"]
+            cls.xa = pacifico["xa"].flatten()
+            cls.ya = pacifico["ya"].flatten()
+            cls.bathymetry = pacifico["A"]
 
-            # Adjust longitude values
-            self.vlon = self.xa - 360
-            self.vlat = self.ya
+            # Adjust longitude values and validate orientation
+            cls.vlon = cls.xa - 360
+            cls.vlat = cls.ya
+            if cls.vlat[0] > cls.vlat[-1]:
+                cls.vlat = cls.vlat[::-1]
+                cls.bathymetry = cls.bathymetry[::-1, :]
 
-            # Ensure correct latitude orientation
-            if self.vlat[0] > self.vlat[-1]:
-                self.vlat = self.vlat[::-1]
-                self.bathymetry = self.bathymetry[::-1, :]
-
-            # Create interpolator for bathymetry data
-            self.bathy_interpolator = RegularGridInterpolator(
-                (self.vlat, self.vlon),
-                self.bathymetry,
+            # Create bathymetry interpolator
+            cls.bathy_interpolator = RegularGridInterpolator(
+                (cls.vlat, cls.vlon),
+                cls.bathymetry,
                 bounds_error=False,
                 fill_value=None,
             )
 
             # Load coastal points data
-            maper1_path = self.data_path / "maper1.mat"
-            maper1 = loadmat(maper1_path)
-            self.maper1 = maper1["A"]
+            maper1_path = MODEL_DIR / "maper1.mat"
+            cls.maper1 = loadmat(maper1_path)["A"]
 
+            cls._data_loaded = True
         except Exception as e:
-            logger.exception("Data loading failed")
-            raise RuntimeError("Failed to initialize geographic data") from e
+            logger.exception("Failed to load bathymetric data")
+            raise RuntimeError("Bathymetric data initialization failed") from e
 
-    def _load_static_files(self):
-        """
-        Preload static files that are reused on every calculation:
-        - Focal mechanism file (mecfoc.dat)
-        - Ports file (puertos.txt)
-        """
+    @classmethod
+    def _load_static_files(cls):
         try:
-            # Load focal mechanisms
-            mech_path = self.data_path / "mecfoc.dat"
-            self.mechanism_data = np.loadtxt(mech_path)
-            self.mechanism_data[:, 0] = np.where(
-                self.mechanism_data[:, 0] > 0,
-                self.mechanism_data[:, 0] - 360,
-                self.mechanism_data[:, 0],
+            # Load focal mechanism data
+            mech_path = MODEL_DIR / "mecfoc.dat"
+            cls.mechanism_data = np.loadtxt(mech_path)
+            # Adjust longitude values
+            cls.mechanism_data[:, 0] = np.where(
+                cls.mechanism_data[:, 0] > 0,
+                cls.mechanism_data[:, 0] - 360,
+                cls.mechanism_data[:, 0],
             )
 
             # Load port locations
-            puertos_path = self.data_path / "puertos.txt"
+            puertos_path = MODEL_DIR / "puertos.txt"
             with open(puertos_path, "r") as f:
-                self.ports = f.readlines()
+                cls.ports = f.readlines()
 
+            cls._static_loaded = True
         except Exception as e:
-            logger.exception("Static file loading failed")
-            raise RuntimeError("Failed to load static files") from e
+            logger.exception("Failed to load static files")
+            raise RuntimeError("Static file initialization failed") from e
 
     def calculate_earthquake_parameters(
         self, data: EarthquakeInput, output_dir: Optional[Path] = None
     ) -> CalculationResponse:
         """
-        Calculate earthquake parameters, assess tsunami risk and generate hypo.dat
+        Calculate earthquake parameters and tsunami risk assessment.
+        It also generates a hypo.dat file which will be used in the main simulation.
         """
         try:
-            # Rupture parameter calculations
-            L = 10 ** (0.55 * data.Mw - 2.19)  # Length (km)
-            W = 10 ** (0.31 * data.Mw - 0.63)  # Width (km)
+            # Calculate rupture parameters
+            L = 10 ** (0.55 * data.Mw - 2.19)  # Rupture length (km)
+            W = 10 ** (0.31 * data.Mw - 0.63)  # Rupture width (km)
             M0 = 10 ** (1.5 * data.Mw + 9.1)  # Seismic moment (N*m)
             u = 4.5e10  # Rigidity (N/m^2)
             D = M0 / (u * (L * 1000) * (W * 1000))  # Dislocation (m)
 
-            # Focal mechanism parameters
+            # Get focal mechanism parameters
             azimuth, dip = self._get_focal_mechanism(data.lon0, data.lat0)
 
             # Fault plane geometry
@@ -131,8 +141,8 @@ class TsunamiCalculator:
             location = determine_epicenter_location(h0, distance_to_coast)
             warning = determine_tsunami_warning(data.Mw, data.h, h0, distance_to_coast)
 
-            # Write hypo.dat file (for model execution)
-            self._write_hypo_dat(data, output_dir or self.data_path)
+            # Generate hypo.dat file (for model execution)
+            self._write_hypo_dat(data, output_dir or Path.cwd())
 
             return CalculationResponse(
                 length=L,
@@ -161,7 +171,7 @@ class TsunamiCalculator:
         try:
             arrival_times = {}
             distances = {}
-            time0 = float(data.hhmm[:2]) + float(data.hhmm[2:]) / 60
+            time0 = float(data.hhmm[:2]) + float(data.hhmm[2:]) / 60  # Decimal hours
 
             for port in self.ports:
                 if len(port) < 15:
@@ -170,7 +180,7 @@ class TsunamiCalculator:
                 parts = port.split()
                 if len(parts) < 3:
                     logger.warning(f"Insufficient data in port line: '{port.strip()}'")
-                    continue  # Skip invalid entries
+                    continue
 
                 port_name = port[:15].strip()
                 try:
@@ -248,85 +258,65 @@ class TsunamiCalculator:
         W1 = W * 1000 * np.cos(np.deg2rad(dip))
         beta = np.degrees(np.arctan(W1 / L1))
         alfa = azimuth - 270
-        h1 = np.sqrt(L1**2 + W1**2)
-        a1 = 0.5 * h1 * np.sin(np.deg2rad(alfa + beta)) / 1000  # in km
-        b1 = 0.5 * h1 * np.cos(np.deg2rad(alfa + beta)) / 1000  # in km
-        xo = lon0 + b1 / 110
-        yo = lat0 - a1 / 110
+        h1 = np.hypot(L1, W1)
 
-        # Rectangle corner calculations
-        a1_prime = -np.radians(azimuth - 90)
-        a2_prime = -np.radians(azimuth)
-        r1 = L1 / NM_CONVERSION
-        r2 = W1 / NM_CONVERSION
+        # Calculate rectangle parameters
+        params = {
+            "L1": L1,
+            "W1": W1,
+            "beta": beta,
+            "alfa": alfa,
+            "h1": h1,
+            "a1": 0.5 * h1 * np.sin(np.deg2rad(alfa + beta)) / 1000,  # in km
+            "b1": 0.5 * h1 * np.cos(np.deg2rad(alfa + beta)) / 1000,  # in km
+            "xo": lon0 + (0.5 * h1 * np.cos(np.deg2rad(alfa + beta)) / 1000) / 110,
+            "yo": lat0 - (0.5 * h1 * np.sin(np.deg2rad(alfa + beta)) / 1000) / 110,
+        }
+
+        # Corner calculations
+        angles = np.radians([azimuth - 90, azimuth])
+        r = np.array([L1, W1]) / NM_CONVERSION
 
         sx = (
-            np.array(
-                [
-                    0,
-                    r1 * np.cos(a1_prime),
-                    r1 * np.cos(a1_prime) + r2 * np.cos(a2_prime),
-                    r2 * np.cos(a2_prime),
-                    0,
-                ]
-            )
-            + xo
-        )
+            r[0] * np.cos(angles[0])
+            + r[1] * np.cos(angles[1]) * np.array([0, 1, 1, 0, 0])
+        ) + lon0
 
         sy = (
-            np.array(
-                [
-                    0,
-                    r1 * np.sin(a1_prime),
-                    r1 * np.sin(a1_prime) + r2 * np.sin(a2_prime),
-                    r2 * np.sin(a2_prime),
-                    0,
-                ]
-            )
-            + yo
-        )
+            r[0] * np.sin(angles[0])
+            + r[1] * np.sin(angles[1]) * np.array([0, 1, 1, 0, 0])
+        ) + lat0
 
-        return (
-            {
-                "L1": L1,
-                "W1": W1,
-                "beta": beta,
-                "alfa": alfa,
-                "h1": h1,
-                "a1": a1,
-                "b1": b1,
-                "xo": xo,
-                "yo": yo,
-            },
-            [{"lon": lon, "lat": lat} for lon, lat in zip(sx, sy, strict=False)],
-        )
+        corners = [{"lon": x, "lat": y} for x, y in zip(sx, sy, strict=False)]
+
+        return params, corners
 
     def _calculate_travel_time(
         self, lon0: float, lat0: float, port_lon: float, port_lat: float, time0: float
     ) -> Tuple[float, float]:
         """
-        Calculate tsunami travel time between two points
+        Travel time calculation between two given points
 
         Args:
-            lon0: Source longitude
-            lat0: Source latitude
-            port_lon: Destination longitude
-            port_lat: Destination latitude
-            time0: Initial time
+            lon0:       Source longitude
+            lat0:       Source latitude
+            port_lon:   Destination longitude
+            port_lat:   Destination latitude
+            time0:      Initial time
 
         Returns:
             Tuple of (distance, travel_time)
         """
-        # Spherical coordinates conversion
+        # Convert to spherical coordinates
         t1 = np.pi / 2 - np.radians(lat0)
         f1 = np.radians(lon0)
         t2 = np.pi / 2 - np.radians(port_lat)
         f2 = np.radians(port_lon)
 
-        # Great circle distance calculation using spherical law of cosines
-        cosen = np.sin(t1) * np.sin(t2) * np.cos(f1 - f2) + np.cos(t1) * np.cos(t2)
-        alfa = np.arccos(cosen)
-        distance = self.R * alfa
+        # Great circle distance calculation (spherical law of cosines)
+        cos_alpha = np.sin(t1) * np.sin(t2) * np.cos(f1 - f2) + np.cos(t1) * np.cos(t2)
+        alpha = np.arccos(np.clip(cos_alpha, -1, 1))
+        distance = EARTH_RADIUS * alpha
 
         # Travel time estimation based on distance and location
         if distance >= 750:
@@ -334,83 +324,57 @@ class TsunamiCalculator:
         elif not (-19 <= lat0 <= 0) and distance < 750:
             travel_time = distance / 700
         else:
-            travel_time = self._calculate_detailed_travel_time(
-                lon0, lat0, port_lon, port_lat, distance, alfa
+            # Detailed path analysis
+            n_points = 100
+            delta = np.degrees(alpha) / n_points
+            vu = np.array([port_lon - lon0, port_lat - lat0]) / distance * 110
+
+            indices = np.arange(n_points + 1)[:, None]
+            # Each row: P = P0 + (i * delta) * vu
+            path_points = (
+                np.array([lon0, lat0]) + indices * delta * vu
+            )  # shape (n+1, 2)
+            bath_points = path_points[:, [1, 0]]  # Swap to (lat, lon)
+
+            # Bathymetry interpolation
+            h = np.abs(self.bathy_interpolator(bath_points))
+            v = np.sqrt(GRAVITY * h) * 3.6  # Velocity in km/h
+
+            # Simpson's rule integration
+            delta_dist = (alpha / n_points) * EARTH_RADIUS
+            y = 1 / v
+            integral = (
+                delta_dist
+                / 3
+                * (y[0] + y[-1] + 4 * y[1:-1:2].sum() + 2 * y[2:-1:2].sum())
             )
+
+            travel_time = 0.5 * integral
+
+            # Empirical adjustments to travel time
+            if travel_time > 3.0:
+                travel_time = distance / 733 + 0.25
+            elif 1.4 < travel_time < 3.0:
+                travel_time = distance / 690 + 0.2
 
         return distance, travel_time + time0
 
-    def _calculate_detailed_travel_time(
-        self,
-        lon0: float,
-        lat0: float,
-        port_lon: float,
-        port_lat: float,
-        distance: float,
-        alfa: float,
-    ) -> float:
-        """
-        Calculate detailed bathymetry-based travel time calculation
-
-        Args:
-            lon0: Source longitude
-            lat0: Source latitude
-            port_lon: Destination longitude
-            port_lat: Destination latitude
-            distance: Great circle distance
-            alfa: Angular distance
-
-        Returns:
-            Calculated travel time
-        """
-        # Compute unit velocity vector
-        # (direction scaled to 110 for geographic conversion)
-        vu = np.array([port_lon - lon0, port_lat - lat0]) / distance * 110
-        n = 100
-        delta = (alfa * 180 / np.pi) / n  # step size in degrees
-
-        # Generate path points
-        indices = np.arange(0, n + 1).reshape(-1, 1)  # shape (n+1, 1)
-        # Each row: P = P0 + (i * delta) * vu
-        positions = np.array([lon0, lat0]) + indices * delta * vu  # shape (n+1, 2)
-        points = positions[:, [1, 0]]  # Swap to (lat, lon)
-
-        # Bathymetry interpolation
-        h = np.abs(self.bathy_interpolator(points))
-        v = np.sqrt(self.g * h) * 3.6  # Velocity in km/h
-
-        # Simpson's rule integration
-        delta_distance = (alfa / n) * self.R
-        y = 1 / v
-        integral = (delta_distance / 3) * (
-            y[0] + y[-1] + 4 * np.sum(y[1:-1:2]) + 2 * np.sum(y[2:-1:2])
-        )
-
-        travel_time = 0.50 * integral
-
-        # Empirical corrections
-        if travel_time > 3.0:
-            return distance / 733 + 0.25
-        if 1.4 < travel_time < 3.0:
-            return distance / 690 + 0.2
-        return travel_time
-
-    def _write_hypo_dat(self, data: EarthquakeInput, output_dir: Optional[Path] = None):
-        """
-        Write earthquake parameters to hypo.dat to specified directory
-        """
-        output_dir = output_dir or self.data_path
+    def _write_hypo_dat(self, data: EarthquakeInput, output_dir: Path):
+        """Write earthquake parameters to hypo.dat"""
         try:
+            output_dir.mkdir(parents=True, exist_ok=True)
             hypo_path = output_dir / "hypo.dat"
-            with open(hypo_path, "w") as f:
-                f.writelines(
-                    [
-                        f"{data.hhmm}\n",
-                        f"{data.lon0:.2f}\n",
-                        f"{data.lat0:.2f}\n",
-                        f"{data.h:.0f}\n",
-                        f"{data.Mw:.1f}\n",
-                    ]
+            with hypo_path.open("w") as f:
+                f.write(
+                    "\n".join(
+                        [
+                            data.hhmm,
+                            f"{data.lon0:.2f}",
+                            f"{data.lat0:.2f}",
+                            f"{data.h:.0f}",
+                            f"{data.Mw:.1f}",
+                        ]
+                    )
                 )
         except Exception as e:
             logger.exception("Failed to write hypo.dat")
