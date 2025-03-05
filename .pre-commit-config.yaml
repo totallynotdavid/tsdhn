@@ -1,6 +1,6 @@
 repos:
 -   repo: https://gitlab.com/vojko.pribudic.foss/pre-commit-update
-    rev: v0.5.1post1
+    rev: v0.6.1
     hooks:
     -   id: pre-commit-update
 -   repo: https://github.com/python-poetry/poetry
@@ -8,5 +8,9 @@ repos:
     hooks:
     -   id: poetry-check
     -   id: poetry-lock
-    -   id: poetry-export
     -   id: poetry-install
+-   repo: https://github.com/python-poetry/poetry-plugin-export/
+    rev: 1.9.0
+    hooks:
+    -   id: poetry-export
+        args: ["-f", "requirements.txt", "--without-hashes"]
