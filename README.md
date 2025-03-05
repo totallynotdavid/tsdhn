@@ -321,25 +321,21 @@ picv-2025/
 
 ## Endpoints de la API
 
-El servicio expone los siguientes endpoints para la gestión de simulaciones de tsunami. Toda solicitud debe enviarse con cabecera `Content-Type: application/json`.
+El servicio expone los siguientes endpoints para la gestión de simulaciones de tsunami. Toda solicitud debe incluir la cabecera `Content-Type: application/json`.
 
 > [!WARNING]
-> El modelo solo procesa magnitudes entre **Mw 6.5 y Mw 9.5**. Valores fuera de este rango resultarán en un error de validación
+> El rango válido para el parámetro `Mw` es de 6.5 a 9.5 (escala de magnitud momento).
 
-1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) inicia una nueva simulación. Recibe los parámetros sísmicos básicos y los valida. Añade una simulación a la cola. Devuelve un identificador único para monitorear el progreso.
+1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30): Inicia una nueva simulación. Recibe parámetros sísmicos en formato JSON y devuelve un identificado único (UUIDv4) para monitear el progreso. Los parámetros se validan mediante modelos Pydantic definidos en [`schemas.py`](orchestrator/models/schemas.py), que realizan transformaciones automáticas cuando corresponde.
 
-   Parámetros requeridos en el cuerpo (JSON):
+   Parámetros requeridos:
 
-   | Campo  | Descripción                | Restricciones                           |
-   | ------ | -------------------------- | --------------------------------------- |
-   | `Mw`   | Magnitud momento           | Decimal entre 6.5 y 9.5                 |
-   | `h`    | Profundidad del hipocentro | > 0 km                                  |
-   | `lat0` | Latitud epicentro          | [-90, 90] grados                        |
-   | `lon0` | Longitud epicentro         | [-180, 180] grados                      |
-   | `dia`  | Día del evento             | String con cero inicial (ej. `"07"`)    |
-   | `hhmm` | Hora del evento            | Formato `HHMM` (ej. `"0830"` = 8:30 AM) |
-
-   Ten en cuenta que los modelos Pydantic (definidos en [`schemas.py`](orchestrator/models/schemas.py)) se encargan de validar y, en algunos casos, transformar estos parámetros para asegurar que el formato sea el correcto.
+   - `Mw` (decimal): Magnitud momento sísmico
+   - `h` (decimal >0): Profundidad hipocentral en kilómetros
+   - `lat0` (decimal [-90,90]): Latitud epicentral en grados decimales
+   - `lon0` (decimal [-180,180]): Longitud epicentral en grados decimales
+   - `dia` (string): Día del evento en formato DD con cero inicial (ej. "07")
+   - `hhmm` (string): Hora del evento en formato HHMM (ej. "1430" para 2:30 PM UTC)
 
    Ejemplo de solicitud:
 
@@ -360,7 +356,7 @@ El servicio expone los siguientes endpoints para la gestión de simulaciones de 
    </details>
 
    <details>
-   <summary>Ejemplo de respuesta esperada (201)</summary>
+   <summary>Ejemplo de respuesta esperada (HTTP 201)</summary>
 
    ```json
    {
@@ -370,23 +366,16 @@ El servicio expone los siguientes endpoints para la gestión de simulaciones de 
 
    </details>
 
-2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) puede ser utilizado para consultar el estado de una simulación en curso incluyendo resultados intermedios. Da información sobre el paso actual durante el procesamiento.
+2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47): Consulta el estado actual de una simulación. Proporciona metadatos de ejecución, resultados intermedios y enlaces de descarga cuando la simulación ha finalizado. La respuesta incluye:
 
-   Estructura de respuesta:
+   - `status`: Estado del trabajo (queued|running|completed|failed)
+   - `calculation`: Parámetros iniciales (longitud/ancho de falla, momento sísmico, alerta tsunamigénica)
+   - `travel_times`: Tiempos de llegada a costas específicas en formato `HH:mm DDMMM`
+   - `details`: Mensaje de progreso (ej. "Processing maxola"). Se actualiza en cada etapa
+   - `*_at`: Marcas temporales ISO 8601 de cada fase
+   - `download_url`: URL válida por 72 horas para GET /job-result
 
-   | Campo          | Descripción                                                                    |
-   | -------------- | ------------------------------------------------------------------------------ |
-   | `status`       | `queued`, `running`, `completed`, o `failed`                                   |
-   | `calculation`  | Parámetros sísmicos calculados (ver subcampos abajo)                           |
-   | `travel_times` | Tiempos de llegada del tsunami (ver subcampos abajo)                           |
-   | `details`      | Mensaje descriptivo del paso actual de la simulación (ej. "Processing maxola") |
-   | `error`        | `null` en éxito, detalle técnico si `status=failed`                            |
-   | `created_at`   | Fecha/hora de creación (ISO 8601)                                              |
-   | `started_at`   | Fecha/hora de inicio de procesamiento                                          |
-   | `ended_at`     | Fecha/hora de finalización                                                     |
-   | `download_url` | URL del informe (solo si `status=completed`)                                   |
-
-   Subcampos de `calculation`:
+   Ejemplo de subcampos de `calculation`:
 
    ```json
    {
@@ -403,7 +392,7 @@ El servicio expone los siguientes endpoints para la gestión de simulaciones de 
    }
    ```
 
-   Subcampos de `travel_times`:
+   Ejemplo de subcampos de `travel_times`:
 
    ```json
    {
@@ -454,10 +443,15 @@ El servicio expone los siguientes endpoints para la gestión de simulaciones de 
 
    </details>
 
-3. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L61) descarga el informe PDF final. Requiere que `status=completed`. Ejemplo de uso:
-   `http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e`
+3. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L61): Descarga el informe técnico en PDF. Requiere estado `completed` y acepta cabecera `Accept: application/pdf`. Los recursos se almacenan por 72 horas desde su generación.
 
-4. [`GET /health`](orchestrator/main.py?plain=1#L204) verifica la disponibilidad de la API y su conexión con Redis.
+   Ejemplo de uso directo:
+
+   ```
+   http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e
+   ```
+
+4. [`GET /health`](orchestrator/main.py?plain=1#L204): Verifica el estado operativo del servicio y su conexión con Redis.
 
     <details>
     <summary>Ejemplo de respuesta esperada</summary>
