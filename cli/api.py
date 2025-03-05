@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import aiohttp
 
@@ -10,7 +10,7 @@ from cli.ui import SimpleUI
 class APIClient:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
-        self._session = None
+        self._session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self):
         self._session = aiohttp.ClientSession(
@@ -20,10 +20,14 @@ class APIClient:
         return self
 
     async def __aexit__(self, *exc):
-        await self._session.close()
-        self._session = None
+        if self._session:
+            await self._session.close()
+            self._session = None
 
     async def _request(self, method: str, endpoint: str, **kwargs) -> Any:
+        if self._session is None:
+            raise RuntimeError("API client session not initialized")
+
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         timeout = kwargs.pop("timeout", DEFAULT_TIMEOUTS.get(endpoint, 30))
         try:
