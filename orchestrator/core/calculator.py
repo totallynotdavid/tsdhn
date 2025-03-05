@@ -274,18 +274,19 @@ class TsunamiCalculator:
         }
 
         # Corner calculations
-        angles = np.radians([azimuth - 90, azimuth])
+        angles = -np.radians([(azimuth - 90), azimuth])
+
         r = np.array([L1, W1]) / NM_CONVERSION
 
         sx = (
-            r[0] * np.cos(angles[0])
-            + r[1] * np.cos(angles[1]) * np.array([0, 1, 1, 0, 0])
-        ) + lon0
+            r[0] * np.cos(angles[0]) * np.array([0, 1, 1, 0, 0])
+            + r[1] * np.cos(angles[1]) * np.array([0, 0, 1, 1, 0])
+        ) + params["xo"]
 
         sy = (
-            r[0] * np.sin(angles[0])
-            + r[1] * np.sin(angles[1]) * np.array([0, 1, 1, 0, 0])
-        ) + lat0
+            r[0] * np.sin(angles[0]) * np.array([0, 1, 1, 0, 0])
+            + r[1] * np.sin(angles[1]) * np.array([0, 0, 1, 1, 0])
+        ) + params["yo"]
 
         corners = [{"lon": x, "lat": y} for x, y in zip(sx, sy, strict=False)]
 
