@@ -258,7 +258,6 @@ sudo apt update -y && sudo apt upgrade -y
    ```bash
    git clone https://github.com/totallynotdavid/picv-2025
    cd picv-2025 && poetry install
-   poetry self add 'poethepoet[poetry_plugin]'
    ```
 
 2. Valida la instalación con:
