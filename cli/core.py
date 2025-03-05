@@ -125,46 +125,40 @@ class SimulationManager:
                 )
 
     async def _execute_calculation_steps(self, client: APIClient) -> Optional[str]:
-        pasos = [
-            (1, "Parámetros iniciales", "calculate"),
-            (2, "Tiempos de arribo", "tsunami-travel-times"),
-            (3, "Simulación TSDHN", "run-tsdhn"),
-        ]
-        resultados = {}
-        total = len(pasos)
-        for num, descripcion, endpoint in pasos:
-            t0 = time.time()
+        description = "Iniciando simulación completa"
+        endpoint = "run-simulation"
 
-            # Prepare the payload based on the endpoint:
-            if endpoint == "run-tsdhn":
-                payload = {
-                    **self.config["simulation_params"],
-                    "skip_steps": self.config.get("skip_steps", []),
-                }
-            else:
-                payload = self.config["simulation_params"]
+        t0 = time.time()
 
-            try:
-                resultado = await client.call_endpoint(
-                    endpoint,
-                    payload,
-                    timeout=DEFAULT_TIMEOUTS.get(endpoint, 30),
-                )
-                dt = time.time() - t0
-                SimpleUI.show_success(
-                    f"[Endpoint {num}/{total}] {descripcion}... ({dt:.1f}s)",
-                    add_separator=False,
-                )
-                resultados[endpoint] = resultado
-            except Exception as e:
-                SimpleUI.show_error(f"Error en el paso {num}: {str(e)}")
-                raise
+        payload = {
+            "data": self.config["simulation_params"],
+            "skip_steps": self.config.get("skip_steps", None),
+        }
 
-        SimpleUI.show_info("")
-        job_id = resultados.get("run-tsdhn", {}).get("job_id")
-        if job_id:
-            SimpleUI.show_success(f"ID de simulación: {job_id}")
-        return job_id
+        timeout = DEFAULT_TIMEOUTS.get(endpoint, 30)
+
+        try:
+            result = await client.call_endpoint(
+                endpoint,
+                payload,
+                timeout=timeout,
+            )
+
+            elapsed_time = time.time() - t0
+            SimpleUI.show_success(
+                f"[Endpoint 1/1] {description}... ({elapsed_time:.1f}s)",
+                add_separator=False,
+            )
+
+            SimpleUI.show_info("")
+            job_id = result.get("job_id")
+            if job_id:
+                SimpleUI.show_success(f"ID de simulación: {job_id}")
+            return job_id
+
+        except Exception as e:
+            SimpleUI.show_error(f"Error en el paso 1: {str(e)}")
+            raise
 
 
 class JobMonitor:

@@ -1,25 +1,18 @@
 import logging
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List, Optional
 
 import anyio
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from orchestrator.core.calculator import TsunamiCalculator
 from orchestrator.core.config import LOGGING_CONFIG
 from orchestrator.core.queue import JobStatus, tsdhn_queue
-from orchestrator.models.schemas import (
-    CalculationResponse,
-    EarthquakeInput,
-    RunTSDHNRequest,
-    TsunamiTravelResponse,
-)
+from orchestrator.models.schemas import EarthquakeInput
 from orchestrator.utils.job_validators import secure_path_construction, validate_job_id
 
-# Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
@@ -33,159 +26,71 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-# Initialize services
-calculator = TsunamiCalculator()
 
-
-@app.post("/calculate", response_model=CalculationResponse)
-async def calculate_endpoint(data: EarthquakeInput):
-    """
-    Calculate earthquake parameters and assess tsunami risk.
-
-    Args:
-        data (EarthquakeInput): Input data containing:
-            - Mw (float): Earthquake magnitude
-            - h (float): Depth
-            - lat0 (float): Latitude
-            - lon0 (float): Longitude
-            - dia (str, optional): Day
-            - hhmm (str, optional): Time
-
-    Returns:
-        CalculationResponse: Calculated parameters including:
-            - Rupture dimensions
-            - Tsunami warning
-            - Location classification
-            - Rectangle parameters and corners
-    """
+@app.post("/run-simulation", status_code=status.HTTP_201_CREATED)
+async def run_simulation(
+    data: EarthquakeInput, skip_steps: Optional[List[str]] = None
+) -> Dict:
+    """Initialize complete simulation pipeline"""
     try:
-        logger.info(
-            "Processing calculation request for earthquake",
-            extra={"lat": data.lat0, "lon": data.lon0},
-        )
-        return await anyio.to_thread.run_sync(
-            calculator.calculate_earthquake_parameters, data
-        )
-    except Exception as e:
-        logger.exception("Error in calculate_endpoint")
-        raise HTTPException(
-            status_code=500, detail="Error processing calculation"
-        ) from e
-
-
-@app.post("/tsunami-travel-times", response_model=TsunamiTravelResponse)
-async def tsunami_travel_times_endpoint(data: EarthquakeInput):
-    """
-    Calculate tsunami travel times to coastal locations.
-
-    Args:
-        data (EarthquakeInput): Same input parameters as /calculate endpoint
-
-    Returns:
-        TsunamiTravelResponse: Estimated arrival times and distances for monitored ports
-    """
-    try:
-        logger.info(
-            "Calculating tsunami travel times",
-            extra={"lat": data.lat0, "lon": data.lon0},
-        )
-        return await anyio.to_thread.run_sync(
-            calculator.calculate_tsunami_travel_times, data
-        )
-    except Exception as e:
-        logger.exception("Error in tsunami_travel_times_endpoint")
-        raise HTTPException(
-            status_code=500, detail="Error calculating travel times"
-        ) from e
-
-
-@app.post("/run-tsdhn")
-async def run_tsdhn_endpoint(payload: RunTSDHNRequest):
-    """
-    Enqueue a TSDHN model execution job.
-
-    The TSDHN model takes approximately 25 minutes to run on a fast server.
-    Returns a job ID that can be used to check the execution
-    status later on or retrieve the results.
-
-    Returns:
-        Dict containing:
-            - status: "queued"
-            - job_id: Unique identifier for the job
-            - message: Status message
-    """
-    try:
-        logger.info("Enqueueing new TSDHN job")
-        job_id = tsdhn_queue.enqueue_job(skip_steps=payload.skip_steps)
-        return {
-            "status": "queued",
-            "job_id": job_id,
-            "message": "Job queued successfully",
-        }
+        logger.info("Enqueueing new simulation job")
+        job_id = tsdhn_queue.enqueue_job(data=data, skip_steps=skip_steps)
+        return {"job_id": job_id}
     except Exception as e:
         logger.exception("Job queuing failed")
         raise HTTPException(
-            status_code=500, detail="Error starting processing job"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to start simulation pipeline",
         ) from e
 
 
-@app.get("/job-status/{job_id}")
-async def get_job_status_endpoint(job_id: str) -> Dict:
-    """
-    Args:
-        job_id (str): The job identifier returned by /run-tsdhn
-
-    Returns:
-        Dict containing:
-            - status: Current job status (queued/running/completed/failed)
-            - error: Error message if failed
-            - created_at: Job creation timestamp
-            - ended_at: Job completion timestamp (if completed)
-    """
+@app.get("/job-status/{job_id}", response_model=Dict)
+async def get_job_status(job_id: str) -> Dict:
     try:
-        logger.debug("Retrieving job status", extra={"job_id": job_id})
         return tsdhn_queue.get_job_status(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as e:
-        logger.exception(f"Error checking status for job {job_id}")
+        logger.error(f"Status check failed for {job_id}: {str(e)}")
         raise HTTPException(
-            status_code=500, detail="Error retrieving job status"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Job status retrieval failed",
         ) from e
 
 
-@app.get("/job-result/{job_id}")
-async def get_job_result_endpoint(job_id: str):
-    """
-    Args:
-        job_id (str): The job identifier returned by /run-tsdhn
-
-    Returns:
-        FileResponse: The generated PDF report
-    """
+@app.get("/job-result/{job_id}", response_class=FileResponse)
+async def get_job_result(job_id: str):
+    """Retrieve final simulation report"""
     validate_job_id(job_id)
 
     try:
-        status = tsdhn_queue.get_job_status(job_id)
-        if status["status"] != JobStatus.COMPLETED.value:
-            raise HTTPException(status_code=400, detail="Job processing not complete")
+        job_status = tsdhn_queue.get_job_status(job_id)
+        if job_status["status"] != JobStatus.COMPLETED.value:
+            raise HTTPException(
+                status_code=status.HTTP_425_TOO_EARLY,
+                detail="Job processing not complete",
+            )
 
         job_dir = secure_path_construction(job_id)
         report_path = job_dir / "reporte.pdf"
 
         if not await anyio.to_thread.run_sync(report_path.exists):
-            raise HTTPException(status_code=404, detail="Report not available")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Report not generated"
+            )
 
         return FileResponse(
-            path=report_path,
+            report_path,
             filename=f"tsdhn_report_{job_id}.pdf",
             media_type="application/pdf",
         )
-
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Result retrieval error")
+        logger.exception("Result retrieval failed")
         raise HTTPException(
-            status_code=500, detail="Error retrieving job results"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Result retrieval error",
         ) from e
 
 
@@ -194,8 +99,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "calculator": "initialized",
-        "queue_status": "connected" if tsdhn_queue.redis.ping() else "disconnected",
+        "redis_connected": tsdhn_queue.is_redis_connected(),
     }
 
 
