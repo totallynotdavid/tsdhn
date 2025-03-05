@@ -33,10 +33,10 @@ build_extension_clause() {
 find_files() {
     local ignore_clause
     local ext_clause
-    
+
     ignore_clause=$(build_ignore_clause)
     ext_clause=$(build_extension_clause)
-    
+
     # Combine root files and directory search
     {
         # First, find root files (if any)

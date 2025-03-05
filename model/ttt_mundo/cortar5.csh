@@ -5,17 +5,17 @@ set BATHYFILE0=/media/cjimenez/datos/Topografia/gebco30/GridOne.nc
 set BATHYFILE1=cortado.grd
 
 #echo cut the bathymetry domain...
-gmt grdcut $BATHYFILE0 -G$BATHYFILE1 -R$REGION -V 
+gmt grdcut $BATHYFILE0 -G$BATHYFILE1 -R$REGION -V
 #grd2xyz $BATHYFILE1 -R$REGION -s -fig -fog -V > salida.asc
 
 # Resample the bathymetry
-gmt grdsample $BATHYFILE1 -Gtemp1.grd -I120s/120s -R$REGION -V 
+gmt grdsample $BATHYFILE1 -Gtemp1.grd -I120s/120s -R$REGION -V
 gmt grdmath temp1.grd -1 MUL -V = temp3.grd
 gmt grd2xyz temp3.grd -R$REGION -s -fig -fog -V > salida2.xyz
 
 #echo Transform to raster...
 #set PSPATH=c:\programs\gs9.02\bin\gswin64c
-#ps2raster %PSFILE% -A -Tg -V -G%PSPATH%    
+#ps2raster %PSFILE% -A -Tg -V -G%PSPATH%
 
 #rm temp*.*
 #rm cortado.grd

@@ -1,10 +1,10 @@
 % Falla multiple para m x n segmentos
-% Calcular las coordenadas de las subfuentes, teniendo 
+% Calcular las coordenadas de las subfuentes, teniendo
 % en cuenta las ecuaciones de esfericidad de la Tierra
 % Aplicable para zonas de latitud alta (lat > 20)
 % Copyright: Cesar Jimenez
 % Update: 22 Abr 2020
-  
+
   clear all; close all; clc
   xep = 142.37; yep=38.29; zep =29; % coordenadas epicentro
   xo = 142.31; yo = 35.5; % extremo inferior (o ext sup para Japon)
@@ -69,7 +69,7 @@ if s == 1
 end
 % Fin de leer Replicas
 
-dip=echado*pi/180; 
+dip=echado*pi/180;
 a1=-(Az-90)*pi/180; a2=-(Az)*pi/180;
 r1=L; r2=W*cos(dip);
 r1=r1/(60*1853); r2=r2/(60*1853);
@@ -117,7 +117,7 @@ if s == 2
 
   ST=Az; DI=echado;
   lon1 = xo; lat1 = yo;
-  phai=lat1; 
+  phai=lat1;
   rad=pi/180.0;
 
   phai=phai*pi/180.0;
@@ -129,7 +129,7 @@ if s == 2
   l1=(pi/180.0)*((a*0.001*cos(phai))/sqrt(1.0-e2*(sin(phai)^2)));
   % l4 lat
   l4=(pi/648000.0)*(a*(1.0-e2)/((1.0-e2*(sin(phai)^2))^1.5));
- 
+
   l1=l1*1000.0;
   l4=l4*3600.0;
 
@@ -143,7 +143,7 @@ if s == 2
 
   lon3 = lon2 + W*cdip*cstr/l1;
   lat3 = lat2 - W*cdip*sstr/l4;
-   
+
   lon4 = lon3 - L*sstr/l1;
   lat4 = lat3 - L*cstr/l4;
 
@@ -188,7 +188,7 @@ disp ('Se crearan los archivos pfallaXX.inp')
 L_new = L/n; W_new = W/m;
 fprintf ('%s %4.0f %s %6.0f\n','L_new =',L_new,'W_new =',W_new);
 
-%for k = 1:m*n    
+%for k = 1:m*n
 %   k = num2str(k);
 %      if length(k) < 2, k=['0',k]; end
 %   fname = ['pfalla',k,'.inp'];
@@ -213,13 +213,13 @@ fprintf ('%s %4.0f %s %6.0f\n','L_new =',L_new,'W_new =',W_new);
 A = load('puertos.txt');
 [p q] = size(A);
 for k = 1:p
-    if A(k,1) < 0 A(k,1) = A(k,1) + 360; end 
+    if A(k,1) < 0 A(k,1) = A(k,1) + 360; end
 end
 fname = 'tidalx.dat';
 fid = fopen (fname, 'w');
 disp ('')
 disp ('Ubicacion de los mareografos')
-for k = 1:p    
+for k = 1:p
    I0=find(abs(xa-A(k,1)) == min(abs(xa-A(k,1))) ); I0=I0(1);
    J0=find(abs(ya-A(k,2)) == min(abs(ya-A(k,2))) ); J0=J0(1);
    fprintf ('%4.0f %4.0f %4.0f \n',k,I0,J0);
@@ -231,7 +231,7 @@ title ('Blue: subfaults,  Red: tidal stations')
 zoom on
 
 % Calculo de la grilla de deformacion: IDS IDE JDS JDE
-disp ('Creando parametros: IDS IDE JDS JDE') 
+disp ('Creando parametros: IDS IDE JDS JDE')
 IDS = xe - km2deg(0.70*L/1000);
 I0=find(abs(xa-IDS) == min(abs(xa-IDS))); IDS=I0(1);
 fprintf ('%s %4.0f \n','IDS = ',IDS);

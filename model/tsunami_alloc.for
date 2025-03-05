@@ -10,7 +10,7 @@ c KE             : Numero total de pasos de computo
 c KD             : Razon de muestreo del mareograma
 c KA             : Separacion entre los snapshops
 c NG             : Numero de mareografos virtuales
-   
+
 c     PARAMETER(IA=1921, JA=1441)
 c     PARAMETER(IDS=1,IDE=300,JDS=1050,JDE=1350)
       PARAMETER(DELTA=240.0/3600.0)
@@ -20,7 +20,7 @@ c     PARAMETER(IDS=1,IDE=300,JDS=1050,JDE=1350)
       PARAMETER(RT=6.37E+6)
 c      REAL MA,NA
       CHARACTER PNAME
-C  
+C
       DIMENSION IP(NG),JP(NG)
       DIMENSION PNAME(NG),PZ(NG)
       real(4), allocatable :: ZA(:,:,:),MA(:,:,:),NA(:,:,:),ZMXA(:,:)
@@ -29,7 +29,7 @@ C
 c      COMMON /AXA/ ZA(IA,JA,2),MA(IA,JA,2),NA(IA,JA,2),ZMXA(IA,JA)
 c      COMMON /AHA/ HA(IA,JA),RXA(JA),CJA(JA),TMX(IA,JA),ZMX(IA,JA)
 c      COMMON /ADA/ HMA(IA,JA),HNA(IA,JA),XXA(IA,JA),YYA(IA,JA)
-C    
+C
       call cpu_time(t0)
       OPEN(5,FILE='xyo.dat',STATUS='OLD')
         READ(5,*)IDS,IDE,JDS,JDE,IA,JA
@@ -59,14 +59,14 @@ C     OPEN(3,FILE='tidal.dat',STATUS='OLD')
 
 C ********   INPUT GRID    ***********
 C
-      CALL INPUTA(HA,IA,JA) 
+      CALL INPUTA(HA,IA,JA)
       CALL HMN(IA,JA,HA,HMA,HNA)
       CALL CEROS(IA,JA,ZA,MA,NA)
       CALL DEFORMA(IA,JA,ZA,IDS,IDE,JDS,JDE)
 C
 C*****CALCULOS PRELIMINARES
 C
-      CALL PRELIM(IA,JA,RT,DA,DT,HMA,HNA,BLATA,RXA,CJA,XXA,YYA)  
+      CALL PRELIM(IA,JA,RT,DA,DT,HMA,HNA,BLATA,RXA,CJA,XXA,YYA)
 C
 C ================= CHECK TIDE GAUGE LOCATION =================
 
@@ -80,14 +80,14 @@ C ================= CHECK TIDE GAUGE LOCATION =================
       END DO
       WRITE(*,*)'No tidal gauge locate on ground'
 
-C *********    MAIN CALCULATION    ********** 
+C *********    MAIN CALCULATION    **********
 C
 C     OPEN(4,FILE='zfolder/green.dat')
       DO  10  K = 1 , KE
       KK=K-1
       IF(MOD(K,10).EQ.0) THEN
          WRITE(*,'(A10,I5,A7,I5)')   'Numero  : ',K,'-th de ',KE
-      ENDIF       
+      ENDIF
       CALL MASS(IA,JA,ZA,MA,NA,HA,RXA,CJA)
       CALL BOUT(IA,JA,ZA,MA,NA,HA)
       CALL MMNT(IA,JA,ZA,MA,NA,HA,XXA,YYA)
@@ -97,18 +97,18 @@ C     OPEN(4,FILE='zfolder/green.dat')
          PZ(KG)=ZA(IP(KG),JP(KG),2)
       END DO
       WRITE(4,'(F7.1,100F7.3)')KK*DT/60.0,(PZ(KG),KG=1,NG)
-C        
+C
             CALL ZMAX(IA,JA,ZA,ZMXA)
             CALL TMAX(IA,JA,TMX,ZMX,ZA,KK,DT)
 
             ELSE
             ENDIF
-		  
+
             IF(MOD(KK,KA).EQ.0) THEN
 c           CALL MOVIE(KK,KA,IA,JA,ZA)
 
             ELSE
-            ENDIF 
+            ENDIF
 
       CALL CHAN(IA,JA,ZA,MA,NA)
 
@@ -131,7 +131,7 @@ C Fin solo inversion
       call cpu_time(tf)
       write(*,*) t0, tf
       write(*,666)'Tiempo de corrida= ',(tf-t0)/60,' min'
-666   format (A20,F6.2,A5) 
+666   format (A20,F6.2,A5)
       STOP
       END
 C***** DE AQUI EN DELANTE NO ALTERAR
@@ -140,9 +140,9 @@ C*******************************************************
 C*******************************************************
 C*******************************************************
 C**** SE LEEN LA BATIMETRIA DEL DOMINIO A
-      SUBROUTINE INPUTA(HA,IA,JA) 
+      SUBROUTINE INPUTA(HA,IA,JA)
       DIMENSION HA(IA,JA)
-      
+
 C     OPEN(1,FILE='grid_a.grd')
       DO 10 I=1,IA
 10    READ(1,*) (HA(I,J),J=1,JA)
@@ -151,7 +151,7 @@ C     OPEN(1,FILE='grid_a.grd')
       DO 20 J=1,JA
       DO 20 I=1,IA
 20    IF(HA(I,J).GT.0.0.AND.HA(I,J).LT.10.0) HA(I,J)=10.0
-        
+
       RETURN
       END
 C
@@ -159,7 +159,7 @@ C*****SE LEE LA DEFORMACION O CONDICION INICIAL
 C
       SUBROUTINE DEFORMA(IA,JA,Z,IDS,IDE,JDS,JDE)
       DIMENSION Z(IA,JA,2)
-   
+
 C     OPEN(2,FILE='deform_a.grd')
       DO 10 I=IDS,IDE
 10    READ(2,*) (Z(I,J,1),J=JDS,JDE)
@@ -187,7 +187,7 @@ C
 C     TMX = travel time matrix (minutes)
       DIMENSION Z(IA,JA,2),ZMX(IA,JA)
       DIMENSION TMX(IA,JA)
-      
+
       DO 10 J=2,JA
       DO 10 I=2,IA
 
@@ -213,7 +213,7 @@ C
 
       KT=KK/KA
    	WRITE(NAME,100) KT + 1000
-100   FORMAT('zfolder/z',I4)    
+100   FORMAT('zfolder/z',I4)
       OPEN(7,FILE=NAME)
 	DO 10 I=1,IA
 10    WRITE(7,22) (ZA(I,J,2),J=1,JA)
@@ -221,9 +221,9 @@ C
 22	FORMAT(4000F9.2)
 
 	RETURN
-      END	   
+      END
 C
-C****CALCULOS PRELIMINARES PARA CONSERVACION DE MASA Y MOMENTO 
+C****CALCULOS PRELIMINARES PARA CONSERVACION DE MASA Y MOMENTO
 C    RZ=LATITUD EN NODOS DE ELEVACION
 C    RN=LATITUD EN NODOS DE VELOCIDAD MERIDIONAL
 C    RT=RADIO DE LA TIERRA
@@ -234,7 +234,7 @@ C    YY=FACTOR EN CONSERVACION DE MOMENTO MERIDIONAL
 C    DY=PASO DE MAYA EN RADIANES
 C    DT=PASO DE TIEMPO EN SEGUNDOS
 C    BLAT=EXTREMO SUR DE LATITUD EN GRADOS (+N, -S)
-      SUBROUTINE PRELIM(IA,JA,RT,DY,DT,HM,HN,BLAT,RX,CJ,XX,YY) 
+      SUBROUTINE PRELIM(IA,JA,RT,DY,DT,HM,HN,BLAT,RX,CJ,XX,YY)
       DIMENSION  RX(JA),CJ(JA),HM(IA,JA),HN(IA,JA)
       DIMENSION  XX(IA,JA),YY(IA,JA)
 
@@ -264,27 +264,27 @@ C*****SE CALCULAN LAS PROFUNDIDADES EN LOS PUNTOS EN DONDE SE EVALUAN
 C*****LAS DESCARGAS.
 
       SUBROUTINE HMN(IF,JF,HZ,HM,HN)
- 
+
       DIMENSION HZ(IF,JF),HM(IF,JF),HN(IF,JF)
- 
+
       DO 10 J=1,JF
         DO 10 I=1,IF
           IF(I.EQ.IF) GO TO 11
           HH=0.5*(HZ(I,J)+HZ(I+1,J))
-       
+
           HM(I,J)=HH
           GO TO 12
 11        HM(I,J)=HZ(I,J)
 12        IF(J.EQ.JF) GO TO 13
           HH=0.5*(HZ(I,J)+HZ(I,J+1))
- 
+
           HN(I,J)=HH
           GO TO 10
 13        HN(I,J)=HZ(I,J)
 10    CONTINUE
- 
+
       RETURN
-      END      
+      END
 C
 C*****CONSERVACION DE MASA EN ESFERICAS (LINEAL)
 C
@@ -296,28 +296,28 @@ C
 
       DO 10 J=2,JA
         DO 10 I=2,IA
-          IF(H(I,J).GT.0.0)THEN 
+          IF(H(I,J).GT.0.0)THEN
           Z(I,J,2)=Z(I,J,1)-RX(J)*( M(I,J,1)-M(I-1,J,1) )
      &  -RX(J)*( N(I,J,1)*CJ(J) - N(I,J-1,1)*CJ(J-1) )
           IF(ABS(Z(I,J,2)).LT.1.0E-5) Z(I,J,2)=0.0
           ELSE
             Z(I,J,2)=0.0
           ENDIF
-   10 CONTINUE 
+   10 CONTINUE
       RETURN
-      END 
+      END
 C
 C***** CONSERVACION DE MOMENTO LINEAL EN ESFERICAS (SIN FRICCION)
 C
       SUBROUTINE MMNT(IA,JA,Z,M,N,H,XX,YY)
-	           
-      REAL M,N     
+
+      REAL M,N
       DIMENSION Z(IA,JA,2),M(IA,JA,2),N(IA,JA,2)
       DIMENSION H(IA,JA)
       DIMENSION XX(IA,JA),YY(IA,JA)
 
       DO 10 J=2,JA
-        DO 10 I=2,IA-1        
+        DO 10 I=2,IA-1
         IF(H(I,J).GT.0.0.AND.H(I+1,J).GT.0.0)THEN
         M(I,J,2)=M(I,J,1)-XX(I,J)*( Z(I+1,J,2)-Z(I,J,2) )
           IF(ABS(M(I,J,2)).LT.1.0E-5) M(I,J,2)=0.0
@@ -325,10 +325,10 @@ C
             M(I,J,2)=0.0
           ENDIF
    10 CONTINUE
-      
+
       DO 20 J=2,JA-1
         DO 20 I=2,IA
-        IF(H(I,J).GT.0.0.AND.H(I,J+1).GT.0.0) THEN      
+        IF(H(I,J).GT.0.0.AND.H(I,J+1).GT.0.0) THEN
         N(I,J,2)=N(I,J,1)-YY(I,J)*(Z(I,J+1,2)-Z(I,J,2))
           IF(ABS(N(I,J,2)).LT.1.0E-5) N(I,J,2)=0.0
           ELSE
@@ -345,7 +345,7 @@ C**** CONDICIONES DE FRONTERA ABIERTA EN EL DOMINIO "A"
 
       REAL MA,NA
       DIMENSION ZA(IA,JA,2),MA(IA,JA,2),NA(IA,JA,2),HA(IA,JA)
- 
+
       DO 10 KK=1,2
         J=2
         IF(KK.EQ.2)J=JA
@@ -374,7 +374,7 @@ C**** CONDICIONES DE FRONTERA ABIERTA EN EL DOMINIO "A"
           IF(I.EQ.IA.AND.MA(I-1,J,2).LT.0.0)ZZ=-ZZ
           ZA(I,J,2)=ZZ
    20 CONTINUE
- 
+
       RETURN
       END
 C****
@@ -385,26 +385,26 @@ C
       REAL MX,NX,MY,NY
       DIMENSION MX(IX,JX,2),NX(IX,JX,2),HY(IY,JY)
       DIMENSION MY(IY,JY,2),NY(IY,JY,2),L0(4)
-      ISS=2 
-      JSS=2 
-      IES=IY 
-      JES=JY 
-      ISL=L0(1) 
+      ISS=2
+      JSS=2
+      IES=IY
+      JES=JY
+      ISL=L0(1)
       JSL=L0(2)
-      IEL=L0(3) 
+      IEL=L0(3)
       JEL=L0(4)
       CHK=BCHK
       KB=CHK/1000
       IF(KB.EQ.1)THEN
         CHK=CHK-1000
-        I=ISS 
-        J=JSS-1 
-       II=ISL-1  
+        I=ISS
+        J=JSS-1
+       II=ISL-1
        JJ=JSL-1
         DO WHILE(I.LE.IES)
           SI=(I-ISS+2)/3.0
-          IS=IFIX(SI) 
-          DI=SI-IS 
+          IS=IFIX(SI)
+          DI=SI-IS
           II=IS+ISL-1
           NY(I,J,2)=(1-DI)*NX(II,JJ,2)+DI*NX(II+1,JJ,2)
           IF(HY(I,J+1).LT.0.0)NY(I,J,2)=0.0
@@ -415,14 +415,14 @@ C
       KB=CHK/100
       IF(KB.EQ.1)THEN
         CHK=CHK-100
-        I=IES 
+        I=IES
         J=JSS
-       II=IEL 
+       II=IEL
        JJ=JSL-1
         DO WHILE(J.LE.JES)
           SJ=(J-JSS+2)/3.0
-          JS=IFIX(SJ) 
-          DJ=SJ-JS  
+          JS=IFIX(SJ)
+          DJ=SJ-JS
           JJ=JS+JSL-1
           MY(I,J,2)=(1-DJ)*MX(II,JJ,2)+DJ*MX(II,JJ+1,2)
           IF(HY(I,J).LT.0.0)MY(I,J,2)=0.0
@@ -433,14 +433,14 @@ C
       KB=CHK/10
       IF(KB.EQ.1)THEN
         CHK=CHK-10
-        I=ISS 
-        J=JES 
-       II=ISL-1 
+        I=ISS
+        J=JES
+       II=ISL-1
        JJ=JEL
         DO WHILE(I.LE.IES)
           SI=(I-ISS+2)/3.0
-          IS=IFIX(SI) 
-          DI=SI-IS 
+          IS=IFIX(SI)
+          DI=SI-IS
           II=IS+ISL-1
           NY(I,J,2)=(1-DI)*NX(II,JJ,2)+DI*NX(II+1,JJ,2)
           IF(HY(I,J).LT.0.0)NY(I,J,2)=0.0
@@ -449,14 +449,14 @@ C
       ENDIF
 C
       IF(CHK.EQ.1)THEN
-        I=ISS-1 
-        J=JSS  
-       II=ISL-1 
+        I=ISS-1
+        J=JSS
+       II=ISL-1
        JJ=JSL-1
         DO WHILE(J.LE.JES)
           SJ=(J-JSS+2)/3.0
-          JS=IFIX(SJ) 
-          DJ=SJ-JS 
+          JS=IFIX(SJ)
+          DJ=SJ-JS
           JJ=JS+JSL-1
           MY(I,J,2)=(1-DJ)*MX(II,JJ,2)+DJ*MX(II,JJ+1,2)
           IF(HY(I+1,J).LT.0.0)MY(I,J,2)=0.0
@@ -483,14 +483,14 @@ C
 C
       REAL M,N
       DIMENSION Z(IF,JF,2),M(IF,JF,2),N(IF,JF,2)
-        
+
       DO 100 L=1,2
       DO 10 J=1,JF
       DO 10 I=1,IF
-      Z(I,J,L)=0.0 
-      M(I,J,L)=0.0 
-      N(I,J,L)=0.0           
-10    CONTINUE 
+      Z(I,J,L)=0.0
+      M(I,J,L)=0.0
+      N(I,J,L)=0.0
+10    CONTINUE
 100   CONTINUE
       RETURN
       END

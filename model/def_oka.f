@@ -4,7 +4,7 @@
 !C  Modified by C Jimenez 23 Abr 2013: input file pfalla_n.inp is readed
 !  Modified by C Jimenez 30 Jul 2014: output format: GMT or Matlab
 !c  Modified by C Jimenez 22 Mar 2022: allocate and allocatable
-!C --- Variables for the output --- 
+!C --- Variables for the output ---
 !C     Z        : Surface displacement (m)
 !C
 !C --- Parameters required to be changed for each computation ---
@@ -26,7 +26,7 @@
 !C     RE       : Radius on the equator
 !C
 !C     Note     :
-!C     * I0 and J0 should be given by the grid number 
+!C     * I0 and J0 should be given by the grid number
 !C       of the computational region (automatically computed in this code).
 !C  -------------------------------------------------
       INTEGER SGL
@@ -36,7 +36,7 @@
 !c      PARAMETER (IA=IDE-IDS+1, JA=JDE-JDS+1)
 !     PARAMETER (DX=9266.243887,DY=DX)
       PARAMETER (DX=7412.9951096,DY=DX)
-      PARAMETER (NP=1) 
+      PARAMETER (NP=1)
 !C  -------- Correction Parameters for the Fault Position ---
 !C  -------- You don't have to change parameters below -------
       PARAMETER (VP=4.82E+3,VS=2.78E+3)
@@ -54,8 +54,8 @@
       OPEN(30,FILE='deform_a.grd',STATUS='UNKNOWN')
 !C
 !C  -------- You need to change parameters below -------
-!C     I0       : Position of each fault (or segment) in grid system 
-!C     J0       : Position of each fault (or segment) in grid system 
+!C     I0       : Position of each fault (or segment) in grid system
+!C     J0       : Position of each fault (or segment) in grid system
 !C     D0       : Dislocation of each fault (or segment) in meter
 !C     L0       : Fault length in strike direction in meter
 !C     W0       : Fault width in dip direction in meter
@@ -63,14 +63,14 @@
 !C     DI       : Dip angle
 !C     SL       : Rake angle
 !C     HH       : Depth of the fault origin in meter
-!C     
+!C
       OPEN(1,FILE='xyo.dat',STATUS='OLD')
         READ(1,*)IDS,IDE,JDS,JDE
       CLOSE(1)
 	  IA=IDE-IDS+1
 	  JA=JDE-JDS+1
       allocate(Z(IA,JA),UX(IA,JA),UY(IA,JA))
-	  
+
       OPEN(2,FILE='pfalla.inp',STATUS='OLD')
       DO N=1,NP
         READ(2,*)I0(N),J0(N),D0(N),L0(N),W0(N),ST(N),DI(N),SL(N),HH(N)
@@ -96,11 +96,11 @@
 
       DO N=1,NP
          WRITE(*,'(A20,I3,A3)')   ' Segment          : ',N,'-th'
-         IF(SGL.EQ.0.AND.N.NE.1)GO TO 11 
+         IF(SGL.EQ.0.AND.N.NE.1)GO TO 11
          STR=(90.0-ST(N))*PI/180.0
          DIR=DI(N)*PI/180.0
          SLR=SL(N)*PI/180.0
-        
+
          CS=COS(DIR)
          SN=SIN(DIR)
          DE=HH(N)+W0(N)*SN
@@ -119,22 +119,22 @@
          Q=Y*SN-DE*CS
 
          CALL USTRIKE
-     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X,P,FX1,FY1,FZ1) 
+     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X,P,FX1,FY1,FZ1)
          CALL USTRIKE
-     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X,P-W0(N),FX2,FY2,FZ2) 
+     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X,P-W0(N),FX2,FY2,FZ2)
          CALL USTRIKE
-     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X-L0(N),P,FX3,FY3,FZ3) 
+     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X-L0(N),P,FX3,FY3,FZ3)
          CALL USTRIKE
-     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X-L0(N),P-W0(N),FX4,FY4,FZ4) 
+     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X-L0(N),P-W0(N),FX4,FY4,FZ4)
 
          CALL UDIP
-     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X,P,GX1,GY1,GZ1) 
+     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X,P,GX1,GY1,GZ1)
          CALL UDIP
-     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X,P-W0(N),GX2,GY2,GZ2) 
+     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X,P-W0(N),GX2,GY2,GZ2)
          CALL UDIP
-     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X-L0(N),P,GX3,GY3,GZ3) 
+     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X-L0(N),P,GX3,GY3,GZ3)
          CALL UDIP
-     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X-L0(N),P-W0(N),GX4,GY4,GZ4) 
+     &     (EPS,RMU,P,Q,CS,SN,L0(N),W0(N),X-L0(N),P-W0(N),GX4,GY4,GZ4)
 
          UXST=-(FX1-FX2-FX3+FX4)*DST(N)/(2.0*PI)
          UYST=-(FY1-FY2-FY3+FY4)*DST(N)/(2.0*PI)
@@ -159,7 +159,7 @@
       CALL FEATURES (IA,JA,NP,I0,J0,D0,L0,W0,ST,DI,SL,HH,DST,DDP,Z,
      &               DX,DY,SGL)
 
-!c      write (*,*) 
+!c      write (*,*)
 !c      write (*,*) 'Escoger formato de salida:'
 !c      write (*,*) '(1) Formato Matlab'
 !c      write (*,*) '(2) Formato GMT'
@@ -171,7 +171,7 @@
 !c        WRITE(29,22) (UY(I,J),J=1,JA)
          WRITE(30,22) ( Z(I,J),J=1,JA)
 10    CONTINUE
-      
+
       else
 !c     WRITE(28,'(10F7.3)')((UX(I,J),I=1,IA),J=JA,1,-1)
 !c     WRITE(29,'(10F7.3)')((UY(I,J),I=1,IA),J=JA,1,-1)
@@ -422,7 +422,7 @@
 
 !C     *** Call of singular point (R+XI=0) ***
       IF(ABS(R+XI).GE.EPS)THEN
-         UY1=YH*Q/(R*(R+XI)) 
+         UY1=YH*Q/(R*(R+XI))
       ELSE
          UY1=0.0
       END IF
@@ -454,7 +454,7 @@
       RETURN
       END
 
-      SUBROUTINE FEATURES 
+      SUBROUTINE FEATURES
      &           (IA,JA,NP,I0,J0,D0,L0,W0,ST,DI,SL,HH,DST,DDP,Z,
      &            DX,DY,SGL)
 
@@ -470,10 +470,10 @@
      &                ' Grid size DX, DY     (meter)              : ',
      &      DX,',',DY
       WRITE(*,'(A45)')'******** Features of the fault model ********'
-      IF(SGL.EQ.0)WRITE(*,'(A29)')'This is a single fault event.' 
-      IF(SGL.EQ.1)WRITE(*,'(A30)')'This is multiple faults event.' 
+      IF(SGL.EQ.0)WRITE(*,'(A29)')'This is a single fault event.'
+      IF(SGL.EQ.1)WRITE(*,'(A30)')'This is multiple faults event.'
       DO N=1,NP
-      IF(SGL.EQ.0.AND.N.NE.1)GO TO 22 
+      IF(SGL.EQ.0.AND.N.NE.1)GO TO 22
       WRITE(*,'(A45)')'---------------------------------------------'
 !c     WRITE(*,'(A20,I2,A3)')   ' Segment          : ',N,'-th'
       WRITE(*,'(A10,I5,A7,I5)')' Segmento  : ',N,'-th de ',NP

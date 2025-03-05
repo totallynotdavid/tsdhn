@@ -28,10 +28,10 @@ gmt grdcontour $tttbfile=bf -R$REGION -J$SIZE -C1 -A1.f1+uh -Wc.5,30,- -Wa.5,30,
 #gmt grdcontour $tttbfile=bf -R$REGION -J$SIZE -C1 -A1+f9p -Wc.5,30,- -Wa.5,30,- -K -O -P -V >> $psfile
 #gmt grdcontour $dspgrid -J$SIZE -R$REGION -C0.02 -A0.02+f9p -W0.10,255/0/0 -L0.001/10 -K -O -V >> $psfile
 
-#Mecanismo Focal CMT 
+#Mecanismo Focal CMT
 gmt psmeca $cmtfile -R$REGION -J$SIZE -Sa0.29c -G0/0/0 -P -O -V -K >> $psfile
 #gmt psmeca -R$REGION -J$SIZE -Sa0.32c -G0/0/0 -P -O -V -K <<EOF>> $psfile
-#-78.00 -12.00  21.0 330 15 90 8.1 0 0 
+#-78.00 -12.00  21.0 330 15 90 8.1 0 0
 #EOF
 
 #awk '{ print $3, $2 }' tg.lst | gmt psxy -J$SIZE -R$REGION -St0.42c -G0/0/255 -W0.5 -K -O -V >> $psfile

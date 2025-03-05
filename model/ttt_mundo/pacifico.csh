@@ -7,16 +7,16 @@ set BATHYFILE1=cortado1.grd
 set BATHYFILE2=cortado2.grd
 
 #echo cut the bathymetry domain...
-gmt grdcut $BATHYFILE0 -G$BATHYFILE1 -R$REGION1 -V 
+gmt grdcut $BATHYFILE0 -G$BATHYFILE1 -R$REGION1 -V
 # Resample the bathymetry
-gmt grdsample $BATHYFILE1 -Gtemp1.grd -I240c/240c -R$REGION1 -V 
+gmt grdsample $BATHYFILE1 -Gtemp1.grd -I240c/240c -R$REGION1 -V
 gmt grdmath temp1.grd -1 MUL -V = temp3.grd
 gmt grd2xyz temp3.grd -R$REGION1 -s -fig -fog -V > salida1.xyz
 
 #echo cut the bathymetry domain...
-gmt grdcut $BATHYFILE0 -G$BATHYFILE2 -R$REGION2 -V 
+gmt grdcut $BATHYFILE0 -G$BATHYFILE2 -R$REGION2 -V
 # Resample the bathymetry
-gmt grdsample $BATHYFILE2 -Gtemp1.grd -I240c/240c -R$REGION2 -V 
+gmt grdsample $BATHYFILE2 -Gtemp1.grd -I240c/240c -R$REGION2 -V
 gmt grdmath temp1.grd -1 MUL -V = temp3.grd
 gmt grd2xyz temp3.grd -R$REGION2 -s -fig -fog -V > salida2.xyz
 
@@ -34,4 +34,3 @@ rm salida1.xyz
 rm salida2.xyz
 rm salida.xyz
 rm pacifico.xyz
-

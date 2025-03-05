@@ -16,5 +16,5 @@ awk '{ print $3, $2 }' tg.lst | gmt psxy -J$SIZE -R$REGION -St0.4c -G255/0/0 \
 	-W1 -K -O -V >> $psfile
 awk '{ print $3, $2, 15, 0, 0, "CT", $1 }' tg.lst | gmt pstext -J$SIZE \
 	-R$REGION -O -V >> $psfile
-	
+
 evince etopo1.ps &
