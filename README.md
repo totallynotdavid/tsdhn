@@ -14,80 +14,31 @@ El Orchestrator-TSDHN es una herramienta para la estimación de parámetros de t
 A continuación, se muestra un diagrama que ilustra el flujo general del Orchestrator-TSDHN:
 
 ```mermaid
-flowchart LR
-    classDef client fill:#e8f4ff,stroke:#3a7dbd,stroke-width:1px;
-    classDef api fill:#f0f7ff,stroke:#3a7dbd,stroke-width:1px;
-    classDef job fill:#e6f4f9,stroke:#2d7d9a,stroke-width:1px;
-    classDef core fill:#e8f7e9,stroke:#2e7d32,stroke-width:1px;
-    classDef storage fill:#f5f0ff,stroke:#5e4d9b,stroke-width:1px;
-    classDef orchestrator fill:#fff4e6,stroke:#cc7a00,stroke-width:1px;
-    classDef queue fill:#ffe6e6,stroke:#b71c1c,stroke-width:1px;
-    linkStyle default stroke:#666,stroke-width:1.5px
+sequenceDiagram
+    participant Aplicación as Aplicación web
+    participant API
+    participant Orch as Orchestrator
+    participant Redis as Redis Worker
+    participant TSDHN
 
-    subgraph ClientLayer["Client Layer"]
-        WebApp["**Aplicación web (Next.js)**<br>- Dashboard<br>- Configuración de la simulación<br>- Visualización de los resultados"]
-        ExternalClient["**Sistemas externos**<br>- Monitoreo<br>- Alertas"]
-    end
-
-    subgraph APILayer["**API Gateway Layer** (FastAPI)"]
-        APIEndpoints["**Endpoints REST API**"]
-
-        subgraph ModelAPIs["**APIs de cálculo numérico**"]
-            Calculate["`**POST /calculate**
-            Calcula parámetros sísmicos
-            Retorna: JobID`"]
-            TravelTimes["`**POST /tsunami-travel-times**
-            Calcula tiempos de llegada
-            Retorna: JobID`"]
-            RunModel["`**POST /run-tsdhn**
-            Inicia la simulación
-            Retorna: JobID`"]
-        end
-
-        subgraph JobAPIs["**APIs de gestión de tareas**"]
-            JobStatus["`**GET /job-status/{job_id}**
-            Retorna: Estado`"]
-            Download["`**GET /job-result/{job_id}**
-            Retorna: Resultados (PDF)`"]
-        end
-    end
-
-    subgraph Orchestrator["**Orchestration Layer**<br>(RQ, Python)"]
-        Queue["**Redis Queue**<br>(Gestión de simulaciones)"]:::queue
-        ModelRunner["**main.py**<br>(Ejecuta secuencialmente los pasos de la simulación)"]
-
-        subgraph PreCalc["**Procesamiento inicial**"]
-            TsunamiCalc["**calculator.py**<br>- calculate_earthquake()<br>- calculate_travel_times()<br>- validate_input()"]
-        end
-
-        subgraph CoreEngine["**Procesamiento principal**"]
-            TSDHN_Engine["**Modelo TSDHN**<br>- fault_plane<br>- deformación<br>- tsunami"]
-            Visualization["**Visualización**<br>- maxola<br>- ttt_inverso<br>- point_ttt<br>- ttt_max"]
-            Reporting["**Reportes**<br>- generate_reports"]
-        end
-    end
-
-    subgraph StorageLayer["**Storage Layer**"]
-        JobStorage["**Workspace de tareas**<br>(/jobs/{job_id})<br>- entrada/<br>- salida/"]
-        ResultsDB["**Base de datos de resultados**<br>- Metadatos<br>- Métricas<br>- Historial"]
-    end
-
-    WebApp --> APIEndpoints
-    ExternalClient --> APIEndpoints
-    APIEndpoints --> ModelAPIs & JobAPIs
-
-    Calculate --> TsunamiCalc
-    TravelTimes --> TsunamiCalc
-    RunModel --> Queue
-    Queue --> ModelRunner
-    ModelRunner --> TSDHN_Engine
-    TsunamiCalc --> TSDHN_Engine
-    TSDHN_Engine --> Visualization
-    Visualization --> Reporting
-    Reporting --> JobStorage
-    JobStorage --> ResultsDB
-    JobStatus --> Queue
-    Download --> JobStorage
+    Aplicación->>API: - Enviar parámetros<br/>- Consultar estado<br/>- Consultar resultados
+    activate API
+    API->>Orch: Administrar<br/>simulaciones
+    activate Orch
+    Orch->>Redis: Consulta estado
+    activate Redis
+    Orch->>Redis: Añadir simulación<br/>a la cola
+    Note over Redis,TSDHN: Preparar entorno de trabajo
+    Redis->>TSDHN: Inicia simulación
+    activate TSDHN
+    TSDHN->>Redis: Retornar informe<br/>final
+    deactivate TSDHN
+    Redis->>Orch: Notificar finalización
+    deactivate Redis
+    Orch->>API: Actualizar el estado<br/>de la simulación
+    deactivate Orch
+    API->>Aplicación: Retornar resultados
+    deactivate API
 ```
 
 ## Instalación
