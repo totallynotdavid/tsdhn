@@ -14,90 +14,40 @@ El Orchestrator-TSDHN es una herramienta para la estimación de parámetros de t
 A continuación, se muestra un diagrama que ilustra el flujo general del Orchestrator-TSDHN:
 
 ```mermaid
-flowchart LR
-    classDef client fill:#e8f4ff,stroke:#3a7dbd,stroke-width:1px;
-    classDef api fill:#f0f7ff,stroke:#3a7dbd,stroke-width:1px;
-    classDef job fill:#e6f4f9,stroke:#2d7d9a,stroke-width:1px;
-    classDef core fill:#e8f7e9,stroke:#2e7d32,stroke-width:1px;
-    classDef storage fill:#f5f0ff,stroke:#5e4d9b,stroke-width:1px;
-    classDef orchestrator fill:#fff4e6,stroke:#cc7a00,stroke-width:1px;
-    classDef queue fill:#ffe6e6,stroke:#b71c1c,stroke-width:1px;
-    linkStyle default stroke:#666,stroke-width:1.5px
+sequenceDiagram
+    participant Aplicación as Aplicación web
+    participant API
+    participant Orch as Orchestrator
+    participant Redis as Redis Worker
+    participant TSDHN
 
-    subgraph ClientLayer["Client Layer"]
-        WebApp["**Aplicación web (Next.js)**<br>- Dashboard<br>- Configuración de la simulación<br>- Visualización de los resultados"]
-        ExternalClient["**Sistemas externos**<br>- Monitoreo<br>- Alertas"]
-    end
-
-    subgraph APILayer["**API Gateway Layer** (FastAPI)"]
-        APIEndpoints["**Endpoints REST API**"]
-
-        subgraph ModelAPIs["**APIs de cálculo numérico**"]
-            Calculate["`**POST /calculate**
-            Calcula parámetros sísmicos
-            Retorna: JobID`"]
-            TravelTimes["`**POST /tsunami-travel-times**
-            Calcula tiempos de llegada
-            Retorna: JobID`"]
-            RunModel["`**POST /run-tsdhn**
-            Inicia la simulación
-            Retorna: JobID`"]
-        end
-
-        subgraph JobAPIs["**APIs de gestión de tareas**"]
-            JobStatus["`**GET /job-status/{job_id}**
-            Retorna: Estado`"]
-            Download["`**GET /job-result/{job_id}**
-            Retorna: Resultados (PDF)`"]
-        end
-    end
-
-    subgraph Orchestrator["**Orchestration Layer**<br>(RQ, Python)"]
-        Queue["**Redis Queue**<br>(Gestión de simulaciones)"]:::queue
-        ModelRunner["**main.py**<br>(Ejecuta secuencialmente los pasos de la simulación)"]
-
-        subgraph PreCalc["**Procesamiento inicial**"]
-            TsunamiCalc["**calculator.py**<br>- calculate_earthquake()<br>- calculate_travel_times()<br>- validate_input()"]
-        end
-
-        subgraph CoreEngine["**Procesamiento principal**"]
-            TSDHN_Engine["**Modelo TSDHN**<br>- fault_plane<br>- deformación<br>- tsunami"]
-            Visualization["**Visualización**<br>- maxola<br>- ttt_inverso<br>- point_ttt<br>- ttt_max"]
-            Reporting["**Reportes**<br>- generate_reports"]
-        end
-    end
-
-    subgraph StorageLayer["**Storage Layer**"]
-        JobStorage["**Workspace de tareas**<br>(/jobs/{job_id})<br>- entrada/<br>- salida/"]
-        ResultsDB["**Base de datos de resultados**<br>- Metadatos<br>- Métricas<br>- Historial"]
-    end
-
-    WebApp --> APIEndpoints
-    ExternalClient --> APIEndpoints
-    APIEndpoints --> ModelAPIs & JobAPIs
-
-    Calculate --> TsunamiCalc
-    TravelTimes --> TsunamiCalc
-    RunModel --> Queue
-    Queue --> ModelRunner
-    ModelRunner --> TSDHN_Engine
-    TsunamiCalc --> TSDHN_Engine
-    TSDHN_Engine --> Visualization
-    Visualization --> Reporting
-    Reporting --> JobStorage
-    JobStorage --> ResultsDB
-    JobStatus --> Queue
-    Download --> JobStorage
+    Aplicación->>API: - Enviar parámetros<br/>- Consultar estado<br/>- Consultar resultados
+    activate API
+    API->>Orch: Administrar<br/>simulaciones
+    activate Orch
+    Orch->>Redis: Consulta estado
+    activate Redis
+    Orch->>Redis: Añadir simulación<br/>a la cola
+    Note over Redis,TSDHN: Preparar entorno de trabajo
+    Redis->>TSDHN: Inicia simulación
+    activate TSDHN
+    TSDHN->>Redis: Retornar informe<br/>final
+    deactivate TSDHN
+    Redis->>Orch: Notificar finalización
+    deactivate Redis
+    Orch->>API: Actualizar el estado<br/>de la simulación
+    deactivate Orch
+    API->>Aplicación: Retornar resultados
+    deactivate API
 ```
 
 ## Instalación
 
-El proyecto requiere **Ubuntu 20.04** o superior. Usuarios de Windows deben configurar Windows Subsystem for Linux (WSL 2.0 o superior) siguiendo la [<kbd>guía oficial</kbd>](https://learn.microsoft.com/es-es/windows/wsl/install) de Microsoft antes de continuar.
+El proyecto requiere **Ubuntu 24.04** o superior. Usuarios de Windows deben configurar Windows Subsystem for Linux (WSL 2.0 o superior) siguiendo la [<kbd>guía oficial</kbd>](https://learn.microsoft.com/es-es/windows/wsl/install) de Microsoft antes de continuar.
 
 ### Prerrequisitos
 
-> [!TIP]
-> Ejecuta `bash utils/setup-env.sh` para instalar todas las dependencias mencionadas en esta sección. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`.
+Ejecuta `bash utils/setup-env.sh` para instalar todas las dependencias mencionadas en esta sección. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`. Si deseas instalar manualmente, sigue los pasos a continuación.
 
 Actualiza los paquetes del sistema antes de iniciar:
 
@@ -185,8 +135,7 @@ sudo apt update -y && sudo apt upgrade -y
    make test clean
    ```
 
-> [!NOTE]
-> Almacenamos el SDK en GitLab para aprovechar su política de LFS gratuito y para reducir la carga en los servidores de los autores durante pruebas CI/CD.
+   **Nota**: Almacenamos el SDK en GitLab para aprovechar su política de LFS gratuito y para reducir la carga en los servidores de los autores durante pruebas CI/CD.
 
 4. [**TeXLive**](https://www.tug.org/texlive/quickinstall.html) es utilizado para la generación de los informes. Para simplificar el proceso, se opta por una instalación mínima. Ejecute:
 
@@ -321,26 +270,23 @@ picv-2025/
 
 ## Endpoints de la API
 
-> [!WARNING]
-> El modelo solo procesa magnitudes entre **Mw 6.5 y Mw 9.5**. Valores fuera de este rango resultarán en un error. Los siguientes endpoints deben invocarse en **orden secuencial estricto**:
-> `/calculate` → `/tsunami-travel-times` → `/run-tsdhn`.
+El servicio expone varios endpoints para la gestión de simulaciones sísmicas. Todas las solicitudes deben incluir el encabezado HTTP `Content-Type: application/json` y utilizan identificadores UUIDv4 para gestionar las simulaciones.
 
-El proceso inicia cuando el usuario envía datos sísmicos desde la [interfaz web](https://github.com/totallynotdavid/picv-2025-web).
+1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) inicia una nueva simulación. Requiere un cuerpo JSON con parámetros sísmicos validados mediante modelos Pydantic ([`schemas.py`](orchestrator/models/schemas.py)).
 
-1. [`POST /calculate`](orchestrator/main.py?plain=1#L27) recibe los valores para la magnitud (Mw), profundidad (h) y coordenadas del epicentro. Luego, calcula la geometría de la ruptura, el momento sísmico y evalúa el riesgo de tsunami. Genera el archivo [`hypo.dat`](model/hypo.dat) requerido en pasos posteriores.
+   Los parámetros requeridos incluyen:
 
-   Los siguientes campos deben enviarse en el cuerpo de la solicitud en formato JSON:
+   | Parámetro | Tipo                                 | Descripción                                   |
+   | --------- | ------------------------------------ | --------------------------------------------- |
+   | `Mw`      | decimal (6.5 a 9.5)                  | Magnitud de momento sísmico                   |
+   | `h`       | decimal (>0)                         | Profundidad hipocentral en kilómetros         |
+   | `lat0`    | decimal (-90 a 90)                   | Latitud epicentral en grados decimales        |
+   | `lon0`    | decimal (-180 a 180)                 | Longitud epicentral en grados decimales       |
+   | `dia`     | string (formato DD con cero inicial) | Día del evento (ej. "07")                     |
+   | `hhmm`    | string (formato HHMM)                | Hora del evento (ej. "1430" para 2:30 PM UTC) |
 
-   | Parámetro | Descripción                | Unidad              |
-   | --------- | -------------------------- | ------------------- |
-   | `Mw`      | Magnitud momento sísmico   | adimensional        |
-   | `h`       | Profundidad del hipocentro | km                  |
-   | `lat0`    | Latitud del epicentro      | grados              |
-   | `lon0`    | Longitud del epicentro     | grados              |
-   | `dia`     | Día del mes del evento     | string (ej. `"15"`) |
-   | `hhmm`    | Hora y minutos del evento  | formato `HHMM`      |
+   Un ejemplo de solicitud sería:
 
-   Ten en cuenta que los modelos Pydantic (definidos en [`schemas.py`](orchestrator/models/schemas.py)) se encargan de validar y, en algunos casos, transformar estos parámetros para asegurar que el formato sea el correcto.
    <details>
    <summary>Ejemplo de solicitud</summary>
 
@@ -357,104 +303,28 @@ El proceso inicia cuando el usuario envía datos sísmicos desde la [interfaz we
 
    </details>
 
+   La respuesta esperada para esta solicitud contiene el identificador único de la simulación:
+
    <details>
-   <summary>Ejemplo de respuesta esperada</summary>
+   <summary>Ejemplo de respuesta esperada (HTTP 201)</summary>
 
    ```json
    {
-     "length": 575.44,
-     "width": 144.54,
-     "dislocation": 10.64,
-     "seismic_moment": 3.98e22,
-     "tsunami_warning": "Genera un Tsunami grande y destructivo",
-     "distance_to_coast": 10439.47,
-     "azimuth": 247.0,
-     "dip": 18.0,
-     "epicenter_location": "mar",
-     "rectangle_parameters": {
-       "L1": 575439.94,
-       "W1": 137469.49,
-       "beta": 13.44,
-       "alfa": -23.0,
-       "h1": 591632.47,
-       "a1": -49.15,
-       "b1": 291.7,
-       "xo": -153.35,
-       "yo": 56.45
-     },
-     "rectangle_corners": [
-       { "lon": -153.35, "lat": 56.45 },
-       { "lon": -158.11, "lat": 54.42 },
-       { "lon": -158.6, "lat": 55.56 },
-       { "lon": -153.83, "lat": 57.58 },
-       { "lon": -153.35, "lat": 56.45 }
-     ]
+     "job_id": "dee661ec-1c39-47e5-bb50-3926fa70bb8e"
    }
    ```
 
    </details>
 
-2. [`POST /tsunami-travel-times`](orchestrator/main.py?plain=1#L45) utiliza los mismos datos de entrada que `/calculate` y realiza una serie de integraciones vectorizadas para calcular los tiempos de arribo a puertos predefinidos en [`puertos.txt`](/model/puertos.txt). La respuesta es un objeto JSON que incluye tanto los tiempos de arribo como las distancias a cada estación.
+2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) provee información detallada sobre simulaciones en curso o finalizadas. La respuesta incluye:
 
-   <details>
-   <summary>Ejemplo de respuesta esperada</summary>
+   - El estado actual de la simulación (queued, running, completed, failed)
+   - Los parámetros de ruptura sísmica calculados
+   - Los tiempos de arribo a estaciones definidas en [`puertos.txt`](model/puertos.txt)
+   - Las coordenadas del rectángulo del plano de falla para visualización geoespacial
+   - Los metadatos temporales y URL de descarga (disponible 72 horas post-completado)
 
-   ```json
-   {
-     "arrival_times": {
-       "-80.5876  -03.": "12:09 23Feb",
-       "-81.2827  -04.": "12:12 23Feb",
-       "__comment": "Otros puertos omitidos por brevedad",
-       "-70.3232  -18.": "14:40 23Feb"
-     },
-
-     "distances": {
-       "-80.5876  -03.": 9445.79,
-       "-81.2827  -04.": 9491.94,
-       "__comment": "Otros puertos omitidos por brevedad",
-       "-70.3232  -18.": 11438.3
-     },
-
-     "epicenter_info": {
-       "date": "23",
-       "time": "0000",
-       "latitude": "56.00",
-       "longitude": "-156.00",
-       "depth": "12",
-       "magnitude": "9.0"
-     }
-   }
-   ```
-
-   </details>
-
-3. [`POST /run-tsdhn`](orchestrator/main.py?plain=1#L61) inicia el proceso TSDHN. Anteriormente llamaba al script [`job.run`](model/job.run). Inicialmente procesa [`hypo.dat`](model/hypo.dat). El tiempo de ejecución varía entre 25-50 minutos dependiendo de la carga del sistema.
-
-   <details>
-   <summary>Ejemplo de respuesta esperada</summary>
-
-   ```json
-   {
-     "status": "queued",
-     "job_id": "dee661ec-1c39-47e5-bb50-3926fa70bb8e",
-     "message": "TSDHN job has been queued successfully"
-   }
-   ```
-
-   </details>
-
-   donde:
-
-   - `status` indica el estado de la simulación. Puede ser `queued`, `running`, `completed` o `failed`.
-   - `job_id` es el identificador único de la simulación.
-   - `message` proporciona información adicional sobre el estado de la simulación.
-
-   Internamente, el endpoint produce:
-
-   - Ejemplo de [`salida.txt`](model/salida.txt): Tiempos de arribo brutos.
-   - Ejemplo de [`reporte.pdf`](model/reporte.pdf): Mapas de altura de olas, mareógrafos y parámetros técnicos.
-
-4. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L134) retorna el estado actual de una simulación en la cola del RQ worker. Se espera un objeto JSON con el identificador de la simulación:
+   Un ejemplo de solicitud sería:
 
    <details>
    <summary>Ejemplo de solicitud</summary>
@@ -467,12 +337,42 @@ El proceso inicia cuando el usuario envía datos sísmicos desde la [interfaz we
 
    </details>
 
+   Un ejemplo de respuesta esperada sería:
+
    <details>
    <summary>Ejemplo de respuesta esperada</summary>
 
    ```json
    {
      "status": "completed",
+     "calculation": {
+       "length": 575.44,
+       "width": 144.54,
+       "dislocation": 10.64,
+       "seismic_moment": 3.98e22,
+       "tsunami_warning": "Genera un tsunami grande...",
+       "distance_to_coast": 10439.47,
+       "rectangle_corners": [
+         { "lat": 56.44, "lon": -153.34 }
+         { "__comment": "Otras coordenadas, omitidas por brevedad" }
+       ]
+     },
+     "travel_times": {
+       "arrival_times": {
+         "-80.58, -03.0": "12:09 23Mar",
+         "__comment": "Otras estaciones, omitidas por brevedad"
+       },
+       "distances": {
+         "-80.58, -03.0": 9445.79,
+         "__comment": "Otras distancias, omitidas por brevedad"
+       },
+       "epicenter_info": {
+         "date": "23",
+         "time": "0000",
+         "latitude": "56.00",
+         "longitude": "-156.00"
+       }
+     },
      "details": "Job completed successfully",
      "error": null,
      "created_at": "2025-02-17T19:46:08.171522",
@@ -484,10 +384,20 @@ El proceso inicia cuando el usuario envía datos sísmicos desde la [interfaz we
 
    </details>
 
-5. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L163) retorna el informe generado. Ejemplo de uso:
-   `http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e`
+> [!TIP]
+> Los objetos `calculation` y `travel_times` se añaden inmediatamente después de ser calculados. No es necesario esperar a que finalice la simulación para obtener estos datos.
 
-6. [`GET /health`](orchestrator/main.py?plain=1#L204) verifica la disponibilidad de la API.
+3. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L61)permite descargar el informe técnico en formato PDF cuando el estado es `completed`. Requiere el encabezado `Accept: application/pdf`.
+
+   Un ejemplo de uso directo sería:
+
+   ```
+   http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e
+   ```
+
+4. [`GET /health`](orchestrator/main.py?plain=1#L97) verifica la disponibilidad del servicio y su conexión con Redis.
+
+   Una respuesta esperada sería:
 
    <details>
    <summary>Ejemplo de respuesta esperada</summary>
@@ -495,13 +405,14 @@ El proceso inicia cuando el usuario envía datos sísmicos desde la [interfaz we
    ```json
    {
      "status": "healthy",
-     "timestamp": "2025-02-17T16:22:45.133492",
-     "calculator": "initialized",
-     "queue": "connected"
+     "timestamp": "2025-03-05T14:26:45.150833",
+     "redis_connected": true
    }
    ```
 
    </details>
+
+Todas las respuestas de error siguen el formato RFC 7807 con códigos HTTP semánticos. Los recursos generados se purgan automáticamente tras 72 horas de inactividad.
 
 ## Pruebas personalizadas
 
@@ -540,7 +451,7 @@ Este modo permite omitir componentes específicos de la cadena de procesamiento 
 La(s) etapa(s) omitida(s) se guardan en `configuracion_simulacion.json` en el campo `skip_steps`. Este registro es temporal y no persiste entre ejecuciones del CLI, incluso en modo desarrollo. Deberás especificar nuevamente las etapas a omitir en cada ejecución.
 
 > [!CAUTION]
-> **Omitir etapas invalida los resultados**. Use esta función solo para diagnóstico técnico. Los informes generados no son válidos para análisis científico ni toma de decisiones.
+> Omitir etapas **invalida los resultados**. Use esta función solo para diagnóstico técnico. Los informes generados no son válidos para análisis científico ni toma de decisiones.
 
 ## Notas adicionales
 
