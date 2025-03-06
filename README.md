@@ -369,7 +369,7 @@ El servicio expone varios endpoints para la gestión de simulaciones sísmicas. 
 
 2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) provee información detallada sobre simulaciones en curso o finalizadas. La respuesta incluye:
 
-   - El stado actual de la simulación (queued, running, completed, failed)
+   - El estado actual de la simulación (queued, running, completed, failed)
    - Los parámetros de ruptura sísmica calculados
    - Los tiempos de arribo a estaciones definidas en [`puertos.txt`](model/puertos.txt)
    - Las coordenadas del rectángulo del plano de falla para visualización geoespacial
