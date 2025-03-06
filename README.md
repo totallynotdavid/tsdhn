@@ -327,14 +327,14 @@ El servicio expone varios endpoints para la gestión de simulaciones sísmicas. 
 
    Los parámetros requeridos incluyen:
 
-   | Parámetro | Tipo                                 | Descripción                                        |
-   | --------- | ------------------------------------ | -------------------------------------------------- |
-   | `Mw`      | decimal                              | Magnitud de momento sísmico, valor entre 6.5 y 9.5 |
-   | `h`       | decimal (>0)                         | Profundidad hipocentral en kilómetros              |
-   | `lat0`    | decimal (-90 a 90)                   | Latitud epicentral en grados decimales             |
-   | `lon0`    | decimal (-180 a 180)                 | Longitud epicentral en grados decimales            |
-   | `dia`     | string (formato DD con cero inicial) | Día del evento (ej. "07")                          |
-   | `hhmm`    | string (formato HHMM)                | Hora del evento (ej. "1430" para 2:30 PM UTC)      |
+   | Parámetro | Tipo                                 | Descripción                                   |
+   | --------- | ------------------------------------ | --------------------------------------------- |
+   | `Mw`      | decimal (6.5 a 9.5)                  | Magnitud de momento sísmico                   |
+   | `h`       | decimal (>0)                         | Profundidad hipocentral en kilómetros         |
+   | `lat0`    | decimal (-90 a 90)                   | Latitud epicentral en grados decimales        |
+   | `lon0`    | decimal (-180 a 180)                 | Longitud epicentral en grados decimales       |
+   | `dia`     | string (formato DD con cero inicial) | Día del evento (ej. "07")                     |
+   | `hhmm`    | string (formato HHMM)                | Hora del evento (ej. "1430" para 2:30 PM UTC) |
 
    Un ejemplo de solicitud sería:
 
