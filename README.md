@@ -321,11 +321,11 @@ picv-2025/
 
 ## Endpoints de la API
 
-El servicio expone varios endpoints para la gestión de simulaciones. Todas las solicitudes deben incluir la cabecera `Content-Type: application/json`. El sistema utiliza identificadores UUIDv4 (`job_id`), para gestionar las simulaciones.
+El servicio expone varios endpoints para la gestión de simulaciones sísmicas. Todas las solicitudes deben incluir el encabezado HTTP `Content-Type: application/json` y utilizan identificadores UUIDv4 para gestionar las simulaciones.
 
-1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) permite iniciar una nueva simulación. Este endpoint recibe parámetros sísmicos en formato JSON y devuelve un identificador único que puedes utilizar luego para monitorear el progreso de la simulación. Los parámetros se validan mediante modelos Pydantic definidos en [`schemas.py`](orchestrator/models/schemas.py), que realizan transformaciones automáticas cuando corresponde.
+1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) inicia una nueva simulación. Requiere un cuerpo JSON con parámetros sísmicos validados mediante modelos Pydantic ([`schemas.py`](orchestrator/models/schemas.py)).
 
-   Parámetros requeridos:
+   Los parámetros requeridos incluyen:
 
    | Parámetro | Tipo                                 | Descripción                                     |
    | --------- | ------------------------------------ | ----------------------------------------------- |
@@ -354,7 +354,7 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
 
    </details>
 
-   La respuesta esperada para esta solicitud sería:
+   La respuesta esperada para esta solicitud contiene el identificador único de la simulación:
 
    <details>
    <summary>Ejemplo de respuesta esperada (HTTP 201)</summary>
@@ -367,14 +367,13 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
 
    </details>
 
-2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) permite consultar el estado actual de una simulación, proporcionando metadatos de ejecución, resultados intermedios y enlaces de descarga cuando la simulación ha finalizado.
+2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) provee información detallada sobre simulaciones en curso o finalizadas. La respuesta incluye:
 
-   La respuesta incluye:
-
-   - Estado de la simulación (queued, running, completed o failed)
-   - Parámetros de ruptura
-   - Tiempos de arribo en las estaciones definidas en [puertos.txt](model/puertos.txt)
-   - Coordenadas de las esquinas del rectángulo del plano de falla. Puedes utilizar estos valores para visualizar la ruptura en un mapa utilizando Leaflet o Google Maps API.
+   - Estado actual de la simulación (queued, running, completed, failed)
+   - Parámetros de ruptura sísmica calculados
+   - Tiempos de arribo a estaciones definidas en [`puertos.txt`](model/puertos.txt)
+   - Coordenadas del rectángulo del plano de falla para visualización geoespacial
+   - Metadatos temporales y URL de descarga (disponible 72 horas post-completado)
 
    Un ejemplo de solicitud sería:
 
@@ -436,15 +435,15 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
 
    </details>
 
-3. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L61)permite descargar el informe técnico en formato PDF. Este endpoint requiere que el estado de la simulación sea `completed` y acepta la cabecera `Accept: application/pdf`. Los recursos están disponibles por 72 horas desde su generación.
+3. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L61)permite descargar el informe técnico en formato PDF cuando el estado es `completed`. Requiere el encabezado `Accept: application/pdf`.
 
-   Un ejemplo de uso directo:
+   Un ejemplo de uso directo sería:
 
    ```
    http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e
    ```
 
-4. [`GET /health`](orchestrator/main.py?plain=1#L204) verifica el estado operativo del servicio y su conexión con Redis.
+4. [`GET /health`](orchestrator/main.py?plain=1#L97) verifica la disponibilidad del servicio y su conexión con Redis.
 
    Una respuesta esperada sería:
 
@@ -460,6 +459,8 @@ El servicio expone varios endpoints para la gestión de simulaciones. Todas las 
    ```
 
    </details>
+
+Todas las respuestas de error siguen el formato RFC 7807 con códigos HTTP semánticos. Los recursos generados se purgan automáticamente tras 72 horas de inactividad.
 
 ## Pruebas personalizadas
 
