@@ -43,12 +43,11 @@ sequenceDiagram
 
 ## Instalación
 
-El proyecto requiere **Ubuntu 20.04** o superior. Usuarios de Windows deben configurar Windows Subsystem for Linux (WSL 2.0 o superior) siguiendo la [<kbd>guía oficial</kbd>](https://learn.microsoft.com/es-es/windows/wsl/install) de Microsoft antes de continuar.
+El proyecto requiere **Ubuntu 24.04** o superior. Usuarios de Windows deben configurar Windows Subsystem for Linux (WSL 2.0 o superior) siguiendo la [<kbd>guía oficial</kbd>](https://learn.microsoft.com/es-es/windows/wsl/install) de Microsoft antes de continuar.
 
 ### Prerrequisitos
 
-> [!TIP]
-> Ejecuta `bash utils/setup-env.sh` para instalar todas las dependencias mencionadas en esta sección. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`.
+Ejecuta `bash utils/setup-env.sh` para instalar todas las dependencias mencionadas en esta sección. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`. Si deseas instalar manualmente, sigue los pasos a continuación.
 
 Actualiza los paquetes del sistema antes de iniciar:
 
@@ -136,8 +135,7 @@ sudo apt update -y && sudo apt upgrade -y
    make test clean
    ```
 
-> [!NOTE]
-> Almacenamos el SDK en GitLab para aprovechar su política de LFS gratuito y para reducir la carga en los servidores de los autores durante pruebas CI/CD.
+   **Nota**: Almacenamos el SDK en GitLab para aprovechar su política de LFS gratuito y para reducir la carga en los servidores de los autores durante pruebas CI/CD.
 
 4. [**TeXLive**](https://www.tug.org/texlive/quickinstall.html) es utilizado para la generación de los informes. Para simplificar el proceso, se opta por una instalación mínima. Ejecute:
 
