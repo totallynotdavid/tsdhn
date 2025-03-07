@@ -27,13 +27,23 @@ PROCESSING_PIPELINE = [
         name="fault_plane",
         command=["./fault_plane"],
         file_checks=[("pfalla.inp", "Input file for deform not generated")],
-        compiler_config=CompilerConfig("fault_plane.f90", "fault_plane"),
+        compiler_config=CompilerConfig(
+            source="fault_plane.f90",
+            output="fault_plane",
+            compiler="ifx",
+            flags=["-parallel"],
+        ),
     ),
     ProcessingStep(
         name="deform",
         command=["./deform"],
         file_checks=[("deform", "Deform executable missing")],
-        compiler_config=CompilerConfig("def_oka.f", "deform"),
+        compiler_config=CompilerConfig(
+            source="def_oka.f",
+            output="deform",
+            compiler="ifx",
+            flags=["-parallel"],
+        ),
     ),
     ProcessingStep(
         name="tsunami",
@@ -42,6 +52,12 @@ PROCESSING_PIPELINE = [
             ("zfolder/green.dat", "Green data file missing"),
             ("zfolder/zmax_a.grd", "Zmax grid file missing"),
         ],
+        compiler_config=CompilerConfig(
+            source="tsunami1.for",
+            output="tsunami",
+            compiler="ifx",
+            flags=["-parallel", "-qopenmp"],
+        ),
     ),
     ProcessingStep(
         name="maxola",
