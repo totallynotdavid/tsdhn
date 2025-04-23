@@ -52,6 +52,31 @@ has_python_version() {
     return 1
 }
 
+has_ifx_installed() {
+    if cmd_exists "ifx"; then
+        return 0
+    fi
+    
+    # Check if it's installed but not in PATH
+    if [[ -f "$HOME/intel/oneapi/setvars.sh" ]]; then
+        # Check if sourcing setvars.sh would give us ifx
+        # Create a temporary script to test this
+        local tmp_script=$(mktemp)
+        echo '#!/bin/bash
+source "$HOME/intel/oneapi/setvars.sh" &>/dev/null
+command -v ifx &>/dev/null
+exit $?' > "$tmp_script"
+        chmod +x "$tmp_script"
+        if "$tmp_script"; then
+            rm "$tmp_script"
+            return 0
+        fi
+        rm "$tmp_script"
+    fi
+    
+    return 1  # ifx is not installed
+}
+
 log_info "Checking system status"
 
 REQUIRED_PKGS=(
@@ -68,6 +93,7 @@ NEED_TTT_SDK=false
 NEED_TEXLIVE=false
 NEED_REDIS_CONFIG=false
 NEED_GMT_CONFIG=false
+NEED_IFX=false
 
 REQUIRED_PYTHON_VERSION="3.12"
 
@@ -162,10 +188,34 @@ else
     log_success "GMT library is properly configured ($(gmt --version 2>/dev/null || echo "unknown version"))"
 fi
 
+if has_ifx_installed; then
+    if cmd_exists "ifx"; then
+        log_success "Intel® Fortran Essentials is available ($(
+            ifx --version 2>/dev/null \
+                | head -n1 \
+                | awk '{print $3}' \
+                || echo unknown
+        ))"
+    else
+        log_success "Intel® Fortran Essentials is installed but not in PATH"
+        SETVARS="$HOME/intel/oneapi/setvars.sh"
+        if [[ -f "$SETVARS" ]] && ! grep -q "intel/oneapi/setvars.sh" "$HOME/.bashrc"; then
+            log_info "Adding Intel OneAPI environment to bashrc"
+            echo -e '\n# Intel OneAPI environment' >> "$HOME/.bashrc"
+            echo '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null' >> "$HOME/.bashrc"
+            source "$SETVARS" > /dev/null 2>&1 || true
+            log_success "Intel® Fortran Essentials is available ($(ifx --version 2>/dev/null | head -n 1 || echo "unknown version"))"
+        fi
+    fi
+else
+    log_warn "Intel® Fortran Essentials not installed"
+    NEED_IFX=true
+fi
+
 # Installation plan
 if ! $NEED_SYSTEM_PKGS && ! $NEED_PYENV && ! $NEED_PYTHON312 &&
    ! $NEED_POETRY && ! $NEED_TTT_SDK && ! $NEED_TEXLIVE &&
-   ! $NEED_REDIS_CONFIG && ! $NEED_GMT_CONFIG; then
+   ! $NEED_REDIS_CONFIG && ! $NEED_GMT_CONFIG && ! $NEED_IFX; then
     log_success "All components are already installed and configured!"
     exit 0
 fi
@@ -179,6 +229,7 @@ $NEED_TTT_SDK && echo "- TTT SDK will be installed"
 $NEED_TEXLIVE && echo "- TeXLive will be installed"
 $NEED_REDIS_CONFIG && echo "- Redis will be configured for systemd"
 $NEED_GMT_CONFIG && echo "- GMT library symlink will be configured"
+$NEED_IFX && echo "- Intel Fortran Essentials (ifx) will be installed"
 
 # Prompt to continue
 read -p "Continue with installation? [Y/n] " -n 1 -r
@@ -339,7 +390,48 @@ if $NEED_GMT_CONFIG; then
     fi
 fi
 
-source "$HOME/.bashrc"
+if $NEED_IFX; then
+    log_info "Installing Intel® Fortran Essentials (ifx)"
+
+    INSTALLER_URL="https://registrationcenter-download.intel.com/akdlm/IRC_NAS/306e03be-1259-4d71-848a-59e23013c4f0/intel-fortran-essentials-2025.1.0.556_offline.sh"
+    INSTALLER="${INSTALLER_URL##*/}"
+    WORKDIR="${TMPDIR:-/tmp}/ifx-install-$$"
+
+    safe_exec mkdir -p "$WORKDIR"
+    pushd "$WORKDIR" > /dev/null || exit 1
+
+    if [[ ! -f "$INSTALLER" ]]; then
+        log_info "Downloading Intel Fortran Essentials installer... (this may take a while as the file weighs about 950MB)"
+        safe_exec wget -q --show-progress "$INSTALLER_URL"
+    else
+        log_info "Installer already downloaded: $INSTALLER"
+    fi
+
+    safe_exec chmod +x "$INSTALLER"
+
+    log_info "Running silent install (user-local)..."
+    safe_exec sh "./$INSTALLER" -a --silent --eula accept
+
+    SETVARS="$HOME/intel/oneapi/setvars.sh"
+    if [[ -f "$SETVARS" ]]; then
+        log_success "Intel Fortran installed successfully"
+
+        if ! grep -q "intel/oneapi/setvars.sh" "$HOME/.bashrc"; then
+            log_info "Adding Intel OneAPI environment to bashrc"
+            echo -e '\n# Intel OneAPI environment' >> "$HOME/.bashrc"
+            echo '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null' >> "$HOME/.bashrc"
+        fi
+
+        source "$SETVARS" > /dev/null 2>&1 || true
+    else
+        log_warn "Intel Fortran installation may have failed - setvars.sh not found"
+    fi
+    
+    popd > /dev/null || exit 1
+    rm -rf "$WORKDIR"
+fi
+
+source "$HOME/.bashrc" || true
 
 log_info "Verifying installation"
 
@@ -406,6 +498,14 @@ if $NEED_GMT_CONFIG; then
     if ! sudo test -L "/lib/x86_64-linux-gnu/libgmt.so"; then
         log_warn "GMT library symlink verification failed"
         VERIFICATION_FAILED=true
+    fi
+fi
+
+if $NEED_IFX; then
+    if ! has_ifx_installed; then
+        log_warn "Intel Fortran Essentials verification failed - not installed"
+        VERIFICATION_FAILED=true
+        echo "You may need to restart your terminal or run: 'source ~/.bashrc'"
     fi
 fi
 
