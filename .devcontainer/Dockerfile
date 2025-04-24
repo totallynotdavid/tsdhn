@@ -180,7 +180,6 @@ RUN apt-get update && \
 WORKDIR /app
 COPY --chown=appuser:appuser orchestrator ./orchestrator
 COPY --chown=appuser:appuser model ./model
-COPY --chown=appuser:appuser templates ./templates
 COPY --chown=appuser:appuser data ./data
 
 # Set environment and path
