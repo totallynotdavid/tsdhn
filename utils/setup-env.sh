@@ -103,13 +103,38 @@ EOF
     return 1  # ifx is not installed
 }
 
+check_gmt_version() {
+    local min_version="$1"
+    
+    if ! cmd_exists "gmt"; then
+        return 1
+    fi
+    
+    local current_version
+    current_version=$(gmt --version 2>/dev/null | cut -d' ' -f3)
+    
+    if [[ $(echo -e "$current_version\n$min_version" | sort -V | head -n1) == "$min_version" ]] || 
+       [[ "$current_version" == "$min_version" ]]; then
+        # Current version is greater than or equal to min_version
+        return 0
+    else
+        # Current version is less than min_version
+        return 1
+    fi
+}
+
 # ===== System Status Check =====
 log_info "Checking system status\n"
 
 REQUIRED_PKGS=(
     build-essential zlib1g-dev libffi-dev libssl-dev libbz2-dev
     libreadline-dev libsqlite3-dev liblzma-dev libncurses-dev tk-dev
-    git-lfs cmake gfortran redis-server gmt gmt-dcw gmt-gshhg ps2eps csh
+    git-lfs cmake gfortran redis-server ps2eps csh
+
+    # GMT build deps
+    libcurl4-gnutls-dev libnetcdf-dev libgdal-dev libfftw3-dev
+    libpcre3-dev liblapack-dev libglib2.0-dev ghostscript 
+    dcw-gmt gshhg-gmt-nc4 cmake ninja-build
 )
 
 NEED_SYSTEM_PKGS=false
@@ -119,10 +144,11 @@ NEED_POETRY=false
 NEED_TTT_SDK=false
 NEED_TEXLIVE=false
 NEED_REDIS_CONFIG=false
-NEED_GMT_CONFIG=false
+NEED_GMT_BUILD=false
 NEED_IFX=false
 
 REQUIRED_PYTHON_VERSION="3.12"
+GMT_MIN_VERSION="6.5.0"
 
 missing_pkgs=()
 for pkg in "${REQUIRED_PKGS[@]}"; do
@@ -206,13 +232,16 @@ else
     NEED_REDIS_CONFIG=false
 fi
 
-# Check GMT library configuration (symlink)
-if ! sudo test -L "/lib/x86_64-linux-gnu/libgmt.so" ||
-   ! sudo test -f "/lib/x86_64-linux-gnu/libgmt.so.6"; then
-    log_warn "GMT library symlink not properly configured"
-    NEED_GMT_CONFIG=true
+# Check GMT version
+if check_gmt_version "$GMT_MIN_VERSION"; then
+    log_success "GMT $(gmt --version 2>/dev/null | cut -d' ' -f3) is installed and meets minimum version requirements"
 else
-    log_success "GMT library is properly configured ($(gmt --version 2>/dev/null || echo "unknown version"))"
+    if cmd_exists "gmt"; then
+        log_warn "GMT $(gmt --version 2>/dev/null | cut -d' ' -f3) is installed but does not meet minimum version requirement ($GMT_MIN_VERSION)"
+    else
+        log_warn "GMT command not found"
+    fi
+    NEED_GMT_BUILD=true
 fi
 
 if has_ifx_installed; then
@@ -241,7 +270,7 @@ fi
 # ===== Installation Plan =====
 if ! $NEED_SYSTEM_PKGS && ! $NEED_PYENV && ! $NEED_PYTHON312 &&
    ! $NEED_POETRY && ! $NEED_TTT_SDK && ! $NEED_TEXLIVE &&
-   ! $NEED_REDIS_CONFIG && ! $NEED_GMT_CONFIG && ! $NEED_IFX; then
+   ! $NEED_REDIS_CONFIG && ! $NEED_GMT_BUILD && ! $NEED_IFX; then
     log_success "All components are already installed and configured!"
     exit 0
 fi
@@ -254,7 +283,7 @@ $NEED_POETRY && echo "- Poetry will be installed"
 $NEED_TTT_SDK && echo "- TTT SDK will be installed"
 $NEED_TEXLIVE && echo "- TeXLive will be installed"
 $NEED_REDIS_CONFIG && echo "- Redis will be configured for systemd"
-$NEED_GMT_CONFIG && echo "- GMT library symlink will be configured"
+$NEED_GMT_BUILD && echo "- GMT will be built from source (version $GMT_MIN_VERSION or newer)"
 $NEED_IFX && echo "- Intel Fortran Essentials (ifx) will be installed"
 
 # Prompt to continue
@@ -409,12 +438,43 @@ if $NEED_REDIS_CONFIG && sudo test -f "$REDIS_CONF"; then
     safe_exec "Restarting Redis server" sudo systemctl restart redis-server
 fi
 
-if $NEED_GMT_CONFIG; then
-    log_info "Setting up GMT library symlink"
-    if sudo test -f "/lib/x86_64-linux-gnu/libgmt.so.6"; then
-        safe_exec "Creating GMT library symlink" sudo ln -sf /lib/x86_64-linux-gnu/libgmt.so.6 /lib/x86_64-linux-gnu/libgmt.so
+if $NEED_GMT_BUILD; then
+    log_info "Building GMT from source"
+
+    GMT_BUILD_DIR=$(mktemp -d)
+    pushd "$GMT_BUILD_DIR" > /dev/null || exit 1
+
+    # Clone the GMT repository
+    safe_exec "Cloning GMT repository" git clone --depth 1 https://github.com/GenericMappingTools/gmt.git
+
+    # Build and install GMT
+    if [[ -d "gmt" ]]; then
+        mkdir -p gmt/build
+        cd gmt/build || exit 1
+
+        safe_exec "Configuring GMT build" cmake -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_RPATH=/usr/lib \
+            -DGSHHG_ROOT=/usr/share/gshhg-gmt-nc4 \
+            -DDCW_ROOT=/usr/share/dcw-gmt \
+            -GNinja ..
+
+        safe_exec "Building GMT" ninja
+        safe_exec "Installing GMT" sudo ninja install
+        safe_exec "Running ldconfig" sudo ldconfig
     else
-        log_error "GMT library file not found at /lib/x86_64-linux-gnu/libgmt.so.6"
+        log_error "GMT clone failed"
+    fi
+
+    popd > /dev/null || exit 1
+    rm -rf "$GMT_BUILD_DIR"
+
+    # Verify installation
+    if cmd_exists "gmt"; then
+        GMT_VERSION=$(gmt --version 2>/dev/null | cut -d' ' -f3)
+        log_success "GMT $GMT_VERSION built and installed successfully"
+    else
+        log_error "GMT installation verification failed - command not available"
     fi
 fi
 
@@ -518,9 +578,12 @@ if $NEED_REDIS_CONFIG; then
     fi
 fi
 
-if $NEED_GMT_CONFIG; then
-    if ! sudo test -L "/lib/x86_64-linux-gnu/libgmt.so"; then
-        log_error "GMT library symlink verification failed"
+if $NEED_GMT_BUILD; then
+    if ! cmd_exists "gmt"; then
+        log_error "GMT verification failed - command not available"
+        VERIFICATION_FAILED=true
+    elif ! check_gmt_version "$GMT_MIN_VERSION"; then
+        log_error "GMT verification failed - version $(gmt --version 2>/dev/null | cut -d' ' -f3) does not meet minimum requirement ($GMT_MIN_VERSION)"
         VERIFICATION_FAILED=true
     fi
 fi
