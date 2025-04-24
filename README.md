@@ -126,7 +126,7 @@ sudo apt update -y && sudo apt upgrade -y
    poetry --version
    ```
 
-3. [**TTT SDK**](https://www.geoware-online.com/tsunami.html) (Tsunami Travel Time) calcula los tiempos de arribo de tsunamis a partir de la batimetría del océano Pacífico. Para instalarlo, necesitas Git LFS para poder descargar los datos y CMake para compilación:
+3. [**TTT SDK**](https://www.geoware-online.com/tsunami.html) (Tsunami Travel Time) calcula los tiempos de arribo de un tsunami a partir de la batimetría de una cuadrícula geográfica (el océano Pacífico en nuestro caso). Para instalarlo, necesitas Git LFS para poder descargar los datos y CMake para compilación:
 
    ```bash
    sudo apt install -y git-lfs cmake
