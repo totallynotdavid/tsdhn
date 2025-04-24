@@ -206,9 +206,16 @@ sudo apt update -y && sudo apt upgrade -y
    source ~/.bashrc
    ```
 
-6. **Generic Mapping Tools (GMT) 6.5+**: Como parte de nuestra migración a Python, utilizamos `pygmt` que requiere GMT >= 6.4.0 [[7](https://www.pygmt.org/dev/install.html#which-gmt)]. Compilamos desde el código fuente para evitar dependencias adicionales (e.g. conda) y garantizar compatibilidad en entornos limitados.
+6. **Generic Mapping Tools (GMT)**: Como parte de nuestra migración a Python, utilizamos `pygmt` que requiere GMT >= 6.4.0 [[7](https://www.pygmt.org/dev/install.html#which-gmt)]. Compilamos desde el código fuente para evitar dependencias adicionales (e.g. conda) y garantizar compatibilidad en entornos limitados.
 
    > **Importante**: No es recomendable usar `sudo apt install gmt` ya que los repositorios oficiales generalmente ofrecen la versión 6.0.0, que no es compatible con `pygmt`.
+
+   Crea un directorio temporal para la compilación:
+
+   ```bash
+   GMT_BUILD_DIR=$(mktemp -d)
+   cd "$GMT_BUILD_DIR"
+   ```
 
    Descarga el código fuente y los datos de soporte:
 
@@ -227,8 +234,8 @@ sudo apt update -y && sudo apt upgrade -y
    ```bash
    cat > gmt/cmake/ConfigUser.cmake << EOF
    set (CMAKE_INSTALL_PREFIX "/usr/local")
-   set (GSHHG_ROOT "/ruta/a/gshhg-gmt-2.3.7")
-   set (DCW_ROOT "/ruta/a/dcw-gmt-2.1.1")
+   set (GSHHG_ROOT "${GMT_BUILD_DIR}/gshhg-gmt-2.3.7")
+   set (DCW_ROOT "${GMT_BUILD_DIR}/dcw-gmt-2.2.0")
    EOF
    ```
 
@@ -247,6 +254,13 @@ sudo apt update -y && sudo apt upgrade -y
 
    ```bash
    gmt --version
+   ```
+
+   Limpia el directorio temporal:
+
+   ```bash
+   cd
+   rm -rf "$GMT_BUILD_DIR"
    ```
 
 7. **Dependencias adicionales**: `redis-server`, `ps2eps`, `csh`. Ejecuta:
