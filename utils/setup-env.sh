@@ -1,9 +1,12 @@
 #!/bin/bash
 set -eo pipefail
 
-log_info() { echo -e "\n■ $1"; }
-log_success() { echo -e "✓ $1"; }
-log_warn() { echo -e "◇ $1"; }
+# ===== Utility Functions =====
+
+log_info() { echo -e "\n🔷 $1"; }
+log_success() { echo -e "✅ $1"; }
+log_warn() { echo -e "⚠️  $1"; }
+log_error() { echo -e "❌ $1"; }
 
 cmd_exists() {
     command -v "$1" &>/dev/null
@@ -18,25 +21,43 @@ path_exists() {
 }
 
 safe_exec() {
+    local cmd_desc="$1"
+    shift
+    
+    log_info "Executing: $cmd_desc"
     if ! "$@"; then
-        log_warn "Command failed: $*"
+        log_error "Command failed: $*"
         return 1
     fi
+    log_success "$cmd_desc completed"
     return 0
+}
+
+add_to_bashrc() {
+    local section="$1"
+    local line="$2"
+    
+    if ! grep -q "$line" "$HOME/.bashrc"; then
+        if ! grep -q "# $section" "$HOME/.bashrc"; then
+            echo -e "\n# $section" >> "$HOME/.bashrc"
+        fi
+        echo "$line" >> "$HOME/.bashrc"
+        return 0
+    fi
+    return 1  # Already exists
 }
 
 has_python_version() {
     local required_version="$1"
-    local python_cmd
 
+    # Check if python3 is the required version
     if cmd_exists "python3"; then
-        python_cmd="python3"
-        local py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        local py_version
+        py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
         if [[ "$py_version" == "$required_version" ]]; then
             return 0
         fi
     fi
-
 
     if cmd_exists "python$required_version"; then
         return 0
@@ -56,17 +77,22 @@ has_ifx_installed() {
     if cmd_exists "ifx"; then
         return 0
     fi
-    
+
     # Check if it's installed but not in PATH
     if [[ -f "$HOME/intel/oneapi/setvars.sh" ]]; then
         # Check if sourcing setvars.sh would give us ifx
+        local tmp_script
+        tmp_script=$(mktemp)
+        
         # Create a temporary script to test this
-        local tmp_script=$(mktemp)
-        echo '#!/bin/bash
+        cat > "$tmp_script" << 'EOF'
+#!/bin/bash
 source "$HOME/intel/oneapi/setvars.sh" &>/dev/null
 command -v ifx &>/dev/null
-exit $?' > "$tmp_script"
+exit $?
+EOF
         chmod +x "$tmp_script"
+
         if "$tmp_script"; then
             rm "$tmp_script"
             return 0
@@ -77,6 +103,7 @@ exit $?' > "$tmp_script"
     return 1  # ifx is not installed
 }
 
+# ===== System Status Check =====
 log_info "Checking system status"
 
 REQUIRED_PKGS=(
@@ -108,7 +135,7 @@ if (( ${#missing_pkgs[@]} > 0 )); then
     NEED_SYSTEM_PKGS=true
     log_warn "Missing packages: ${missing_pkgs[*]}"
 else
-    log_success "All required packages are installed"
+    log_success "All required system packages are installed"
 fi
 
 if has_python_version "$REQUIRED_PYTHON_VERSION"; then
@@ -201,8 +228,7 @@ if has_ifx_installed; then
         SETVARS="$HOME/intel/oneapi/setvars.sh"
         if [[ -f "$SETVARS" ]] && ! grep -q "intel/oneapi/setvars.sh" "$HOME/.bashrc"; then
             log_info "Adding Intel OneAPI environment to bashrc"
-            echo -e '\n# Intel OneAPI environment' >> "$HOME/.bashrc"
-            echo '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null' >> "$HOME/.bashrc"
+            add_to_bashrc "Intel OneAPI environment" '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null'
             source "$SETVARS" > /dev/null 2>&1 || true
             log_success "Intel® Fortran Essentials is available ($(ifx --version 2>/dev/null | head -n 1 || echo "unknown version"))"
         fi
@@ -212,7 +238,7 @@ else
     NEED_IFX=true
 fi
 
-# Installation plan
+# ===== Installation Plan =====
 if ! $NEED_SYSTEM_PKGS && ! $NEED_PYENV && ! $NEED_PYTHON312 &&
    ! $NEED_POETRY && ! $NEED_TTT_SDK && ! $NEED_TEXLIVE &&
    ! $NEED_REDIS_CONFIG && ! $NEED_GMT_CONFIG && ! $NEED_IFX; then
@@ -235,24 +261,26 @@ $NEED_IFX && echo "- Intel Fortran Essentials (ifx) will be installed"
 read -p "Continue with installation? [Y/n] " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
-    echo "Installation aborted."
+    log_info "Installation aborted."
     exit 1
 fi
 
+# ===== Installation Process =====
+
 if $NEED_SYSTEM_PKGS; then
     log_info "Updating system packages"
-    safe_exec sudo apt update -y
-    safe_exec sudo apt upgrade -y
+    safe_exec "APT update" sudo apt update -y
+    safe_exec "APT upgrade" sudo apt upgrade -y
 
     if (( ${#missing_pkgs[@]} > 0 )); then
         log_info "Installing missing packages"
-        safe_exec sudo apt install -y "${missing_pkgs[@]}"
+        safe_exec "Installing required packages" sudo apt install -y "${missing_pkgs[@]}"
     fi
 fi
 
 if $NEED_PYENV; then
     log_info "Installing Pyenv"
-    safe_exec curl -fsSL https://pyenv.run | bash
+    safe_exec "Downloading and running pyenv installer" curl -fsSL https://pyenv.run | bash
 
     if [[ -d "$HOME/.pyenv" ]]; then
         export PYENV_ROOT="$HOME/.pyenv"
@@ -265,24 +293,22 @@ if $NEED_PYENV; then
         if [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]]; then
             log_info "WSL environment detected"
             WSL_MODE=true
-            PYENV_INIT_CMD="eval \"\$(pyenv init -)\""
+            PYENV_INIT_CMD='eval "$(pyenv init -)"'
         else
             log_info "Native Linux environment detected"
             WSL_MODE=false
-            PYENV_INIT_CMD="eval \"\$(pyenv init - bash)\""
+            PYENV_INIT_CMD='eval "$(pyenv init - bash)"'
         fi
-        if ! grep -q "PYENV_ROOT" "$HOME/.bashrc"; then
-            log_info "Adding pyenv to PATH in bashrc"
-            echo -e '\n# Pyenv configuration' >> "$HOME/.bashrc"
-            echo 'export PYENV_ROOT="$HOME/.pyenv"' >> "$HOME/.bashrc"
-
-            if $WSL_MODE; then
-                echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> "$HOME/.bashrc"
-                echo 'eval "$(pyenv init -)"' >> "$HOME/.bashrc"
-            else
-                echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> "$HOME/.bashrc"
-                echo 'eval "$(pyenv init - bash)"' >> "$HOME/.bashrc"
-            fi
+        
+        # Add pyenv to bashrc
+        add_to_bashrc "Pyenv configuration" 'export PYENV_ROOT="$HOME/.pyenv"'
+        
+        if $WSL_MODE; then
+            add_to_bashrc "Pyenv configuration" 'export PATH="$PYENV_ROOT/bin:$PATH"'
+            add_to_bashrc "Pyenv configuration" 'eval "$(pyenv init -)"'
+        else
+            add_to_bashrc "Pyenv configuration" '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"'
+            add_to_bashrc "Pyenv configuration" 'eval "$(pyenv init - bash)"'
         fi
 
         eval "$PYENV_INIT_CMD"
@@ -293,40 +319,35 @@ fi
 
 if $NEED_PYTHON312 && (cmd_exists "pyenv" || $NEED_PYENV); then
     log_info "Installing Python $REQUIRED_PYTHON_VERSION using pyenv"
-    safe_exec pyenv install -s $REQUIRED_PYTHON_VERSION
-    safe_exec pyenv global $REQUIRED_PYTHON_VERSION
+    safe_exec "Installing Python $REQUIRED_PYTHON_VERSION" pyenv install -s "$REQUIRED_PYTHON_VERSION"
+    safe_exec "Setting Python $REQUIRED_PYTHON_VERSION as global" pyenv global "$REQUIRED_PYTHON_VERSION"
 fi
 
 if $NEED_POETRY; then
     log_info "Installing Poetry"
-    safe_exec curl -sSL https://install.python-poetry.org | python3 -
+    safe_exec "Downloading and running Poetry installer" curl -sSL https://install.python-poetry.org | python3 -
 
     if [[ -d "$HOME/.local/bin" ]]; then
         export PATH="$HOME/.local/bin:$PATH"
-
-        if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
-            log_info "Adding poetry to PATH in bashrc"
-            echo -e '\n# Poetry path' >> "$HOME/.bashrc"
-            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-        fi
+        add_to_bashrc "Poetry path" 'export PATH="$HOME/.local/bin:$PATH"'
     fi
 fi
 
 if $NEED_TTT_SDK; then
     log_info "Installing TTT SDK"
     TMP_DIR=$(mktemp -d)
-    safe_exec git clone -q https://gitlab.com/totallynotdavid/tttapi/ "$TMP_DIR/tttapi"
+    safe_exec "Cloning TTT SDK repository" git clone -q https://gitlab.com/totallynotdavid/tttapi/ "$TMP_DIR/tttapi"
 
     if [[ -d "$TMP_DIR/tttapi" ]]; then
         (
             cd "$TMP_DIR/tttapi" || exit 1
-            safe_exec make config compile >/dev/null 2>&1
-            safe_exec sudo make install datadir docs >/dev/null 2>&1
-            safe_exec make test clean >/dev/null 2>&1
+            safe_exec "Configuring and compiling TTT SDK" make config compile >/dev/null 2>&1
+            safe_exec "Installing TTT SDK" sudo make install datadir docs >/dev/null 2>&1
+            safe_exec "Testing and cleaning TTT SDK" make test clean >/dev/null 2>&1
         )
         rm -rf "$TMP_DIR"
     else
-        log_warn "TTT SDK clone failed"
+        log_error "TTT SDK clone failed"
     fi
 fi
 
@@ -335,18 +356,24 @@ if $NEED_TEXLIVE; then
     TMP_TL=$(mktemp -d)
     pushd "$TMP_TL" > /dev/null || exit 1
 
-    safe_exec wget -q https://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz
-    safe_exec tar -xzf install-tl-unx.tar.gz
+    safe_exec "Downloading TeXLive installer" wget -q https://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz
+    safe_exec "Extracting TeXLive installer" tar -xzf install-tl-unx.tar.gz
 
     INSTALL_TL_DIR=$(find . -maxdepth 1 -type d -name "install-tl-*" | head -1)
 
     if [[ -n "$INSTALL_TL_DIR" ]]; then
         cd "$INSTALL_TL_DIR" || exit 1
 
-        echo -e "selected_scheme scheme-basic\ntlpdbopt_autobackup 0\ntlpdbopt_install_docfiles 0\ntlpdbopt_install_srcfiles 0" > texlive.profile
+        # Create profile for non-interactive installation
+        cat > texlive.profile << EOF
+selected_scheme scheme-basic
+tlpdbopt_autobackup 0
+tlpdbopt_install_docfiles 0
+tlpdbopt_install_srcfiles 0
+EOF
 
         TEXLIVE_INSTALL_DIR="$HOME/texlive"
-        safe_exec perl ./install-tl \
+        safe_exec "Installing TeXLive" perl ./install-tl \
             --profile=texlive.profile \
             --texdir="$TEXLIVE_INSTALL_DIR" \
             --texuserdir="$HOME/.texlive" \
@@ -357,13 +384,10 @@ if $NEED_TEXLIVE; then
 
             if [[ -n "$TEXLIVE_BIN_DIR" ]]; then
                 export PATH="$TEXLIVE_BIN_DIR:$PATH"
-
-                if ! grep -q "texlive/bin" "$HOME/.bashrc"; then
-                    echo -e '\n# TeXLive path\nexport PATH="'"$TEXLIVE_BIN_DIR"':$PATH"' >> "$HOME/.bashrc"
-                fi
+                add_to_bashrc "TeXLive path" "export PATH=\"$TEXLIVE_BIN_DIR:\$PATH\""
 
                 if command -v tlmgr >/dev/null 2>&1; then
-                    safe_exec "$TEXLIVE_BIN_DIR/tlmgr" install babel-spanish hyphen-spanish booktabs --verify-repo=none
+                    safe_exec "Installing additional TeXLive packages" "$TEXLIVE_BIN_DIR/tlmgr" install babel-spanish hyphen-spanish booktabs --verify-repo=none
                 fi
             fi
         fi
@@ -375,18 +399,18 @@ fi
 
 if $NEED_REDIS_CONFIG && sudo test -f "$REDIS_CONF"; then
     log_info "Configuring Redis for systemd"
-    safe_exec sudo cp "$REDIS_CONF" "${REDIS_CONF}.bak"
-    safe_exec sudo sed -i -E 's/^(# ?)?supervised .*/supervised systemd/' "$REDIS_CONF"
-    safe_exec service --status-all
-    safe_exec sudo systemctl restart redis-server
+    safe_exec "Backing up Redis config" sudo cp "$REDIS_CONF" "${REDIS_CONF}.bak"
+    safe_exec "Updating Redis config" sudo sed -i -E 's/^(# ?)?supervised .*/supervised systemd/' "$REDIS_CONF"
+    safe_exec "Checking system services" service --status-all
+    safe_exec "Restarting Redis server" sudo systemctl restart redis-server
 fi
 
 if $NEED_GMT_CONFIG; then
     log_info "Setting up GMT library symlink"
     if sudo test -f "/lib/x86_64-linux-gnu/libgmt.so.6"; then
-        safe_exec sudo ln -sf /lib/x86_64-linux-gnu/libgmt.so.6 /lib/x86_64-linux-gnu/libgmt.so
+        safe_exec "Creating GMT library symlink" sudo ln -sf /lib/x86_64-linux-gnu/libgmt.so.6 /lib/x86_64-linux-gnu/libgmt.so
     else
-        log_warn "GMT library file not found at /lib/x86_64-linux-gnu/libgmt.so.6"
+        log_error "GMT library file not found at /lib/x86_64-linux-gnu/libgmt.so.6"
     fi
 fi
 
@@ -397,42 +421,38 @@ if $NEED_IFX; then
     INSTALLER="${INSTALLER_URL##*/}"
     WORKDIR="${TMPDIR:-/tmp}/ifx-install-$$"
 
-    safe_exec mkdir -p "$WORKDIR"
+    safe_exec "Creating temporary directory" mkdir -p "$WORKDIR"
     pushd "$WORKDIR" > /dev/null || exit 1
 
     if [[ ! -f "$INSTALLER" ]]; then
         log_info "Downloading Intel Fortran Essentials installer... (this may take a while as the file weighs about 950MB)"
-        safe_exec wget -q --show-progress "$INSTALLER_URL"
+        safe_exec "Downloading Intel Fortran installer" wget -q --show-progress "$INSTALLER_URL"
     else
         log_info "Installer already downloaded: $INSTALLER"
     fi
 
-    safe_exec chmod +x "$INSTALLER"
+    safe_exec "Making installer executable" chmod +x "$INSTALLER"
 
     log_info "Running silent install (user-local)..."
-    safe_exec sh "./$INSTALLER" -a --silent --eula accept
+    safe_exec "Installing Intel Fortran" sh "./$INSTALLER" -a --silent --eula accept
 
     SETVARS="$HOME/intel/oneapi/setvars.sh"
     if [[ -f "$SETVARS" ]]; then
         log_success "Intel Fortran installed successfully"
-
-        if ! grep -q "intel/oneapi/setvars.sh" "$HOME/.bashrc"; then
-            log_info "Adding Intel OneAPI environment to bashrc"
-            echo -e '\n# Intel OneAPI environment' >> "$HOME/.bashrc"
-            echo '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null' >> "$HOME/.bashrc"
-        fi
-
+        add_to_bashrc "Intel OneAPI environment" '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null'
+        
         source "$SETVARS" > /dev/null 2>&1 || true
     else
-        log_warn "Intel Fortran installation may have failed - setvars.sh not found"
+        log_error "Intel Fortran installation may have failed - setvars.sh not found"
     fi
     
     popd > /dev/null || exit 1
     rm -rf "$WORKDIR"
 fi
 
-source "$HOME/.bashrc" || true
+source "$HOME/.bashrc" 2>/dev/null || true
 
+# ===== Installation Verification =====
 log_info "Verifying installation"
 
 VERIFICATION_FAILED=false
@@ -441,7 +461,7 @@ VERIFICATION_FAILED=false
 if $NEED_SYSTEM_PKGS; then
     for pkg in "${missing_pkgs[@]}"; do
         if ! is_pkg_installed "$pkg"; then
-            log_warn "Package $pkg failed to install"
+            log_error "Package $pkg failed to install"
             VERIFICATION_FAILED=true
         fi
     done
@@ -449,21 +469,21 @@ fi
 
 if $NEED_PYENV; then
     if ! cmd_exists "pyenv"; then
-        log_warn "Pyenv verification failed - command not available"
+        log_error "Pyenv verification failed - command not available"
         VERIFICATION_FAILED=true
     fi
 fi
 
 if $NEED_PYTHON312; then
     if ! has_python_version "$REQUIRED_PYTHON_VERSION"; then
-        log_warn "Python $REQUIRED_PYTHON_VERSION verification failed - not installed"
+        log_error "Python $REQUIRED_PYTHON_VERSION verification failed - not installed"
         VERIFICATION_FAILED=true
     fi
 fi
 
 if $NEED_POETRY; then
     if ! cmd_exists "poetry"; then
-        log_warn "Poetry verification failed - command not available"
+        log_error "Poetry verification failed - command not available"
         VERIFICATION_FAILED=true
         echo "You may need to restart your terminal or run: 'source ~/.bashrc'"
     fi
@@ -471,17 +491,17 @@ fi
 
 if $NEED_TTT_SDK; then
     if ! cmd_exists "ttt_client"; then
-        log_warn "TTT SDK verification failed - command not available"
+        log_error "TTT SDK verification failed - command not available"
         VERIFICATION_FAILED=true
     fi
 fi
 
 if $NEED_TEXLIVE; then
     if ! path_exists "$HOME/texlive"; then
-        log_warn "TeXLive verification failed - installation directory not found"
+        log_error "TeXLive verification failed - installation directory not found"
         VERIFICATION_FAILED=true
     elif ! cmd_exists "tex" && ! cmd_exists "pdflatex"; then
-        log_warn "TeXLive verification failed - commands not available"
+        log_error "TeXLive verification failed - commands not available"
         echo "You may need to restart your terminal or run: 'source ~/.bashrc'"
         VERIFICATION_FAILED=true
     fi
@@ -489,29 +509,31 @@ fi
 
 if $NEED_REDIS_CONFIG; then
     if sudo test -f "$REDIS_CONF" && ! sudo grep -q "^supervised systemd" "$REDIS_CONF"; then
-        log_warn "Redis configuration verification failed"
+        log_error "Redis configuration verification failed"
         VERIFICATION_FAILED=true
     fi
 fi
 
 if $NEED_GMT_CONFIG; then
     if ! sudo test -L "/lib/x86_64-linux-gnu/libgmt.so"; then
-        log_warn "GMT library symlink verification failed"
+        log_error "GMT library symlink verification failed"
         VERIFICATION_FAILED=true
     fi
 fi
 
 if $NEED_IFX; then
     if ! has_ifx_installed; then
-        log_warn "Intel Fortran Essentials verification failed - not installed"
+        log_error "Intel Fortran Essentials verification failed - not installed"
         VERIFICATION_FAILED=true
         echo "You may need to restart your terminal or run: 'source ~/.bashrc'"
     fi
 fi
 
+# Final status report
 if $VERIFICATION_FAILED; then
     log_warn "Some components may require additional configuration"
     echo "You may need to restart your terminal or run: 'source ~/.bashrc'"
 else
     log_success "All installed components verified successfully"
+    echo "You might need to restart your terminal for all changes to take effect"
 fi
