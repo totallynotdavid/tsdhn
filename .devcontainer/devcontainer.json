@@ -1,0 +1,62 @@
+{
+    "name": "Orchestrator-TSDHN Dev",
+
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+
+    "workspaceFolder": "/app",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
+
+    "hostRequirements": {
+        "cpus": 4,
+        "memory": "16gb",
+        "storage": "32gb"
+    },
+
+    "remoteUser": "appuser",
+
+    "forwardPorts": [8000],
+    "portsAttributes": {
+        "8000": {
+            "label": "Orchestrator-TSDHN App",
+            "onAutoForward": "notify"
+        }
+    },
+
+    "postCreateCommand": "pip install --user pylint black",
+
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/bin/python3.12",
+                "python.linting.pylintEnabled": true,
+                "python.linting.enabled": true,
+                "python.formatting.provider": "black",
+                "editor.formatOnSave": true,
+                "[python]": {
+                    "editor.codeActionsOnSave": {
+                        "source.organizeImports": "explicit"
+                    }
+                },
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash"
+                    }
+                },
+                "files.eol": "\n"
+            },
+
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylint",
+                "ms-python.black-formatter",
+                "redhat.vscode-yaml",
+                "tamasfe.even-better-toml",
+                "GitHub.copilot"
+            ]
+        }
+    }
+}
