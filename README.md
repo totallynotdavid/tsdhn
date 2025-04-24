@@ -61,7 +61,7 @@ sudo apt update -y && sudo apt upgrade -y
    curl -fsSL https://pyenv.run | bash
    ```
 
-   <ins>Si estás usando WSL</ins>, ejecuta lo siguiente [[1](https://stackoverflow.com/a/76483889)]:
+   <ins>Si estás usando Ubuntu a través de WSL</ins>, ejecuta lo siguiente [[1](https://stackoverflow.com/a/76483889)]:
 
    ```bash
    cat << 'EOF' >> ~/.bashrc
@@ -111,6 +111,11 @@ sudo apt update -y && sudo apt upgrade -y
 
    ```bash
    curl -sSL https://install.python-poetry.org | python3 -
+   ```
+
+   Configuración del <kbd>PATH</kbd>:
+
+   ```
    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
    source ~/.bashrc
    ```
@@ -127,7 +132,7 @@ sudo apt update -y && sudo apt upgrade -y
    sudo apt install -y git-lfs cmake
    ```
 
-   Para instalar el TTT SDK:
+   Para instalar TTT SDK, ejecuta:
 
    ```bash
    git clone https://gitlab.com/totallynotdavid/tttapi/
@@ -179,16 +184,82 @@ sudo apt update -y && sudo apt upgrade -y
    tlmgr update --self && tlmgr install babel-spanish hyphen-spanish booktabs
    ```
 
-5. Dependencias adicionales: `gfortran`, `redis-server`, `gmt`[^1], `ps2eps`, `csh`. Ejecute:
+5. [Intel® Fortran Essentials](https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2025-1/online-offline-installer-003.html): Anteriormente, usábamos `ifort` para compilar los archivos de Fortran de forma optimizada, pero Intel terminó removiéndolo en favor de `ifx` [[6](https://www.intel.com/content/www/us/en/developer/articles/release-notes/fortran-compiler/2025.html)]. Para instalarlo, descarga:
 
    ```bash
-   sudo apt install -y gfortran redis-server gmt gmt-dcw gmt-gshhg ps2eps csh
+   wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/306e03be-1259-4d71-848a-59e23013c4f0/intel-fortran-essentials-2025.1.0.556_offline.sh
    ```
 
-   [`pygmt`](https://www.pygmt.org/latest/) requiere un enlace simbólico para funcionar correctamente:
+   Este archivo pesa alrededor de 951 MB. Para continuar, ejecuta:
 
    ```bash
-   sudo ln -s /lib/x86_64-linux-gnu/libgmt.so.6 /lib/x86_64-linux-gnu/libgmt.so
+   chmod +x intel-fortran-essentials-*.sh
+   ./intel-fortran-essentials-*.sh -a --silent --eula accept
+   echo '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null' >> ~/.bashrc
+   ```
+
+   Configuración del <kbd>PATH</kbd>:
+
+   ```bash
+   echo '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+`setvars.sh` se encarga de añadir los archivos al path
+
+6. Generic Mapping Tools (GMT) 6.5+: Como parte de nuestra migración a Python, utilizamos `pygmt` que requiere GMT >=6.4.0 [[7](https://www.pygmt.org/dev/install.html#which-gmt)]. Aunque el equipo de PyGMT recomienda usar conda, prefiero compilar desde el código fuente para evitar añadir complejidad innecesaria y dependencias al implementar en entornos más limitados.
+
+No es recomendable usar `sudo apt install gmt` ya que la última versión disponible en la mayoría de los repositorios es solamente la 6.0.0.
+
+Primero, descargamos el código fuente de GMT y los datos de soporte necesarios:
+
+```bash
+git clone --depth 50 https://github.com/GenericMappingTools/gmt
+
+wget https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-gmt-2.3.7.tar.gz
+tar xzf gshhg-gmt-2.3.7.tar.gz
+
+wget https://github.com/GenericMappingTools/dcw-gmt/releases/download/2.1.1/dcw-gmt-2.1.1.tar.gz
+tar xzf dcw-gmt-2.1.1.tar.gz
+```
+
+Luego, creamos el archivo de configuración:
+
+```bash
+cat > gmt/cmake/ConfigUser.cmake << EOF
+set (CMAKE_INSTALL_PREFIX "/usr/local")
+set (GSHHG_ROOT "/ruta/a/gshhg-gmt-2.3.7")
+set (DCW_ROOT "/ruta/a/dcw-gmt-2.1.1")
+EOF
+```
+
+Luego, creamos el directorio donde vamos a compilar:
+
+```bash
+mkdir -p gmt/build
+cd gmt/build
+```
+
+Configuramos, compilamos e instalamos GMT:
+
+```bash
+cmake .. -G Ninja
+
+cmake --build .
+sudo cmake --build . --target install
+sudo ldconfig
+```
+
+Verifica la instalación:
+
+```bash
+gmt --version
+```
+
+7. Dependencias adicionales: `redis-server`, `ps2eps`, `csh`. Ejecute:
+
+   ```bash
+   sudo apt install -y gfortran redis-server ps2eps csh
    ```
 
    Configura Redis para usar systemd:
@@ -198,7 +269,7 @@ sudo apt update -y && sudo apt upgrade -y
    sudo systemctl restart redis-server
    ```
 
-6. **Opcional**: Si necesitas ejecutar la interfaz gráfica original ([<kbd>tsunami.m</kbd>](model/tsunami.m)), puedes instalar [MATLAB R2014](https://drive.google.com/file/d/1VhLnwXX78Y7O8huwlRuE-shOW2LKlVpd/view?usp=drive_link).
+8. **Opcional**: Si necesitas ejecutar la interfaz gráfica original ([<kbd>tsunami.m</kbd>](model/tsunami.m)), puedes instalar [MATLAB R2014](https://drive.google.com/file/d/1VhLnwXX78Y7O8huwlRuE-shOW2LKlVpd/view?usp=drive_link).
 
 ### Iniciar el proyecto
 
