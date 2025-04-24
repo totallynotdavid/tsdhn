@@ -20,3 +20,23 @@ def setup_workspace(src: Path, dst: Path) -> None:
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
+
+
+def sanitize_for_log(value: str) -> str:
+    """
+    Sanitize a value for logging to prevent log injection attacks.
+    Replaces newlines and control characters that could be used for log forging.
+    """
+    if value is None:
+        return "None"
+
+    value_str = str(value)  # Force it to be a string
+
+    sanitized = value_str.replace("\n", "\\n").replace("\r", "\\r")
+
+    # Avoid huge log entries
+    max_length = 100
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + "..."
+
+    return sanitized
