@@ -140,9 +140,9 @@ sudo apt update -y && sudo apt upgrade -y
    make test clean
    ```
 
-   > **Nota**: Alojamos el SDK en GitLab para aprovechar su política gratuita de LFS (Git Large File Storage) y reducir la carga en los servidores de los autores durante nuestras pruebas de CI/CD.
+   **Nota**: Alojamos el SDK en GitLab para aprovechar su política gratuita de LFS (Git Large File Storage) y reducir la carga en los servidores de los autores durante nuestras pruebas de CI/CD.
 
-4. [**TeXLive**](https://www.tug.org/texlive/quickinstall.html), específicamente pdflatex es utilizado para generar los informes en PDF. Realizamos una instalación mínima para optimizar espacio:
+4. [**TeXLive**](https://www.tug.org/texlive/quickinstall.html), específicamente pdflatex, es utilizado para generar los informes en PDF. Realizamos una instalación mínima para optimizar espacio:
 
    ```bash
    cd /tmp
@@ -151,7 +151,7 @@ sudo apt update -y && sudo apt upgrade -y
    cd install-tl-2*
    ```
 
-   Crea un perfil de instalación (<kbd>texlive.profile</kbd>) que selecciona solo los componentes básicos:
+   Crea un perfil de instalación (<kbd>texlive.profile</kbd>) que selecciona solo los componentes a instalar:
 
    ```bash
    cat > texlive.profile << EOF
@@ -190,7 +190,7 @@ sudo apt update -y && sudo apt upgrade -y
    wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/306e03be-1259-4d71-848a-59e23013c4f0/intel-fortran-essentials-2025.1.0.556_offline.sh
    ```
 
-   > **Nota**: Este archivo pesa aproximadamente 951 MB.
+   **Nota**: Este archivo pesa aproximadamente 951 MB.
 
    Instala el compilador:
 
@@ -208,7 +208,7 @@ sudo apt update -y && sudo apt upgrade -y
 
 6. **Generic Mapping Tools (GMT)**: Como parte de nuestra migración a Python, utilizamos `pygmt` que requiere GMT >= 6.4.0 [[7](https://www.pygmt.org/dev/install.html#which-gmt)]. Compilamos desde el código fuente para evitar dependencias adicionales (e.g. conda) y garantizar compatibilidad en entornos limitados.
 
-   > **Importante**: No es recomendable usar `sudo apt install gmt` ya que los repositorios oficiales generalmente ofrecen la versión 6.0.0, que no es compatible con `pygmt`.
+   **Importante**: No es recomendable usar `sudo apt install gmt` ya que los repositorios oficiales generalmente ofrecen la versión 6.0.0, que no es compatible con `pygmt`.
 
    Crea un directorio temporal para la compilación:
 
