@@ -24,7 +24,7 @@ RUN apt-get update && \
         # Core Utils
         wget curl ca-certificates gnupg lsb-release git git-lfs \
         # Python 3.12
-        python3.12 python3-pip \
+        python3.12 python3.12-venv python3-pip \
         # Build Essentials
         build-essential make pkg-config \
         # GMT Build Deps & Runtime Libs
@@ -40,11 +40,15 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Update pip & install essentials
-RUN python3.12 -m pip install --no-cache-dir --upgrade pip setuptools wheel
-
 # Initialize git-lfs
 RUN git lfs install --system
+
+# Create and activate Python virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3.12 -m venv ${VIRTUAL_ENV}
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # ========================
 # TTT SDK installation
@@ -150,12 +154,27 @@ WORKDIR /app
 
 # Copy requirements file and install Python dependencies
 COPY --chown=appuser:appuser requirements.txt .
-RUN python3.12 -m pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ========================
 # Final image assembly
 # ========================
 FROM base
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.12 python3.12-venv \
+        libcurl4 libnetcdf-c++4 libgdal32 \
+        libfftw3-3 libpcre3 liblapack3 libblas3 libglib2.0-0 \
+        ghostscript graphicsmagick ffmpeg \
+        csh ps2eps fontconfig && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+COPY --from=python-deps ${VIRTUAL_ENV} ${VIRTUAL_ENV}
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 # Copy tools from builder stages
 COPY --from=ttt-builder /usr/local/bin/ttt_* /usr/local/bin/
@@ -164,7 +183,6 @@ COPY --from=texlive-builder /usr/local/texlive /usr/local/texlive
 COPY --from=gmt-builder /usr/local/bin/gmt* /usr/local/bin/
 COPY --from=gmt-builder /usr/local/share/gmt /usr/local/share/gmt
 COPY --from=ifx-builder /opt/intel/oneapi /opt/intel/oneapi
-COPY --from=python-deps /usr/local/lib/python3.12/dist-packages /usr/local/lib/python3.12/dist-packages
 
 # Copy application code
 WORKDIR /app
