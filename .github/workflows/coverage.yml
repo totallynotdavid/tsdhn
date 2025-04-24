@@ -1,56 +1,55 @@
 name: "Test Coverage"
-
 on:
-  workflow_dispatch:
-  push:
-    branches: ["main"]
-    paths:
-      - "orchestrator/**"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "orchestrator/**"
+    push:
+        branches: ["main"]
+        paths:
+            - "orchestrator/**"
+    pull_request:
+        branches: ["main"]
+        paths:
+            - "orchestrator/**"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    statuses: write
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
 
-    steps:
-      - uses: actions/checkout@v4
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12.3"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12.3"
+            - name: gmt (#33) fix for libgmt symlink
+              run: |
+                  sudo apt-get install -y gmt libgmt-dev
+                  sudo find /usr -name "libgmt.so.*" -exec sudo ln -sf {} $(dirname {})/libgmt.so \;
 
-      - name: gmt (#33) fix for libgmt symlink
-        run: |
-          sudo apt-get install -y gmt libgmt-dev
-          sudo find /usr -name "libgmt.so.*" -exec sudo ln -sf {} $(dirname {})/libgmt.so \;
+            - uses: snok/install-poetry@8081dddc3955298b06b8552cef6c12d7d58da755 # v1.4.1
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+            - run: poetry install --with dev
 
-      - name: Install dependencies
-        run: poetry install --with dev
+            - name: Run tests with coverage
+              run: |
+                  poetry run coverage run -m pytest
+                  poetry run coverage report
+                  poetry run coverage json
+                  export TOTAL=$(python -c "import json;print(json.load(open('coverage.json'))['totals']['percent_covered_display'])")
+                  echo "total=$TOTAL" >> $GITHUB_ENV
+                  echo "### Total coverage: ${TOTAL}%" >> $GITHUB_STEP_SUMMARY
 
-      - name: Run tests with coverage
-        run: |
-          poetry run coverage run -m pytest
-          poetry run coverage report
-          poetry run coverage json
-          export TOTAL=$(python -c "import json;print(json.load(open('coverage.json'))['totals']['percent_covered_display'])")
-          echo "total=$TOTAL" >> $GITHUB_ENV
-          echo "### Total coverage: ${TOTAL}%" >> $GITHUB_STEP_SUMMARY
-
-      - name: "Make badge"
-        uses: schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_TOKEN }}
-          gistID: fb9b3bc6236ef7e8a1560403b5c58186
-          filename: covbadge.json
-          label: Coverage
-          message: ${{ env.total }}%
-          minColorRange: 40
-          maxColorRange: 90
-          valColorRange: ${{ env.total }}
+            - name: Make badge
+              uses: schneegans/dynamic-badges-action@7142847813c746736c986b42dec98541e49a2cea # v1.7.0
+              with:
+                  auth: ${{ secrets.GIST_TOKEN }}
+                  gistID: fb9b3bc6236ef7e8a1560403b5c58186
+                  filename: covbadge.json
+                  label: Coverage
+                  message: ${{ env.total }}%
+                  minColorRange: 40
+                  maxColorRange: 90
+                  valColorRange: ${{ env.total }}

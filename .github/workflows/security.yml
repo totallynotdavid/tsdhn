@@ -1,27 +1,27 @@
 name: Security Report
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "orchestrator/**"
-      - "model/**"
+    push:
+        branches:
+            - main
+        paths:
+            - "orchestrator/**"
+            - "model/**"
+    workflow_dispatch:
 
 jobs:
-  security_checks:
-    runs-on: ubuntu-latest
-    name: PyCharm Security Scan
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
+    security_checks:
+        runs-on: ubuntu-latest
+        name: PyCharm Security Scan
+        permissions:
+            actions: read
+            contents: read
+            security-events: write
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: tonybaloney/pycharm-security@5c1ceeb1fb2a18478fa7076a81f9f47fd450e592
-        with:
-          path: orchestrator/
-          fail_on_warnings: "no"
+            - uses: tonybaloney/pycharm-security@5c1ceeb1fb2a18478fa7076a81f9f47fd450e592
+              with:
+                  path: orchestrator/
+                  fail_on_warnings: "no"
