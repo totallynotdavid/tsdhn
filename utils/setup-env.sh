@@ -246,7 +246,7 @@ if ! $NEED_SYSTEM_PKGS && ! $NEED_PYENV && ! $NEED_PYTHON312 &&
     exit 0
 fi
 
-log_info "Installation plan:"
+log_info "Installation plan:\n"
 $NEED_SYSTEM_PKGS && echo "- System packages will be installed/updated"
 $NEED_PYENV && echo "- Pyenv will be installed"
 $NEED_PYTHON312 && echo "- Python $REQUIRED_PYTHON_VERSION will be installed"
@@ -258,6 +258,7 @@ $NEED_GMT_CONFIG && echo "- GMT library symlink will be configured"
 $NEED_IFX && echo "- Intel Fortran Essentials (ifx) will be installed"
 
 # Prompt to continue
+echo "" # Add a space between the installation plan and the question for better readability
 read -p "Continue with installation? [Y/n] " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
