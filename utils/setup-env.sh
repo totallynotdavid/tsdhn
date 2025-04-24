@@ -23,7 +23,7 @@ path_exists() {
 safe_exec() {
     local cmd_desc="$1"
     shift
-    
+
     log_info "Executing: $cmd_desc"
     if ! "$@"; then
         log_error "Command failed: $*"
@@ -36,7 +36,7 @@ safe_exec() {
 add_to_bashrc() {
     local section="$1"
     local line="$2"
-    
+
     if ! grep -q "$line" "$HOME/.bashrc"; then
         if ! grep -q "# $section" "$HOME/.bashrc"; then
             echo -e "\n# $section" >> "$HOME/.bashrc"
@@ -49,7 +49,7 @@ add_to_bashrc() {
 
 has_python_version() {
     local required_version="$1"
-    
+
     # Check if python3 is the required version
     if cmd_exists "python3"; then
         local py_version
@@ -77,13 +77,13 @@ has_ifx_installed() {
     if cmd_exists "ifx"; then
         return 0
     fi
-    
+
     # Check if it's installed but not in PATH
     if [[ -f "$HOME/intel/oneapi/setvars.sh" ]]; then
         # Check if sourcing setvars.sh would give us ifx
         local tmp_script
         tmp_script=$(mktemp)
-        
+
         # Create a temporary script to test this
         cat > "$tmp_script" << 'EOF'
 #!/bin/bash
@@ -92,24 +92,24 @@ command -v ifx &>/dev/null
 exit $?
 EOF
         chmod +x "$tmp_script"
-        
+
         if "$tmp_script"; then
             rm "$tmp_script"
             return 0
         fi
         rm "$tmp_script"
     fi
-    
+
     return 1  # ifx is not installed
 }
 
 check_gmt_version() {
     local min_version="$1"
-    
+
     if ! cmd_exists "gmt"; then
         return 1
     fi
-    
+
     local current_version
     current_version=$(gmt --version 2>/dev/null | cut -d' ' -f3)
     
@@ -127,10 +127,12 @@ check_gmt_version() {
 log_info "Checking system status\n"
 
 REQUIRED_PKGS=(
+    # Required for building Python with pyenv
     build-essential zlib1g-dev libffi-dev libssl-dev libbz2-dev
     libreadline-dev libsqlite3-dev liblzma-dev libncurses-dev tk-dev
 
-    git-lfs cmake redis-server ps2eps csh
+    # Required for TTT SDK
+    git-lfs 
 
     # Used to build GMT
     cmake ninja-build
@@ -139,6 +141,9 @@ REQUIRED_PKGS=(
     libcurl4-gnutls-dev libnetcdf-dev libgdal-dev gdal-bin \
     libfftw3-dev libpcre3-dev libpcre3-dev liblapack-dev libblas-dev \
     libglib2.0-dev ghostscript graphicsmagick ffmpeg
+
+    # Other dependencies
+    redis-server ps2eps csh
 )
 
 NEED_SYSTEM_PKGS=false
@@ -514,7 +519,7 @@ if $NEED_IFX; then
     else
         log_error "Intel Fortran installation may have failed - setvars.sh not found"
     fi
-    
+
     popd > /dev/null || exit 1
     rm -rf "$WORKDIR"
 fi
