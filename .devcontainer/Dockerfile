@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Create non-root user
 RUN groupadd -r appuser && \
-    useradd --no-log-init -r -g appuser -m -d /app -s /sbin/nologin -c "Docker image user" appuser
+    useradd --no-log-init -r -g appuser -m -d /app -s /sbin/nologin -c "non-root-user" appuser
 
 # ========================
 # Base system dependencies
@@ -29,14 +29,14 @@ RUN apt-get update && \
         build-essential make pkg-config \
         # GMT Build Deps & Runtime Libs
         cmake ninja-build \
-        libcurl4-gnutls-dev libnetcdf-dev libnetcdf19 libgdal-dev libgdal30 gdal-bin \
-        libfftw3-dev libfftw3-double3 libpcre3-dev libpcre3 liblapack-dev liblapack3 \
-        libblas-dev libblas3 libglib2.0-dev libglib2.0-0 \
+        libcurl4-gnutls-dev libnetcdf-dev libgdal-dev gdal-bin \
+        libfftw3-dev libpcre3-dev libpcre3 liblapack-dev \
+        libblas-dev libglib2.0-dev \
         ghostscript graphicsmagick ffmpeg \
         # TeXLive Installer Dep
-        perl fontconfig \
+        perl \
         # App Runtime Deps
-        csh ps2eps && \
+        csh ps2eps fontconfig && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -165,16 +165,6 @@ COPY --from=gmt-builder /usr/local/bin/gmt* /usr/local/bin/
 COPY --from=gmt-builder /usr/local/share/gmt /usr/local/share/gmt
 COPY --from=ifx-builder /opt/intel/oneapi /opt/intel/oneapi
 COPY --from=python-deps /usr/local/lib/python3.12/dist-packages /usr/local/lib/python3.12/dist-packages
-
-# Install runtime dependencies only
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3.12 python3-pip \
-        libnetcdf19 libgdal30 libfftw3-double3 libpcre3 liblapack3 libblas3 libglib2.0-0 \
-        ghostscript graphicsmagick ffmpeg \
-        csh ps2eps fontconfig && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 
 # Copy application code
 WORKDIR /app
