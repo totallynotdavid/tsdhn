@@ -43,7 +43,7 @@ sequenceDiagram
 
 ## Instalación
 
-El proyecto requiere **Ubuntu 24.04** o superior. Usuarios de Windows deben configurar Windows Subsystem for Linux (WSL 2.0 o superior) siguiendo la [<kbd>guía oficial</kbd>](https://learn.microsoft.com/es-es/windows/wsl/install) de Microsoft antes de continuar.
+El proyecto requiere **Ubuntu 24.04** o superior y de, al menos, 15 GB de espacio libre en disco. Usuarios de Windows deben configurar Windows Subsystem for Linux (WSL 2.0 o superior) siguiendo la [<kbd>guía oficial</kbd>](https://learn.microsoft.com/es-es/windows/wsl/install) de Microsoft antes de continuar.
 
 ### Prerrequisitos
 
