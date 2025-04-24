@@ -1,5 +1,4 @@
 name: "Test Coverage"
-
 on:
     push:
         branches: ["main"]
@@ -11,10 +10,13 @@ on:
             - "orchestrator/**"
     workflow_dispatch:
 
+permissions:
+    contents: read
+    statuses: write
+
 jobs:
     test:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v4
 
