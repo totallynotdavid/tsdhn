@@ -47,21 +47,21 @@ El proyecto requiere **Ubuntu 24.04** o superior. Usuarios de Windows deben conf
 
 ### Prerrequisitos
 
-Ejecuta `bash utils/setup-env.sh` para instalar todas las dependencias mencionadas en esta sección. Además, asegúrate de darle permisos de ejecución con `chmod +x utils/setup-env.sh`. Si deseas instalar manualmente, sigue los pasos a continuación.
+Ejecuta `bash utils/setup-env.sh` para instalar automáticamente todas las dependencias mencionadas en esta sección. Recuerda darle permisos de ejecución con `chmod +x utils/setup-env.sh`. Si prefieres instalar manualmente, sigue los pasos a continuación.
 
-Actualiza los paquetes del sistema antes de iniciar:
+Antes de comenzar, actualiza los paquetes del sistema:
 
 ```bash
 sudo apt update -y && sudo apt upgrade -y
 ```
 
-1. **Python** (con [pyenv](https://github.com/pyenv/pyenv)): Usamos pyenv porque nos permite gestionar múltiples versiones de Python. Ejecuta:
+1. **Python** (con [pyenv](https://github.com/pyenv/pyenv)): Utilizamos pyenv para gestionar múltiples versiones de Python en el mismo sistema, lo que nos permite aislar entornos de desarrollo. Para instalarlo:
 
    ```bash
    curl -fsSL https://pyenv.run | bash
    ```
 
-   <ins>Si estás usando Ubuntu a través de WSL</ins>, ejecuta lo siguiente [[1](https://stackoverflow.com/a/76483889)]:
+   <ins>Si estás usando Ubuntu a través de WSL</ins>, añade estas líneas a tu `.bashrc` [[1](https://stackoverflow.com/a/76483889)]:
 
    ```bash
    cat << 'EOF' >> ~/.bashrc
@@ -71,7 +71,7 @@ sudo apt update -y && sudo apt upgrade -y
    EOF
    ```
 
-   <ins>Si estás usando Ubuntu de forma nativa</ins>, ejecuta lo siguiente [[2](https://github.com/pyenv/pyenv?tab=readme-ov-file#bash)]:
+   <ins>Si estás usando Ubuntu de forma nativa</ins>, usa esta configuración [[2](https://github.com/pyenv/pyenv?tab=readme-ov-file#bash)]:
 
    ```bash
    cat << 'EOF' >> ~/.bashrc
@@ -81,41 +81,41 @@ sudo apt update -y && sudo apt upgrade -y
    EOF
    ```
 
-   En cualquiera de los dos casos, aplica los cambios con:
+   En ambos casos, aplica los cambios con:
 
    ```bash
    source ~/.bashrc
    ```
 
-   pyenv compila Python a partir del código fuente durante la instalación, por lo que resulta necesario instalar previamente las dependencias de compilación [[3](https://stackoverflow.com/a/74314165)] [[4](https://github.com/pyenv/pyenv/wiki#suggested-build-environment)] y, luego, instala Python:
+   pyenv compila Python desde el código fuente, por lo que necesitas instalar las dependencias de compilación antes de continuar [[3](https://stackoverflow.com/a/74314165)] [[4](https://github.com/pyenv/pyenv/wiki#suggested-build-environment)]:
 
    ```bash
    sudo apt install -y build-essential zlib1g-dev libffi-dev libssl-dev libbz2-dev libreadline-dev libsqlite3-dev liblzma-dev libncurses-dev tk-dev
    pyenv install 3.12 && pyenv global 3.12
    ```
 
-   Si deseas usar Python del sistema en lugar de `pyenv`, solo necesitas instalar `pip3`:
+   **Alternativa**: Si prefieres usar el Python del sistema en lugar de pyenv (para entornos más simples), solo instala pip3:
 
    ```bash
    sudo apt install -y python3-pip
    ```
 
-   En cualquiera de los dos casos, verifica la instalación:
+   Verifica la instalación:
 
    ```bash
    python3 -V
    pip3 -V
    ```
 
-2. [**Poetry**](https://python-poetry.org/docs) nos ayuda a gestionar nuestras dependencias de forma consistente entre dispositivos. Poetry se encarga de instalar las librerías que usamos.
+2. [**Poetry**](https://python-poetry.org/docs): Utilizamos Poetry para gestionar dependencias de forma consistente entre dispositivos. Poetry crea entornos virtuales y asegura el uso de versiones específicas en nuestros paquetes de Python, evitando problemas de compatibilidad:
 
    ```bash
    curl -sSL https://install.python-poetry.org | python3 -
    ```
 
-   Configuración del <kbd>PATH</kbd>:
+   Añade Poetry al <kbd>PATH</kbd>:
 
-   ```
+   ```bash
    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
    source ~/.bashrc
    ```
@@ -126,13 +126,13 @@ sudo apt update -y && sudo apt upgrade -y
    poetry --version
    ```
 
-3. [**TTT SDK**](https://www.geoware-online.com/tsunami.html) (Tsunami Travel Time) calcula los tiempos de arribo de un tsunami a partir de la batimetría de una cuadrícula geográfica (el océano Pacífico en nuestro caso). Para instalarlo, necesitas `git-lfs` para clonar los archivos de datos grandes del repositorio y `cmake` para compilar e instalar el software:
+3. [**TTT SDK**](https://www.geoware-online.com/tsunami.html) (Tsunami Travel Time): Este SDK calcula los tiempos de arribo de tsunamis a partir de la batimetría del océano Pacífico. Para instalarlo, necesitas Git LFS para manejar archivos grandes y CMake para compilación:
 
    ```bash
    sudo apt install -y git-lfs cmake
    ```
 
-   Para instalar TTT SDK, ejecuta:
+   Para instalar el SDK, ejecuta:
 
    ```bash
    git clone https://gitlab.com/totallynotdavid/tttapi/
@@ -140,9 +140,9 @@ sudo apt update -y && sudo apt upgrade -y
    make test clean
    ```
 
-   **Nota**: Almacenamos el SDK en GitLab para aprovechar su política de LFS gratuito y para reducir la carga en los servidores de los autores durante pruebas CI/CD.
+   > **Nota**: Alojamos el SDK en GitLab para aprovechar su política gratuita de LFS (Git Large File Storage) y reducir la carga en los servidores de los autores durante nuestras pruebas de CI/CD.
 
-4. [**TeXLive**](https://www.tug.org/texlive/quickinstall.html) es utilizado para la generación de los informes. Para simplificar el proceso, se opta por una instalación mínima. Ejecute:
+4. [**TeXLive**](https://www.tug.org/texlive/quickinstall.html): Necesario para generar informes en PDF. Realizamos una instalación mínima para optimizar espacio:
 
    ```bash
    cd /tmp
@@ -151,7 +151,7 @@ sudo apt update -y && sudo apt upgrade -y
    cd install-tl-2*
    ```
 
-   Crea un perfil de instalación (<kbd>texlive.profile</kbd>) con el siguiente contenido:
+   Crea un perfil de instalación (<kbd>texlive.profile</kbd>) que selecciona solo los componentes básicos:
 
    ```bash
    cat > texlive.profile << EOF
@@ -162,7 +162,7 @@ sudo apt update -y && sudo apt upgrade -y
    EOF
    ```
 
-   La instalación se realiza en el directorio del usuario para evitar problemas relacionados a permisos y evitar el [modo usuario](https://www.tug.org/texlive/doc/tlmgr.html#USER-MODE) de TeXLive [[5](https://tex.stackexchange.com/a/676880)]:
+   Instalamos en el directorio del usuario para evitar problemas de permisos y el [modo usuario](https://www.tug.org/texlive/doc/tlmgr.html#USER-MODE) de TeXLive [[5](https://tex.stackexchange.com/a/676880)]:
 
    ```bash
    perl ./install-tl --profile=texlive.profile \
@@ -171,92 +171,85 @@ sudo apt update -y && sudo apt upgrade -y
                      --no-interaction
    ```
 
-   Configuración del <kbd>PATH</kbd>:
+   Configura el <kbd>PATH</kbd>:
 
    ```bash
    echo -e '\nexport PATH="$HOME/texlive/bin/x86_64-linux:$PATH"' >> ~/.bashrc
    source ~/.bashrc
    ```
 
-   Instalación de paquetes LaTeX necesarios:
+   Instala los paquetes LaTeX necesarios:
 
    ```bash
    tlmgr update --self && tlmgr install babel-spanish hyphen-spanish booktabs
    ```
 
-5. [Intel® Fortran Essentials](https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2025-1/online-offline-installer-003.html): Anteriormente, usábamos `ifort` para compilar los archivos de Fortran de forma optimizada, pero Intel terminó removiéndolo en favor de `ifx` [[6](https://www.intel.com/content/www/us/en/developer/articles/release-notes/fortran-compiler/2025.html)]. Para instalarlo, descarga:
+5. [**Intel® Fortran Essentials**](https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2025-1/online-offline-installer-003.html): Anteriormente usábamos `ifort` para compilación optimizada de código Fortran, pero Intel lo reemplazó por `ifx` [[6](https://www.intel.com/content/www/us/en/developer/articles/release-notes/fortran-compiler/2025.html)]. Descarga el instalador:
 
    ```bash
    wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/306e03be-1259-4d71-848a-59e23013c4f0/intel-fortran-essentials-2025.1.0.556_offline.sh
    ```
 
-   Este archivo pesa alrededor de 951 MB. Para continuar, ejecuta:
+   > **Nota**: Este archivo pesa aproximadamente 951 MB.
+
+   Instala el compilador:
 
    ```bash
    chmod +x intel-fortran-essentials-*.sh
    ./intel-fortran-essentials-*.sh -a --silent --eula accept
-   echo '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null' >> ~/.bashrc
    ```
 
-   Configuración del <kbd>PATH</kbd>:
+   Configura el entorno para que `setvars.sh` añada las rutas necesarias al <kbd>PATH</kbd>:
 
    ```bash
    echo '[ -f "$HOME/intel/oneapi/setvars.sh" ] && source "$HOME/intel/oneapi/setvars.sh" > /dev/null' >> ~/.bashrc
    source ~/.bashrc
    ```
 
-`setvars.sh` se encarga de añadir los archivos al path
+6. **Generic Mapping Tools (GMT) 6.5+**: Como parte de nuestra migración a Python, utilizamos `pygmt` que requiere GMT >= 6.4.0 [[7](https://www.pygmt.org/dev/install.html#which-gmt)]. Compilamos desde el código fuente para evitar dependencias adicionales (e.g. conda) y garantizar compatibilidad en entornos limitados.
 
-6. Generic Mapping Tools (GMT) 6.5+: Como parte de nuestra migración a Python, utilizamos `pygmt` que requiere GMT >=6.4.0 [[7](https://www.pygmt.org/dev/install.html#which-gmt)]. Aunque el equipo de PyGMT recomienda usar conda, prefiero compilar desde el código fuente para evitar añadir complejidad innecesaria y dependencias al implementar en entornos más limitados.
+   > **Importante**: No es recomendable usar `sudo apt install gmt` ya que los repositorios oficiales generalmente ofrecen la versión 6.0.0, que no es compatible con `pygmt`.
 
-No es recomendable usar `sudo apt install gmt` ya que la última versión disponible en la mayoría de los repositorios es solamente la 6.0.0.
+   Descarga el código fuente y los datos de soporte:
 
-Primero, descargamos el código fuente de GMT y los datos de soporte necesarios:
+   ```bash
+   git clone --depth 50 https://github.com/GenericMappingTools/gmt
 
-```bash
-git clone --depth 50 https://github.com/GenericMappingTools/gmt
+   wget https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-gmt-2.3.7.tar.gz
+   tar xzf gshhg-gmt-2.3.7.tar.gz
 
-wget https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-gmt-2.3.7.tar.gz
-tar xzf gshhg-gmt-2.3.7.tar.gz
+   wget https://github.com/GenericMappingTools/dcw-gmt/releases/download/2.1.1/dcw-gmt-2.1.1.tar.gz
+   tar xzf dcw-gmt-2.1.1.tar.gz
+   ```
 
-wget https://github.com/GenericMappingTools/dcw-gmt/releases/download/2.1.1/dcw-gmt-2.1.1.tar.gz
-tar xzf dcw-gmt-2.1.1.tar.gz
-```
+   Crea el archivo de configuración:
 
-Luego, creamos el archivo de configuración:
+   ```bash
+   cat > gmt/cmake/ConfigUser.cmake << EOF
+   set (CMAKE_INSTALL_PREFIX "/usr/local")
+   set (GSHHG_ROOT "/ruta/a/gshhg-gmt-2.3.7")
+   set (DCW_ROOT "/ruta/a/dcw-gmt-2.1.1")
+   EOF
+   ```
 
-```bash
-cat > gmt/cmake/ConfigUser.cmake << EOF
-set (CMAKE_INSTALL_PREFIX "/usr/local")
-set (GSHHG_ROOT "/ruta/a/gshhg-gmt-2.3.7")
-set (DCW_ROOT "/ruta/a/dcw-gmt-2.1.1")
-EOF
-```
+   Compila e instala GMT:
 
-Luego, creamos el directorio donde vamos a compilar:
+   ```bash
+   mkdir -p gmt/build
+   cd gmt/build
+   cmake .. -G Ninja
+   cmake --build .
+   sudo cmake --build . --target install
+   sudo ldconfig
+   ```
 
-```bash
-mkdir -p gmt/build
-cd gmt/build
-```
+   Verifica la instalación:
 
-Configuramos, compilamos e instalamos GMT:
+   ```bash
+   gmt --version
+   ```
 
-```bash
-cmake .. -G Ninja
-
-cmake --build .
-sudo cmake --build . --target install
-sudo ldconfig
-```
-
-Verifica la instalación:
-
-```bash
-gmt --version
-```
-
-7. Dependencias adicionales: `redis-server`, `ps2eps`, `csh`. Ejecute:
+7. **Dependencias adicionales**: `redis-server`, `ps2eps`, `csh`. Ejecuta:
 
    ```bash
    sudo apt install -y gfortran redis-server ps2eps csh
@@ -269,7 +262,7 @@ gmt --version
    sudo systemctl restart redis-server
    ```
 
-8. **Opcional**: Si necesitas ejecutar la interfaz gráfica original ([<kbd>tsunami.m</kbd>](model/tsunami.m)), puedes instalar [MATLAB R2014](https://drive.google.com/file/d/1VhLnwXX78Y7O8huwlRuE-shOW2LKlVpd/view?usp=drive_link).
+8. **Opcional**: Si necesitas ejecutar la interfaz gráfica original ([<kbd>tsunami.m</kbd>](model/tsunami.m)), instala [MATLAB R2014](https://drive.google.com/file/d/1VhLnwXX78Y7O8huwlRuE-shOW2LKlVpd/view?usp=drive_link).
 
 ### Iniciar el proyecto
 
