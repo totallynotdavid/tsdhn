@@ -11,7 +11,11 @@ from fastapi.responses import FileResponse
 from orchestrator.core.config import LOGGING_CONFIG
 from orchestrator.core.queue import JobStatus, tsdhn_queue
 from orchestrator.models.schemas import EarthquakeInput
-from orchestrator.utils.job_validators import secure_path_construction, validate_job_id
+from orchestrator.utils.job_validators import (
+    sanitize_for_log,
+    secure_path_construction,
+    validate_job_id,
+)
 
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -51,7 +55,7 @@ async def get_job_status(job_id: str) -> Dict:
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"Status check failed for {job_id}: {str(e)}")
+        logger.error(f"Status check failed for {sanitize_for_log(job_id)}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Job status retrieval failed",

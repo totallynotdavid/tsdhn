@@ -11,7 +11,7 @@ from rq.job import Job
 from orchestrator.core.calculator import TsunamiCalculator
 from orchestrator.core.config import MASTER_PIPELINE, MODEL_DIR
 from orchestrator.models.schemas import EarthquakeInput, JobStatus
-from orchestrator.utils.file_utils import setup_workspace
+from orchestrator.utils.file_utils import sanitize_for_log, setup_workspace
 from orchestrator.utils.processing import process_step
 from orchestrator.utils.system import check_dependencies
 
@@ -73,7 +73,7 @@ class TSDHNQueue:
                 else None,
             }
         except Exception as e:
-            logger.error(f"Invalid job ID {job_id}: {str(e)}")
+            logger.error(f"Invalid job ID {sanitize_for_log(job_id)}: {str(e)}")
             raise ValueError("Invalid or expired job ID") from e
 
     def is_redis_connected(self) -> bool:
