@@ -448,37 +448,38 @@ if $NEED_GMT_BUILD; then
     GMT_BUILD_DIR=$(mktemp -d)
     pushd "$GMT_BUILD_DIR" > /dev/null || exit 1
 
-    # Clone the GMT repository
-    safe_exec "Cloning GMT repository" git clone --depth 1 https://github.com/GenericMappingTools/gmt.git
+    safe_exec "Cloning GMT repository" git clone --depth 50 https://github.com/GenericMappingTools/gmt.git
 
-    # Build and install GMT
-    if [[ -d "gmt" ]]; then
-        mkdir -p gmt/build
-        cd gmt/build || exit 1
+    # Get support data
+    safe_exec "Downloading GSHHG data" wget https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-gmt-2.3.7.tar.gz
+    safe_exec "Extracting GSHHG data" tar xzf gshhg-gmt-2.3.7.tar.gz
 
-        safe_exec "Configuring GMT build" cmake -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_RPATH=/usr/lib \
-            -DGSHHG_ROOT=/usr/share/gshhg-gmt-nc4 \
-            -DDCW_ROOT=/usr/share/dcw-gmt \
-            -GNinja ..
+    safe_exec "Downloading DCW data" wget https://github.com/GenericMappingTools/dcw-gmt/releases/download/2.2.0/dcw-gmt-2.2.0.tar.gz
+    safe_exec "Extracting DCW data" tar xzf dcw-gmt-2.2.0.tar.gz
 
-        safe_exec "Building GMT" ninja
-        safe_exec "Installing GMT" sudo ninja install
-        safe_exec "Running ldconfig" sudo ldconfig
-    else
-        log_error "GMT clone failed"
-    fi
+    cat > gmt/cmake/ConfigUser.cmake << EOF
+set (CMAKE_INSTALL_PREFIX "/usr/local")
+set (GSHHG_ROOT "${GMT_BUILD_DIR}/gshhg-gmt-2.3.7")
+set (DCW_ROOT "${GMT_BUILD_DIR}/dcw-gmt-2.2.0")
+EOF
+
+    mkdir -p gmt/build
+    cd gmt/build || exit 1
+
+    safe_exec "Configuring GMT build" cmake .. -G Ninja
+
+    safe_exec "Building GMT" cmake --build .
+    safe_exec "Installing GMT" sudo cmake --build . --target install
+    safe_exec "Running ldconfig" sudo ldconfig
 
     popd > /dev/null || exit 1
     rm -rf "$GMT_BUILD_DIR"
 
-    # Verify installation
-    if cmd_exists "gmt"; then
+    if command -v gmt >/dev/null; then
         GMT_VERSION=$(gmt --version 2>/dev/null | cut -d' ' -f3)
-        log_success "GMT $GMT_VERSION built and installed successfully"
+        log_success "GMT $GMT_VERSION installed successfully"
     else
-        log_error "GMT installation verification failed - command not available"
+        log_error "GMT installation failed - command not found"
     fi
 fi
 
