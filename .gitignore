@@ -4,6 +4,7 @@
 # Files
 configuracion_*.json
 informe*.pdf
+hypo.dat
 
 # Extensions
 *.npy
