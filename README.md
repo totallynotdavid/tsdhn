@@ -55,7 +55,7 @@ Antes de comenzar, actualiza los paquetes del sistema:
 sudo apt update -y && sudo apt upgrade -y
 ```
 
-1. **Python** (con [pyenv](https://github.com/pyenv/pyenv)): Utilizamos pyenv para gestionar múltiples versiones de Python en el mismo sistema, lo que nos permite aislar entornos de desarrollo. Para instalarlo:
+1. **Python** (con [pyenv](https://github.com/pyenv/pyenv)) es el lenguaje principal del proyecto. Utilizamos pyenv porque nos permite gestionar múltiples versiones de Python. Para instalarlo, ejecuta:
 
    ```bash
    curl -fsSL https://pyenv.run | bash
@@ -107,7 +107,7 @@ sudo apt update -y && sudo apt upgrade -y
    pip3 -V
    ```
 
-2. [**Poetry**](https://python-poetry.org/docs): Utilizamos Poetry para gestionar dependencias de forma consistente entre dispositivos. Poetry crea entornos virtuales y asegura el uso de versiones específicas en nuestros paquetes de Python, evitando problemas de compatibilidad:
+2. [**Poetry**](https://python-poetry.org/docs) nos ayuda a gestionar dependencias de forma consistente entre dispositivos. Poetry crea entornos virtuales y asegura el uso de versiones específicas en nuestros paquetes de Python, evitando problemas de compatibilidad:
 
    ```bash
    curl -sSL https://install.python-poetry.org | python3 -
@@ -126,7 +126,7 @@ sudo apt update -y && sudo apt upgrade -y
    poetry --version
    ```
 
-3. [**TTT SDK**](https://www.geoware-online.com/tsunami.html) (Tsunami Travel Time): Este SDK calcula los tiempos de arribo de tsunamis a partir de la batimetría del océano Pacífico. Para instalarlo, necesitas Git LFS para manejar archivos grandes y CMake para compilación:
+3. [**TTT SDK**](https://www.geoware-online.com/tsunami.html) (Tsunami Travel Time) calcula los tiempos de arribo de tsunamis a partir de la batimetría del océano Pacífico. Para instalarlo, necesitas Git LFS para poder descargar los datos y CMake para compilación:
 
    ```bash
    sudo apt install -y git-lfs cmake
@@ -142,7 +142,7 @@ sudo apt update -y && sudo apt upgrade -y
 
    > **Nota**: Alojamos el SDK en GitLab para aprovechar su política gratuita de LFS (Git Large File Storage) y reducir la carga en los servidores de los autores durante nuestras pruebas de CI/CD.
 
-4. [**TeXLive**](https://www.tug.org/texlive/quickinstall.html): Necesario para generar informes en PDF. Realizamos una instalación mínima para optimizar espacio:
+4. [**TeXLive**](https://www.tug.org/texlive/quickinstall.html), específicamente pdflatex es utilizado para generar los informes en PDF. Realizamos una instalación mínima para optimizar espacio:
 
    ```bash
    cd /tmp
@@ -184,7 +184,7 @@ sudo apt update -y && sudo apt upgrade -y
    tlmgr update --self && tlmgr install babel-spanish hyphen-spanish booktabs
    ```
 
-5. [**Intel® Fortran Essentials**](https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2025-1/online-offline-installer-003.html): Anteriormente usábamos `ifort` para compilación optimizada de código Fortran, pero Intel lo reemplazó por `ifx` [[6](https://www.intel.com/content/www/us/en/developer/articles/release-notes/fortran-compiler/2025.html)]. Descarga el instalador:
+5. [**Intel® Fortran Essentials**](https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2025-1/online-offline-installer-003.html) permite generar ejecutables optimizados a partir de nuestro código Fortran, antes con `ifort` y ahora con `ifx` [[6](https://www.intel.com/content/www/us/en/developer/articles/release-notes/fortran-compiler/2025.html)]. Descarga el instalador:
 
    ```bash
    wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/306e03be-1259-4d71-848a-59e23013c4f0/intel-fortran-essentials-2025.1.0.556_offline.sh
