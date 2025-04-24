@@ -164,8 +164,7 @@ FROM base
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         python3.12 python3.12-venv \
-        libcurl4 libnetcdf-c++4 libgdal32 \
-        libfftw3-3 libpcre3 liblapack3 libblas3 libglib2.0-0 \
+        libcurl4 libpcre3 \
         ghostscript graphicsmagick ffmpeg \
         csh ps2eps fontconfig && \
     apt-get clean && \
