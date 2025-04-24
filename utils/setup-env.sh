@@ -3,10 +3,10 @@ set -eo pipefail
 
 # ===== Utility Functions =====
 
-log_info() { echo -e "\n🔷 $1"; }
-log_success() { echo -e "✅ $1"; }
-log_warn() { echo -e "⚠️  $1"; }
-log_error() { echo -e "❌ $1"; }
+log_info() { echo -e "\n■ $1"; }
+log_success() { echo -e "✓ $1"; }
+log_warn() { echo -e "◇ $1"; }
+log_error() { echo -e "✖ $1"; }
 
 cmd_exists() {
     command -v "$1" &>/dev/null
@@ -49,7 +49,7 @@ add_to_bashrc() {
 
 has_python_version() {
     local required_version="$1"
-
+    
     # Check if python3 is the required version
     if cmd_exists "python3"; then
         local py_version
@@ -77,7 +77,7 @@ has_ifx_installed() {
     if cmd_exists "ifx"; then
         return 0
     fi
-
+    
     # Check if it's installed but not in PATH
     if [[ -f "$HOME/intel/oneapi/setvars.sh" ]]; then
         # Check if sourcing setvars.sh would give us ifx
@@ -92,7 +92,7 @@ command -v ifx &>/dev/null
 exit $?
 EOF
         chmod +x "$tmp_script"
-
+        
         if "$tmp_script"; then
             rm "$tmp_script"
             return 0
@@ -104,7 +104,7 @@ EOF
 }
 
 # ===== System Status Check =====
-log_info "Checking system status"
+log_info "Checking system status\n"
 
 REQUIRED_PKGS=(
     build-essential zlib1g-dev libffi-dev libssl-dev libbz2-dev
@@ -325,7 +325,10 @@ fi
 
 if $NEED_POETRY; then
     log_info "Installing Poetry"
-    safe_exec "Downloading and running Poetry installer" curl -sSL https://install.python-poetry.org | python3 -
+    TMP_INSTALLER=$(mktemp)
+    safe_exec "Downloading Poetry installer" curl -sSL https://install.python-poetry.org -o "$TMP_INSTALLER"
+    safe_exec "Running Poetry installer" python3 "$TMP_INSTALLER"
+    rm "$TMP_INSTALLER"
 
     if [[ -d "$HOME/.local/bin" ]]; then
         export PATH="$HOME/.local/bin:$PATH"
