@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e 
+set -e
 
 # Configuration variables
 GMT_INSTALL_PREFIX="/opt/gmt"
@@ -14,7 +14,6 @@ sudo apt-get install -y build-essential cmake libcurl4-gnutls-dev libnetcdf-dev 
 sudo apt-get install -y ninja-build gdal-bin libfftw3-dev libpcre3-dev liblapack-dev \
                    libblas-dev libglib2.0-dev ghostscript graphicsmagick ffmpeg xdg-utils
 
-# Download GMT source code
 echo "Downloading GMT source code..."
 if [ ! -d "gmt" ]; then
     git clone --depth 50 https://github.com/GenericMappingTools/gmt
@@ -43,11 +42,19 @@ cmake --build . --parallel $PARALLEL_JOBS
 echo "Installing GMT..."
 sudo cmake --build . --target install
 
-# Add GMT to PATH
-echo "Adding GMT to PATH..."
-echo "export PATH=\$PATH:$GMT_INSTALL_PREFIX/bin" | sudo tee /etc/profile.d/gmt.sh
-sudo chmod +x /etc/profile.d/gmt.sh
+# Add GMT to PATH in .bashrc
+echo "Adding GMT to PATH in .bashrc..."
+if grep -q "PATH=.*$GMT_INSTALL_PREFIX/bin" ~/.bashrc; then
+    echo "Path already exists in .bashrc"
+else
+    echo "# GMT Path" >> ~/.bashrc
+    echo "export PATH=\$PATH:$GMT_INSTALL_PREFIX/bin" >> ~/.bashrc
+    echo "GMT path added to ~/.bashrc"
+fi
+
+source ~/.bashrc
 
 echo "GMT build and installation completed successfully!"
 echo "GMT is now installed at: $GMT_INSTALL_PREFIX"
-echo "You can run GMT commands after restarting your terminal or running: source /etc/profile.d/gmt.sh"
+echo "GMT has been added to your PATH in ~/.bashrc"
+echo "You can now use GMT commands directly in this terminal session."
