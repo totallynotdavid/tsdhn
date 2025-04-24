@@ -129,12 +129,16 @@ log_info "Checking system status\n"
 REQUIRED_PKGS=(
     build-essential zlib1g-dev libffi-dev libssl-dev libbz2-dev
     libreadline-dev libsqlite3-dev liblzma-dev libncurses-dev tk-dev
-    git-lfs cmake gfortran redis-server ps2eps csh
 
-    # GMT build deps
-    libcurl4-gnutls-dev libnetcdf-dev libgdal-dev libfftw3-dev
-    libpcre3-dev liblapack-dev libglib2.0-dev ghostscript 
-    dcw-gmt gshhg-gmt-nc4 cmake ninja-build
+    git-lfs cmake redis-server ps2eps csh
+
+    # Used to build GMT
+    cmake ninja-build
+
+    # GMT build deps (https://github.com/GenericMappingTools/gmt/wiki/Install-dependencies-on-Ubuntu-and-Debian)
+    libcurl4-gnutls-dev libnetcdf-dev libgdal-dev gdal-bin \
+    libfftw3-dev libpcre3-dev libpcre3-dev liblapack-dev libblas-dev \
+    libglib2.0-dev ghostscript graphicsmagick ffmpeg
 )
 
 NEED_SYSTEM_PKGS=false
