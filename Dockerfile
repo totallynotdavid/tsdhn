@@ -6,8 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=C.UTF-8 \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/usr/local/texlive/bin/x86_64-linux:/usr/local/share/gmt/bin:${PATH}" \
-    GMT_SHAREDIR=/usr/local/share/gmt
+    PATH="/usr/local/texlive/bin/x86_64-linux:${PATH}" \
 
 # Create non-root user
 RUN groupadd -r appuser && \
@@ -144,9 +143,6 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 COPY --from=ttt-builder /usr/local/bin/ttt_* /usr/local/bin/
 COPY --from=ttt-builder /usr/local/share/geoware /usr/local/share/geoware
 COPY --from=texlive-builder /usr/local/texlive /usr/local/texlive
-COPY --from=gmt-builder /usr/local/bin/gmt* /usr/local/bin/
-COPY --from=gmt-builder /usr/local/share/gmt /usr/local/share/gmt
-COPY --from=gmt-builder /usr/local/lib/libgmt* /usr/local/lib/
 COPY --from=ifx-builder /opt/intel/oneapi /opt/intel/oneapi
 
 # Update library links
@@ -159,7 +155,7 @@ COPY --chown=appuser:appuser model ./model
 COPY --chown=appuser:appuser data ./data
 
 # Set environment and path
-ENV PATH="/usr/local/texlive/bin/x86_64-linux:/usr/local/share/gmt/bin:/opt/intel/oneapi/setvars.sh:${PATH}" \
+ENV PATH="/usr/local/texlive/bin/x86_64-linux:/opt/intel/oneapi/setvars.sh:${PATH}" \
     INTEL_ONEAPI_ROOT=/opt/intel/oneapi
 
 # Switch to non-root user
