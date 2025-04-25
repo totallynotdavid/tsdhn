@@ -128,7 +128,7 @@ RUN apt-get update && \
         libcurl4 libpcre3 \
         ghostscript graphicsmagick ffmpeg \
         csh ps2eps fontconfig \
-        libgdal-dev libnetcdf-dev libfftw3-dev libblas-dev liblapack-dev && \
+        libgdal-dev libnetcdf-dev libfftw3-dev libblas-dev liblapack-dev \
         gmt gmt-dcw gmt-gshhg \
         ghostscript gdal-bin graphicsmagick ffmpeg \
     apt-get clean && \
