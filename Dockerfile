@@ -27,12 +27,6 @@ RUN apt-get update && \
         python3.12 python3.12-venv python3-pip \
         # Build Essentials
         build-essential make pkg-config \
-        # GMT Build Deps & Runtime Libs
-        cmake ninja-build \
-        libcurl4-gnutls-dev libnetcdf-dev libgdal-dev gdal-bin \
-        libfftw3-dev libpcre3-dev libpcre3 liblapack-dev \
-        libblas-dev libglib2.0-dev \
-        ghostscript graphicsmagick ffmpeg \
         # TeXLive Installer Dep
         perl \
         # App Runtime Deps
@@ -64,7 +58,7 @@ RUN git clone --depth 1 "${TTT_SDK_REPO}" tttapi
 WORKDIR /tmp/ttt-sdk-build/tttapi
 RUN make config compile && \
     make install datadir docs && \
-    make test clean
+    make clean
 
 # ========================
 # TeXLive installation
@@ -95,36 +89,6 @@ RUN wget -q -O install-tl-unx.tar.gz "${TEXLIVE_INSTALLER_URL}" && \
         babel-spanish hyphen-spanish booktabs && \
     rm -rf /tmp/texlive-install "${TEXLIVE_INSTALL_DIR}/texmf-var/web2c/tlmgr.log" \
            "${TEXLIVE_INSTALL_DIR}/texmf-var/tlpkg/backups" /root/.texlive*
-
-# ========================
-# GMT installation
-# ========================
-FROM system-deps AS gmt-builder
-
-ARG GMT_VERSION_TAG="6.5.0"
-ARG GSHHG_VERSION="2.3.7"
-ARG DCW_VERSION="2.2.0"
-ENV GMT_SHAREDIR=/usr/local/share/gmt
-
-WORKDIR /tmp/gmt-build
-
-# Download source data and build GMT
-RUN wget -q "https://github.com/GenericMappingTools/gshhg-gmt/releases/download/${GSHHG_VERSION}/gshhg-gmt-${GSHHG_VERSION}.tar.gz" && \
-    wget -q "https://github.com/GenericMappingTools/dcw-gmt/releases/download/${DCW_VERSION}/dcw-gmt-${DCW_VERSION}.tar.gz" && \
-    tar xzf "gshhg-gmt-${GSHHG_VERSION}.tar.gz" && \
-    tar xzf "dcw-gmt-${DCW_VERSION}.tar.gz" && \
-    git clone --depth 1 --branch "${GMT_VERSION_TAG}" https://github.com/GenericMappingTools/gmt.git && \
-    cd gmt && \
-    echo "set (CMAKE_INSTALL_PREFIX \"/usr/local\")" > cmake/ConfigUser.cmake && \
-    echo "set (GSHHG_ROOT \"/tmp/gmt-build/gshhg-gmt-${GSHHG_VERSION}\")" >> cmake/ConfigUser.cmake && \
-    echo "set (DCW_ROOT \"/tmp/gmt-build/dcw-gmt-${DCW_VERSION}\")" >> cmake/ConfigUser.cmake && \
-    echo "set (GMT_INSTALL_MODULE_LINKS OFF)" >> cmake/ConfigUser.cmake && \
-    echo "set (GMT_INSTALL_TRADITIONAL_FOLDERNAMES OFF)" >> cmake/ConfigUser.cmake && \
-    mkdir build && cd build && \
-    cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build . && \
-    cmake --build . --target install && \
-    ldconfig
 
 # ========================
 # Intel Fortran Compiler installation
@@ -166,6 +130,8 @@ RUN apt-get update && \
         ghostscript graphicsmagick ffmpeg \
         csh ps2eps fontconfig \
         libgdal-dev libnetcdf-dev libfftw3-dev libblas-dev liblapack-dev && \
+        gmt gmt-dcw gmt-gshhg \
+        ghostscript gdal-bin graphicsmagick ffmpeg \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
