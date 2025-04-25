@@ -1,10 +1,7 @@
 {
     "name": "Orchestrator-TSDHN Dev",
 
-    "build": {
-        "dockerfile": "../Dockerfile",
-        "context": ".."
-    },
+    "image": "ghcr.io/totallynotdavid/seismic-toolkit:main",
 
     "workspaceFolder": "/app",
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
