@@ -133,15 +133,15 @@ RUN wget -q "https://github.com/GenericMappingTools/gshhg-gmt/releases/download/
 FROM system-deps AS ifx-builder
 
 ENV INTEL_ONEAPI_ROOT=/opt/intel/oneapi
-ARG IFX_INSTALLER_URL="https://registrationcenter-download.intel.com/akdlm/IRC_NAS/306e03be-1259-4d71-848a-59e23013c4f0/intel-fortran-essentials-2025.1.0.556_offline.sh"
 
-WORKDIR /tmp/ifx-install
-
-# Download and install Intel Fortran Compiler
-RUN wget -q --show-progress "${IFX_INSTALLER_URL}" -O intel-fortran-essentials.sh && \
-    chmod +x intel-fortran-essentials.sh && \
-    ./intel-fortran-essentials.sh -a --silent --eula accept --install-dir "${INTEL_ONEAPI_ROOT}" && \
-    rm -rf /tmp/ifx-install /opt/intel/oneapi/installer_payloads \
+RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+    | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null && \
+    echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
+    | tee /etc/apt/sources.list.d/oneAPI.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends intel-fortran-essentials && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /opt/intel/oneapi/installer_payloads \
            "${INTEL_ONEAPI_ROOT}/logs" /root/.intel/
 
 # ========================
