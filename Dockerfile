@@ -140,7 +140,6 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 # Copy binaries from builder stages
 COPY --from=ttt-builder /usr/local/bin/ttt_* /usr/local/bin/
-COPY --from=ttt-builder /usr/local/share/geoware /usr/local/share/geoware
 COPY --from=texlive-builder /usr/local/texlive /usr/local/texlive
 COPY --from=ifx-builder /opt/intel/oneapi /opt/intel/oneapi
 
