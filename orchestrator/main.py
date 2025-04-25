@@ -35,7 +35,12 @@ app.add_middleware(
 async def run_simulation(
     data: EarthquakeInput, skip_steps: Optional[List[str]] = None
 ) -> Dict:
-    """Initialize complete simulation pipeline"""
+    """Initialize complete simulation pipeline
+
+    Parameters:
+        data: Earthquake parameters for the simulation
+        skip_steps: Optional list of processing step names to skip during simulation
+    """
     try:
         logger.info("Enqueueing new simulation job")
         job_id = tsdhn_queue.enqueue_job(data=data, skip_steps=skip_steps)
