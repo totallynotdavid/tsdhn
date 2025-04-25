@@ -1,69 +1,69 @@
 {
-  "name": "Orchestrator-TSDHN Dev",
+    "name": "Orchestrator-TSDHN Dev",
 
-  "build": {
-    "dockerfile": "../Dockerfile",
-    "context": ".."
-  },
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": ".."
+    },
 
-  "workspaceFolder": "/app",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
+    "workspaceFolder": "/app",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
 
-  "hostRequirements": {
-    "cpus": 4,
-    "memory": "16gb",
-    "storage": "32gb"
-  },
+    "hostRequirements": {
+        "cpus": 4,
+        "memory": "16gb",
+        "storage": "32gb"
+    },
 
-  "remoteUser": "appuser",
+    "remoteUser": "appuser",
 
-  "forwardPorts": [8000],
-  "portsAttributes": {
-    "8000": {
-      "label": "Orchestrator-TSDHN App",
-      "onAutoForward": "notify"
+    "forwardPorts": [8000],
+    "portsAttributes": {
+        "8000": {
+            "label": "Orchestrator-TSDHN App",
+            "onAutoForward": "notify"
+        }
+    },
+
+    "initializeCommand": "mkdir -p ${localWorkspaceFolder}/.devcontainer/scripts",
+
+    "onCreateCommand": "echo '#!/bin/bash\nsudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs\nsudo usermod -aG sudo appuser\necho \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser\n' > ${localWorkspaceFolder}/.devcontainer/scripts/setup-dev.sh && chmod +x ${localWorkspaceFolder}/.devcontainer/scripts/setup-dev.sh",
+
+    "postCreateCommand": "sudo ./.devcontainer/scripts/setup-dev.sh && pip install --user pylint black isort ipython pytest pytest-cov",
+
+    "postStartCommand": "echo 'Development environment ready!'",
+
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/opt/venv/bin/python",
+                "python.linting.pylintEnabled": true,
+                "python.linting.enabled": true,
+                "python.formatting.provider": "black",
+                "python.formatting.blackPath": "${workspaceFolder}/.local/bin/black",
+                "editor.formatOnSave": true,
+                "[python]": {
+                    "editor.codeActionsOnSave": {
+                        "source.organizeImports": "explicit"
+                    }
+                },
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash"
+                    }
+                },
+                "files.eol": "\n"
+            },
+
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylint",
+                "ms-python.black-formatter",
+                "redhat.vscode-yaml",
+                "tamasfe.even-better-toml",
+                "GitHub.copilot"
+            ]
+        }
     }
-  },
-
-  "initializeCommand": "mkdir -p ${localWorkspaceFolder}/.devcontainer/scripts",
-
-  "onCreateCommand": "echo '#!/bin/bash\nsudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs\nsudo usermod -aG sudo appuser\necho \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser\n' > ${localWorkspaceFolder}/.devcontainer/scripts/setup-dev.sh && chmod +x ${localWorkspaceFolder}/.devcontainer/scripts/setup-dev.sh",
-
-  "postCreateCommand": "sudo ./.devcontainer/scripts/setup-dev.sh && pip install --user pylint black isort ipython pytest pytest-cov",
-
-  "postStartCommand": "echo 'Development environment ready!'",
-
-  "customizations": {
-    "vscode": {
-      "settings": {
-        "python.defaultInterpreterPath": "/opt/venv/bin/python",
-        "python.linting.pylintEnabled": true,
-        "python.linting.enabled": true,
-        "python.formatting.provider": "black",
-        "python.formatting.blackPath": "${workspaceFolder}/.local/bin/black",
-        "editor.formatOnSave": true,
-        "[python]": {
-          "editor.codeActionsOnSave": {
-            "source.organizeImports": "explicit"
-          }
-        },
-        "terminal.integrated.defaultProfile.linux": "bash",
-        "terminal.integrated.profiles.linux": {
-          "bash": {
-            "path": "/bin/bash"
-          }
-        },
-        "files.eol": "\n"
-      },
-
-      "extensions": [
-        "ms-python.python",
-        "ms-python.vscode-pylint",
-        "ms-python.black-formatter",
-        "redhat.vscode-yaml",
-        "tamasfe.even-better-toml",
-        "GitHub.copilot"
-      ]
-    }
-  }
 }
