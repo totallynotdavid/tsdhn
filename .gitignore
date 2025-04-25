@@ -1,5 +1,9 @@
 # Folders
 /jobs/
+# devcontainer artifacts
+/.dotnet/
+/.cache/
+/.vscode-remote/
 
 # Files
 configuracion_*.json
