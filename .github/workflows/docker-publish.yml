@@ -1,19 +1,22 @@
-name: 🐳 Publish Docker Image
+name: 🐳 Publish Docker Images
 
 on:
     workflow_dispatch:
     push:
         branches: ["main"]
         paths:
-            - "Dockerfile"
+            - ".devcontainer/prod/Dockerfile"
+            - ".devcontainer/dev/Dockerfile"
             - ".github/workflows/docker-publish.yml"
 
 env:
     REGISTRY: ghcr.io
-    IMAGE_NAME: ${{ github.repository_owner }}/seismic-toolkit
+    REPO_OWNER: ${{ github.repository_owner }}
+    PROD_IMAGE_NAME: seismic-toolkit
+    DEV_IMAGE_NAME: seismic-toolkit-dev
 
 jobs:
-    build-and-push:
+    build-and-push-production:
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -41,11 +44,11 @@ jobs:
                   username: ${{ github.actor }}
                   password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Extract Docker metadata
-              id: meta
+            - name: Extract Docker metadata for production
+              id: meta-prod
               uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
               with:
-                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.PROD_IMAGE_NAME }}
                   tags: |
                       type=schedule,pattern={{date 'YYYYMMDD'}}
                       type=ref,event=branch
@@ -54,22 +57,84 @@ jobs:
                       type=sha,format=short
                       type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
 
-            - name: Build and push Docker image
-              id: build-and-push
+            - name: Build and push production Docker image
+              id: build-and-push-prod
               uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
               with:
                   context: .
                   file: ./Dockerfile
                   push: ${{ github.event_name != 'pull_request' }}
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
+                  tags: ${{ steps.meta-prod.outputs.tags }}
+                  labels: ${{ steps.meta-prod.outputs.labels }}
+                  cache-from: type=gha,scope=prod
+                  cache-to: type=gha,mode=max,scope=prod
                   platforms: linux/amd64
 
-            - name: Sign the published Docker image
+            - name: Sign the published production Docker image
               if: ${{ github.event_name != 'pull_request' }}
               env:
-                  TAGS: ${{ steps.meta.outputs.tags }}
-                  DIGEST: ${{ steps.build-and-push.outputs.digest }}
+                  TAGS: ${{ steps.meta-prod.outputs.tags }}
+                  DIGEST: ${{ steps.build-and-push-prod.outputs.digest }}
+              run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+    build-and-push-development:
+        runs-on: ubuntu-latest
+        needs: build-and-push-production
+        permissions:
+            contents: read
+            packages: write
+            id-token: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Install cosign
+              if: github.event_name != 'pull_request'
+              uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.1
+              with:
+                  cosign-release: "v2.4.3"
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+            - name: Log in to GitHub Container Registry
+              if: github.event_name != 'pull_request'
+              uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract Docker metadata for development
+              id: meta-dev
+              uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.DEV_IMAGE_NAME }}
+                  tags: |
+                      type=schedule,pattern={{date 'YYYYMMDD'}}
+                      type=ref,event=branch
+                      type=ref,event=tag
+                      type=ref,event=pr
+                      type=sha,format=short
+                      type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+            - name: Build and push development Docker image
+              id: build-and-push-dev
+              uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+              with:
+                  context: .
+                  file: ./Dockerfile.dev
+                  push: ${{ github.event_name != 'pull_request' }}
+                  tags: ${{ steps.meta-dev.outputs.tags }}
+                  labels: ${{ steps.meta-dev.outputs.labels }}
+                  cache-from: type=gha,scope=dev
+                  cache-to: type=gha,mode=max,scope=dev
+                  platforms: linux/amd64
+
+            - name: Sign the published development Docker image
+              if: ${{ github.event_name != 'pull_request' }}
+              env:
+                  TAGS: ${{ steps.meta-dev.outputs.tags }}
+                  DIGEST: ${{ steps.build-and-push-dev.outputs.digest }}
               run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
