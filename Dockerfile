@@ -27,9 +27,6 @@ RUN apt-get update && \
         python3.12 python3.12-venv python3-pip \
         # Build Essentials
         build-essential make pkg-config \
-        # GMT Build Deps & Runtime Libs
-        gmt gmt-dcw gmt-gshhg \
-        ghostscript gdal-bin graphicsmagick ffmpeg \
         # TeXLive Installer Dep
         perl \
         # App Runtime Deps
@@ -133,6 +130,8 @@ RUN apt-get update && \
         ghostscript graphicsmagick ffmpeg \
         csh ps2eps fontconfig \
         libgdal-dev libnetcdf-dev libfftw3-dev libblas-dev liblapack-dev && \
+        gmt gmt-dcw gmt-gshhg \
+        ghostscript gdal-bin graphicsmagick ffmpeg \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
