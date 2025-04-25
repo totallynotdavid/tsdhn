@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=C.UTF-8 \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/usr/local/texlive/bin/x86_64-linux:${PATH}" \
+    PATH="/usr/local/texlive/bin/x86_64-linux:${PATH}"
 
 # Create non-root user
 RUN groupadd -r appuser && \
