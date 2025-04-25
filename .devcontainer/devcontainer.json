@@ -36,11 +36,10 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "python.defaultInterpreterPath": "/usr/bin/python3.12",
         "python.linting.pylintEnabled": true,
         "python.linting.enabled": true,
         "python.formatting.provider": "black",
-        "python.formatting.blackPath": "${workspaceFolder}/.local/bin/black",
         "editor.formatOnSave": true,
         "[python]": {
           "editor.codeActionsOnSave": {
