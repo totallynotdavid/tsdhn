@@ -22,11 +22,7 @@
         }
     },
 
-    "initializeCommand": "mkdir -p ${localWorkspaceFolder}/.devcontainer/scripts",
-
-    "onCreateCommand": "mkdir -p .devcontainer/scripts && echo '#!/bin/bash\nsudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs\nsudo usermod -aG sudo appuser\necho \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser\n' > .devcontainer/scripts/setup-dev.sh && chmod +x .devcontainer/scripts/setup-dev.sh",
-
-    "postCreateCommand": "sudo ./.devcontainer/scripts/setup-dev.sh && pip install --user pylint black isort ipython pytest pytest-cov",
+    "postCreateCommand": "bash -c 'sudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs && sudo usermod -aG sudo appuser && echo \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser && pip install --user pylint black isort ipython pytest pytest-cov'",
 
     "postStartCommand": "echo 'Development environment ready!'",
 
