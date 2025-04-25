@@ -1,7 +1,7 @@
 {
     "name": "Orchestrator-TSDHN Dev",
 
-    "image": "ghcr.io/totallynotdavid/seismic-toolkit:main",
+    "image": "ghcr.io/totallynotdavid/seismic-toolkit-dev:main",
 
     "workspaceFolder": "/app",
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
@@ -22,8 +22,6 @@
         }
     },
 
-    "postCreateCommand": "bash -c 'if ! command -v sudo &> /dev/null; then apt-get update && apt-get install -y sudo; fi && sudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs && sudo usermod -aG sudo appuser && echo \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser && pip install --user pylint black isort ipython pytest pytest-cov'",
-
     "postStartCommand": "echo 'Development environment ready!'",
 
     "customizations": {
@@ -33,11 +31,11 @@
                 "python.linting.pylintEnabled": true,
                 "python.linting.enabled": true,
                 "python.formatting.provider": "black",
-                "python.formatting.blackPath": "${workspaceFolder}/.local/bin/black",
+                "python.formatting.blackPath": "/opt/venv/bin/black",
                 "editor.formatOnSave": true,
                 "[python]": {
                     "editor.codeActionsOnSave": {
-                        "source.organizeImports": "explicit"
+                        "source.organizeImports": "always"
                     }
                 },
                 "terminal.integrated.defaultProfile.linux": "bash",
