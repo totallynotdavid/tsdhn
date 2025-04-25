@@ -22,7 +22,7 @@
         }
     },
 
-    "postCreateCommand": "bash -c 'sudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs && sudo usermod -aG sudo appuser && echo \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser && pip install --user pylint black isort ipython pytest pytest-cov'",
+    "postCreateCommand": "bash -c 'if ! command -v sudo &> /dev/null; then apt-get update && apt-get install -y sudo; fi && sudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs && sudo usermod -aG sudo appuser && echo \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser && pip install --user pylint black isort ipython pytest pytest-cov'",
 
     "postStartCommand": "echo 'Development environment ready!'",
 
