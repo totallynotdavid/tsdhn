@@ -25,13 +25,22 @@
     }
   },
 
+  "initializeCommand": "mkdir -p ${localWorkspaceFolder}/.devcontainer/scripts",
+
+  "onCreateCommand": "echo '#!/bin/bash\nsudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs\nsudo usermod -aG sudo appuser\necho \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser\n' > ${localWorkspaceFolder}/.devcontainer/scripts/setup-dev.sh && chmod +x ${localWorkspaceFolder}/.devcontainer/scripts/setup-dev.sh",
+
+  "postCreateCommand": "sudo ./.devcontainer/scripts/setup-dev.sh && pip install --user pylint black isort ipython pytest pytest-cov",
+
+  "postStartCommand": "echo 'Development environment ready!'",
+
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/usr/bin/python3.12",
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
         "python.linting.pylintEnabled": true,
         "python.linting.enabled": true,
         "python.formatting.provider": "black",
+        "python.formatting.blackPath": "${workspaceFolder}/.local/bin/black",
         "editor.formatOnSave": true,
         "[python]": {
           "editor.codeActionsOnSave": {
