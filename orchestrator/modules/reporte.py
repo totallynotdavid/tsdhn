@@ -1,11 +1,10 @@
 import datetime
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from string import Template
-from typing import Dict
-
-from orchestrator.models.reporte import DatetimeInfo, EarthquakeData, TsunamiTravelData
+from typing import Dict, List
 
 MONTH_MAP = {
     1: "Ene",
@@ -21,6 +20,36 @@ MONTH_MAP = {
     11: "Nov",
     12: "Dic",
 }
+
+
+@dataclass
+class EarthquakeData:
+    longitude: float
+    latitude: float
+    depth: float
+    azimuth: float
+    dip: float
+    rake: float
+    magnitude: float
+    param1: int
+    param2: int
+    origin_time: str
+
+
+@dataclass
+class TsunamiTravelData:
+    travel_times: List[float]
+    max_heights: List[float]
+    hours: List[int]
+    minutes: List[int]
+
+
+@dataclass
+class DatetimeInfo:
+    date_str: str
+    time_str: str
+    year_month_day: tuple[int, int, int]
+    month_abbr: str
 
 
 class LatexTemplate(Template):
