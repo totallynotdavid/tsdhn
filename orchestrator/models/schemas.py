@@ -54,10 +54,6 @@ class TsunamiTravelResponse(BaseModel):
     epicenter_info: Dict[str, str]
 
 
-class RunTSDHNRequest(BaseModel):
-    skip_steps: Optional[List[str]] = None
-
-
 @dataclass(frozen=True)
 class CompilerConfig:
     source: str
