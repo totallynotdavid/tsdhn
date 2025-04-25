@@ -22,7 +22,7 @@
         }
     },
 
-    "postStartCommand": "echo 'Development environment ready!'",
+    "postStartCommand": "sudo ln -s /lib/x86_64-linux-gnu/libgmt.so.6 /lib/x86_64-linux-gnu/libgmt.so",
 
     "customizations": {
         "vscode": {
