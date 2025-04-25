@@ -83,7 +83,7 @@ RUN wget -q -O install-tl-unx.tar.gz "${TEXLIVE_INSTALLER_URL}" && \
         --texdir="${TEXLIVE_INSTALL_DIR}" \
         --no-interaction && \
     "${TEXLIVE_INSTALL_DIR}/bin/x86_64-linux/tlmgr" option repository http://mirror.ctan.org/systems/texlive/tlnet && \
-    "${TEXLIVE_INSTALL_DIR}/bin/x86_64-linux/tlmgr" install \
+    "${TEXLIVE_INSTALL_DIR}/bin/x86_64-linux/tlmgr" install --force \
         babel-spanish hyphen-spanish booktabs && \
     rm -rf /tmp/texlive-install "${TEXLIVE_INSTALL_DIR}/texmf-var/web2c/tlmgr.log" \
            "${TEXLIVE_INSTALL_DIR}/texmf-var/tlpkg/backups" /root/.texlive*
