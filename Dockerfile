@@ -56,8 +56,7 @@ WORKDIR /tmp/ttt-sdk-build
 RUN git clone --depth 1 "${TTT_SDK_REPO}" tttapi
 WORKDIR /tmp/ttt-sdk-build/tttapi
 RUN make config compile && \
-    make install datadir docs && \
-    make clean
+    make install clean
 
 # ========================
 # TeXLive installation
