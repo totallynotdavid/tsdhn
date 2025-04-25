@@ -1,7 +1,7 @@
 {
     "name": "Orchestrator-TSDHN Dev",
 
-    "image": "ghcr.io/totallynotdavid/seismic-toolkit:main",
+    "image": "ghcr.io/totallynotdavid/seismic-toolkit-dev:main",
 
     "workspaceFolder": "/app",
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
