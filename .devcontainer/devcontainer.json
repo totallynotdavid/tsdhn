@@ -1,10 +1,7 @@
 {
     "name": "Orchestrator-TSDHN Dev",
 
-    "build": {
-        "dockerfile": "../Dockerfile",
-        "context": ".."
-    },
+    "image": "ghcr.io/totallynotdavid/seismic-toolkit:main",
 
     "workspaceFolder": "/app",
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
@@ -25,11 +22,7 @@
         }
     },
 
-    "initializeCommand": "mkdir -p ${localWorkspaceFolder}/.devcontainer/scripts",
-
-    "onCreateCommand": "echo '#!/bin/bash\nsudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs\nsudo usermod -aG sudo appuser\necho \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser\n' > ${localWorkspaceFolder}/.devcontainer/scripts/setup-dev.sh && chmod +x ${localWorkspaceFolder}/.devcontainer/scripts/setup-dev.sh",
-
-    "postCreateCommand": "sudo ./.devcontainer/scripts/setup-dev.sh && pip install --user pylint black isort ipython pytest pytest-cov",
+    "postCreateCommand": "bash -c 'if ! command -v sudo &> /dev/null; then apt-get update && apt-get install -y sudo; fi && sudo apt-get update && sudo apt-get install -y git vim sudo nano htop git-lfs && sudo usermod -aG sudo appuser && echo \"appuser ALL=(ALL) NOPASSWD:ALL\" | sudo tee /etc/sudoers.d/appuser && pip install --user pylint black isort ipython pytest pytest-cov'",
 
     "postStartCommand": "echo 'Development environment ready!'",
 
