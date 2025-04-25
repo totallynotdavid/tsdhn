@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Create non-root user
 RUN groupadd -r appuser && \
-    useradd --no-log-init -r -g appuser -m -d /app -s /sbin/nologin -c "non-root-user" appuser
+    useradd --no-log-init -r -g appuser -m -d /app -s /bin/bash -c "application-user" appuser
 
 # ========================
 # Base system dependencies
