@@ -25,7 +25,7 @@ RUN apt-get update && \
         # Python 3.12
         python3.12 python3.12-venv python3-pip \
         # Build Essentials
-        build-essential make pkg-config \
+        build-essential cmake make pkg-config \
         # TeXLive Installer Dep
         perl \
         # App Runtime Deps
