@@ -139,7 +139,7 @@ REQUIRED_PKGS=(
 
     # GMT build deps (https://github.com/GenericMappingTools/gmt/wiki/Install-dependencies-on-Ubuntu-and-Debian)
     libcurl4-gnutls-dev libnetcdf-dev libgdal-dev gdal-bin \
-    libfftw3-dev libpcre3-dev libpcre3-dev liblapack-dev libblas-dev \
+    libfftw3-dev libpcre3-dev liblapack-dev libblas-dev \
     libglib2.0-dev ghostscript graphicsmagick ffmpeg
 
     # Other dependencies
