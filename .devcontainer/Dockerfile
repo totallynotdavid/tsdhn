@@ -64,7 +64,7 @@ RUN git clone --depth 1 "${TTT_SDK_REPO}" tttapi
 WORKDIR /tmp/ttt-sdk-build/tttapi
 RUN make config compile && \
     make install datadir docs && \
-    make clean
+    make test clean
 
 # ========================
 # TeXLive installation
@@ -93,8 +93,7 @@ RUN wget -q -O install-tl-unx.tar.gz "${TEXLIVE_INSTALLER_URL}" && \
     "${TEXLIVE_INSTALL_DIR}/bin/x86_64-linux/tlmgr" option repository http://mirror.ctan.org/systems/texlive/tlnet && \
     "${TEXLIVE_INSTALL_DIR}/bin/x86_64-linux/tlmgr" update --self && \
     "${TEXLIVE_INSTALL_DIR}/bin/x86_64-linux/tlmgr" install \
-        babel-spanish hyphen-spanish booktabs multirow \
-        adjustbox collectbox tcbox environ trimspaces epstopdf-pkg && \
+        babel-spanish hyphen-spanish booktabs && \
     rm -rf /tmp/texlive-install "${TEXLIVE_INSTALL_DIR}/texmf-var/web2c/tlmgr.log" \
            "${TEXLIVE_INSTALL_DIR}/texmf-var/tlpkg/backups" /root/.texlive*
 
@@ -166,7 +165,8 @@ RUN apt-get update && \
         python3.12 python3.12-venv \
         libcurl4 libpcre3 \
         ghostscript graphicsmagick ffmpeg \
-        csh ps2eps fontconfig && \
+        csh ps2eps fontconfig \
+        libgdal-dev libnetcdf-dev libfftw3-dev libblas-dev liblapack-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -175,13 +175,17 @@ ENV VIRTUAL_ENV=/opt/venv
 COPY --from=python-deps ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
-# Copy tools from builder stages
+# Copy binaries from builder stages
 COPY --from=ttt-builder /usr/local/bin/ttt_* /usr/local/bin/
-COPY --from=ttt-builder /usr/local/share/ttt /usr/local/share/ttt
+COPY --from=ttt-builder /usr/local/share/geoware /usr/local/share/geoware
 COPY --from=texlive-builder /usr/local/texlive /usr/local/texlive
 COPY --from=gmt-builder /usr/local/bin/gmt* /usr/local/bin/
 COPY --from=gmt-builder /usr/local/share/gmt /usr/local/share/gmt
+COPY --from=gmt-builder /usr/local/lib/libgmt* /usr/local/lib/
 COPY --from=ifx-builder /opt/intel/oneapi /opt/intel/oneapi
+
+# Update library links
+RUN ldconfig
 
 # Copy application code
 WORKDIR /app
