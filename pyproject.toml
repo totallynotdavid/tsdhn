@@ -28,7 +28,7 @@ build-backend = "poetry.core.masonry.api"
 start = "orchestrator.main:start_app"
 
 [tool.poetry.group.test.dependencies]
-pytest = "^7.4.0"
+pytest = "^8.4.1"
 pytest-asyncio = "^0.21.0"
 httpx = "^0.25.0"
 pytest-cov = "^4.1.0"
