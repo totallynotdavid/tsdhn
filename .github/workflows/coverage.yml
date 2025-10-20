@@ -29,7 +29,7 @@ jobs:
                   sudo apt-get install -y gmt libgmt-dev
                   sudo find /usr -name "libgmt.so.*" -exec sudo ln -sf {} $(dirname {})/libgmt.so \;
 
-            - uses: snok/install-poetry@8081dddc3955298b06b8552cef6c12d7d58da755 # v1.4.1
+            - uses: snok/install-poetry@ff8a7d7de27005376176819789742a2280cc35e2 # v1.4.1
 
             - run: poetry install --with dev
 
