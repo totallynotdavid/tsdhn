@@ -18,13 +18,20 @@ cli = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "ruff>=0.9.6",
+    "ruff>=0.15",
     "mypy>=1.15",
     "types-PyYAML",
-    "pytest>=7.4",
-    "pytest-asyncio>=0.21",
-    "pytest-cov>=4.1",
-    "httpx>=0.25",
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-xdist>=3.6",
+    "pytest-cov>=6",
+    "httpx>=0.27",
+    "coverage>=7.6",
+    "bandit>=1.7",
+    "pip-audit>=2.7",
+]
+build = [
+    "uv_build>=0.11.25",
 ]
 
 [tool.ruff]
@@ -34,7 +41,17 @@ indent-width = 4
 extend-exclude = ["__pycache__", "dist", "build"]
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "I"]
+# E/F/W = pycodestyle/pyflakes/pycodestyle warnings
+# I = isort
+# B = flake8-bugbear
+# UP = pyupgrade
+# S = flake8-bandit (Python security SAST)
+# SIM = flake8-simplify
+# RUF = ruff-specific
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*.py" = ["S101"]  # asserts are fine in tests
 
 [tool.ruff.format]
 quote-style = "double"
@@ -43,8 +60,23 @@ line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.14"
+strict = true
 ignore_missing_imports = true
 warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.coverage.run]
+branch = true
+source = ["packages"]
+omit = ["**/tests/*", "**/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["packages/orchestrator/tests"]
