@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 
@@ -7,23 +7,23 @@ from cli.ui import SimpleUI
 
 
 class APIClient:
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
         self._session: aiohttp.ClientSession | None = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> APIClient:
         self._session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=30),
             connector=aiohttp.TCPConnector(limit_per_host=5, force_close=True),
         )
         return self
 
-    async def __aexit__(self, *exc):
+    async def __aexit__(self, *exc: object) -> None:
         if self._session:
             await self._session.close()
             self._session = None
 
-    async def _request(self, method: str, endpoint: str, **kwargs) -> Any:
+    async def _request(self, method: str, endpoint: str, **kwargs: Any) -> Any:
         if self._session is None:
             raise RuntimeError("API client session not initialized")
 
@@ -60,11 +60,16 @@ class APIClient:
         except Exception:
             return False
 
-    async def call_endpoint(self, endpoint: str, data: dict, **kwargs) -> dict:
-        return await self._request("POST", endpoint, json=data, **kwargs)
+    async def call_endpoint(
+        self, endpoint: str, data: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        result: Any = await self._request("POST", endpoint, json=data, **kwargs)
+        return cast(dict[str, Any], result)
 
-    async def get_job_status(self, job_id: str) -> dict:
-        return await self._request("GET", f"job-status/{job_id}")
+    async def get_job_status(self, job_id: str) -> dict[str, Any]:
+        result: Any = await self._request("GET", f"job-status/{job_id}")
+        return cast(dict[str, Any], result)
 
     async def download_report(self, job_id: str) -> bytes:
-        return await self._request("GET", f"job-result/{job_id}")
+        result: Any = await self._request("GET", f"job-result/{job_id}")
+        return cast(bytes, result)

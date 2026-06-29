@@ -6,7 +6,7 @@ from cli.core import JobMonitor, SimulationManager
 from cli.ui import SimpleUI
 
 
-async def main(args):
+async def main(args: argparse.Namespace) -> None:
     config = ConfigManager().load_config()
     sim = SimulationManager(config, dev_mode=args.dev)
     job_id = await sim.full_test_flow()

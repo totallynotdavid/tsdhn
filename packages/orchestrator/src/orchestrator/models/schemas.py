@@ -22,11 +22,13 @@ class EarthquakeInput(BaseModel):
     hhmm: str | None = "0000"
 
     @field_validator("lon0")
-    def convert_longitude(cls, v):
+    @classmethod
+    def convert_longitude(cls, v: float) -> float:
         return v - 360 if v > 0 else v
 
     @field_validator("hhmm")
-    def validate_time(cls, v):
+    @classmethod
+    def validate_time(cls, v: str) -> str:
         if len(v) == 0 or len(v) < 4:
             return "0000"
         if ":" in v:
@@ -66,14 +68,14 @@ class CompilerConfig:
 class ProcessingStep:
     name: str
     command: list[str] | None = None
-    python_callable: Callable[[Path], None] | None = None
+    python_callable: Callable[[Path], Path | str | None] | None = None
     file_checks: list[tuple[str, str]] = field(default_factory=list)
     compiler_config: CompilerConfig | None = None
     pre_execute_checks: list[tuple[str, str]] = field(default_factory=list)
     extra_executables: list[str] = field(default_factory=list)
     working_dir: str | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not (self.command is None) ^ (self.python_callable is None):
             raise ValueError(
                 "ProcessingStep must have either command or python_callable"

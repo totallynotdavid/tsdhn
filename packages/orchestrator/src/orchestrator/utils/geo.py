@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 import numpy as np
 
@@ -20,8 +21,8 @@ def calculate_distance_to_coast(
     """
     # Compute Euclidean distance in degree space using np.hypot
     distances = np.hypot(coast_points[:, 0] - lon0, coast_points[:, 1] - lat0)
-    min_deg = distances.min()
-    return min_deg * DEG_TO_KM
+    min_deg: np.floating[Any] = distances.min()
+    return float(min_deg) * DEG_TO_KM
 
 
 def format_arrival_time(time: float, day: str) -> str:

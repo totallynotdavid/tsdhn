@@ -1,15 +1,16 @@
 import json
+from typing import Any
 
 from cli.constants import CONFIG_FILE, DEFAULT_CONFIG, JOB_ID_FILE
 from cli.ui import SimpleUI
 
 
 class ConfigManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.config_file = CONFIG_FILE
         self.job_id_file = JOB_ID_FILE
 
-    def load_config(self) -> dict:
+    def load_config(self) -> dict[str, Any]:
         try:
             if self.config_file.exists():
                 with self.config_file.open("r", encoding="utf-8") as f:
@@ -18,7 +19,7 @@ class ConfigManager:
             SimpleUI.show_error(f"Error cargando configuración: {e!s}")
         return DEFAULT_CONFIG
 
-    def save_config(self, config: dict) -> None:
+    def save_config(self, config: dict[str, Any]) -> None:
         try:
             with self.config_file.open("w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)

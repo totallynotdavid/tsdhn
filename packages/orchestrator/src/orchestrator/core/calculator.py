@@ -27,6 +27,8 @@ NM_CONVERSION = 60 * 1853  # Nautical miles to meters conversion
 class TsunamiCalculator:
     _data_loaded: bool = False
     _static_loaded: bool = False
+    xa: np.ndarray
+    ya: np.ndarray
     vlon: np.ndarray | None = None
     vlat: np.ndarray | None = None
     bathymetry: np.ndarray | None = None
@@ -35,12 +37,12 @@ class TsunamiCalculator:
     mechanism_data: np.ndarray | None = None
     ports: list[str] | None = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize calculator with preloaded data"""
         self._ensure_data_loaded()
 
     @classmethod
-    def _ensure_data_loaded(cls):
+    def _ensure_data_loaded(cls) -> None:
         """Lazy-load required data once"""
         if not cls._data_loaded:
             cls._load_geographic_data()
@@ -48,7 +50,7 @@ class TsunamiCalculator:
             cls._load_static_files()
 
     @classmethod
-    def _load_geographic_data(cls):
+    def _load_geographic_data(cls) -> None:
         try:
             # Load Pacific bathymetry matrix
             pacifico_path = MODEL_DIR / "pacifico.mat"
@@ -83,7 +85,7 @@ class TsunamiCalculator:
             raise RuntimeError("Bathymetric data initialization failed") from e
 
     @classmethod
-    def _load_static_files(cls):
+    def _load_static_files(cls) -> None:
         try:
             # Load focal mechanism data
             mech_path = MODEL_DIR / "mecfoc.dat"
@@ -129,16 +131,16 @@ class TsunamiCalculator:
                 L, W, data.lon0, data.lat0, azimuth, dip
             )
 
-            assert self.maper1 is not None, "Coastal data not loaded"
+            if self.maper1 is None:
+                raise RuntimeError("Coastal data not loaded")
 
             # Location analysis
             distance_to_coast = calculate_distance_to_coast(
                 self.maper1[:, :2], data.lon0, data.lat0
             )
 
-            assert self.bathy_interpolator is not None, (
-                "Bathymetry interpolator not loaded"
-            )
+            if self.bathy_interpolator is None:
+                raise RuntimeError("Bathymetry interpolator not loaded")
 
             # Get bathymetry at epicenter
             h0 = self.bathy_interpolator((data.lat0, data.lon0))
@@ -174,8 +176,10 @@ class TsunamiCalculator:
         Calculate tsunami arrival times at monitored locations
         """
         try:
-            assert self.ports is not None, "Port data not loaded"
-            assert data.hhmm is not None, "hhmm must be provided"
+            if self.ports is None:
+                raise RuntimeError("Port data not loaded")
+            if data.hhmm is None:
+                raise RuntimeError("hhmm must be provided")
 
             arrival_times: dict[str, str] = {}
             distances: dict[str, float] = {}
@@ -210,7 +214,7 @@ class TsunamiCalculator:
                 arrival_times=arrival_times,
                 distances=distances,
                 epicenter_info={
-                    "date": data.dia,
+                    "date": cast(str, data.dia),
                     "time": data.hhmm,
                     "latitude": f"{data.lat0:.2f}",
                     "longitude": f"{data.lon0:.2f}",
@@ -233,7 +237,8 @@ class TsunamiCalculator:
         Returns:
             Tuple of (azimuth, dip)
         """
-        assert self.mechanism_data is not None, "Mechanism data not loaded"
+        if self.mechanism_data is None:
+            raise RuntimeError("Mechanism data not loaded")
 
         distances = np.sqrt(
             (self.mechanism_data[:, 0] - lon0) ** 2
@@ -347,9 +352,8 @@ class TsunamiCalculator:
             )  # shape (n+1, 2)
             bath_points = path_points[:, [1, 0]]  # Swap to (lat, lon)
 
-            assert self.bathy_interpolator is not None, (
-                "Bathymetry interpolator not loaded"
-            )
+            if self.bathy_interpolator is None:
+                raise RuntimeError("Bathymetry interpolator not loaded")
 
             # Bathymetry interpolation
             h = np.abs(self.bathy_interpolator(bath_points))
@@ -374,7 +378,7 @@ class TsunamiCalculator:
 
         return distance, travel_time + time0
 
-    def _write_hypo_dat(self, data: EarthquakeInput, output_dir: Path):
+    def _write_hypo_dat(self, data: EarthquakeInput, output_dir: Path) -> None:
         """Write earthquake parameters to hypo.dat"""
         try:
             output_dir.mkdir(parents=True, exist_ok=True)

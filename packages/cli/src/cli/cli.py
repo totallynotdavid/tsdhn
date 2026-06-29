@@ -4,7 +4,7 @@ import asyncio
 from cli.main import main
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Cliente de Simulación TSUNAMI")
     parser.add_argument(
         "--dev",
@@ -14,7 +14,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def run():
+def run() -> None:
     args = parse_args()
     asyncio.run(main(args))
 

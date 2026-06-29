@@ -1,6 +1,7 @@
 import asyncio
 import time
 from datetime import datetime, timedelta
+from typing import Any
 
 from cli.api import APIClient
 from cli.config import ConfigManager
@@ -9,7 +10,7 @@ from cli.ui import SimpleUI
 
 
 class SimulationManager:
-    def __init__(self, config: dict, dev_mode: bool = False):
+    def __init__(self, config: dict[str, Any], dev_mode: bool = False) -> None:
         self.config = config
         self.dev_mode = dev_mode
         self.config_manager = ConfigManager()
@@ -66,7 +67,7 @@ class SimulationManager:
             job_id = await self._execute_calculation_steps(client)
             return job_id
 
-    def modify_parameters(self):
+    def modify_parameters(self) -> None:
         respuesta = (
             SimpleUI.prompt("¿Deseas modificar los parámetros? (s/n): ").strip().lower()
         )
@@ -80,7 +81,9 @@ class SimulationManager:
                 ("dia", "Día"),
             ]:
                 current_val = self.config["simulation_params"].get(key)
-                nuevo = input(f"│     * {label} (actual: {current_val}): ").strip()
+                nuevo: str | float = input(
+                    f"│     * {label} (actual: {current_val}): "
+                ).strip()
                 if nuevo:
                     if key in ["Mw", "h", "lat0", "lon0"]:
                         try:
@@ -129,7 +132,7 @@ class SimulationManager:
 
         t0 = time.time()
 
-        payload = {
+        payload: dict[str, Any] = {
             "data": self.config["simulation_params"],
             "skip_steps": self.config.get("skip_steps", None),
         }
@@ -161,7 +164,7 @@ class SimulationManager:
 
 
 class JobMonitor:
-    def __init__(self, config: dict, job_id: str):
+    def __init__(self, config: dict[str, Any], job_id: str) -> None:
         self.config = config
         self.job_id = job_id
         self.start_time = time.time()
@@ -227,7 +230,9 @@ class JobMonitor:
         }
         return status_map.get(raw_status.lower(), raw_status.capitalize())
 
-    async def _finalizar(self, client: APIClient, estado: dict | None) -> None:
+    async def _finalizar(
+        self, client: APIClient, estado: dict[str, Any] | None
+    ) -> None:
         duration = self._format_elapsed(int(time.time() - self.start_time))
 
         if estado is None:
