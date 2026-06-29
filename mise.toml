@@ -1,3 +1,47 @@
 [tools]
 python = "3.14.6"
 uv = "0.11.25"
+gitleaks = "8.30.1"
+cosign = "2.4.3"
+
+[tasks]
+install = "uv sync --all-packages --group dev --group build"
+
+lint = [
+    "uv run ruff check --select E,F,W,I,B,UP,S,SIM,RUF .",
+    "uv run ruff format --check .",
+    "uv run mypy --strict packages",
+]
+
+fix = [
+    "uv run ruff check --fix --unsafe-fixes .",
+    "uv run ruff format .",
+]
+
+test = "uv run pytest -n auto"
+
+coverage = [
+    "uv run coverage run -m pytest",
+    "uv run coverage report --fail-under=70",
+    "uv run coverage json",
+]
+
+security = [
+    "uv run bandit -r packages -lll --skip B101",
+    "uv run pip-audit --strict --skip-editable",
+    "gitleaks detect --source . --no-banner",
+]
+
+build = [
+    "uv build --package orchestrator --out-dir dist/orchestrator",
+    "uv build --package cli --out-dir dist/cli",
+]
+
+doctor = [
+    "uv run python --version",
+    "uv --version",
+    "uv run ruff --version",
+    "uv run mypy --version",
+    "gitleaks version",
+    "cosign version",
+]
