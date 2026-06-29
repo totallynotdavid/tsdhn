@@ -1,81 +1,51 @@
 [project]
-name = "orchestrator"
+name = "picv-2025"
 version = "0.1.0"
-description = ""
+description = "Tsunami simulation orchestrator workspace"
+requires-python = ">=3.14"
+readme = "readme.md"
+license = { text = "MIT" }
 authors = [
-  {name = "David Duran",email = "dadch1404@gmail.com"}
-]
-license = {text = "MIT"}
-readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [
-    "fastapi (>=0.115.7,<0.116.0)",
-    "uvicorn (>=0.34.0,<0.35.0)",
-    "pydantic (>=2.10.6,<3.0.0)",
-    "scipy (==1.15.1)",
-    "numpy (==2.2.2)",
-    "redis (>=5.2.1,<6.0.0)",
-    "rq (>=2.1.0,<3.0.0)",
-    "pygmt (>=0.14.2,<0.15.0)",
-    "pyyaml (>=6.0.2,<7.0.0)",
+    { name = "David Duran", email = "dadch1404@gmail.com" },
 ]
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.uv.workspace]
+members = ["packages/*"]
 
-[tool.poetry.scripts]
-start = "orchestrator.main:start_app"
+[tool.uv.sources]
+orchestrator = { workspace = true }
+cli = { workspace = true }
 
-[tool.poetry.group.test.dependencies]
-pytest = "^7.4.0"
-pytest-asyncio = "^0.21.0"
-httpx = "^0.25.0"
-pytest-cov = "^4.1.0"
-
-[tool.poetry.group.dev.dependencies]
-aiohttp = "^3.11.12"
-ruff = "^0.9.6"
-rich = "^13.9.4"
-pre-commit = "^4.1.0"
-
-[tool.poetry.requires-plugins]
-poetry-plugin-export = ">=1.8"
-poethepoet = ">=0.33.0"
-
-[tool.pytest.ini_options]
-log_cli = false
-log_cli_level = "DEBUG"
-log_cli_format = "%(asctime)s %(message)s (%(filename)s:%(lineno)s)"
-log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-# addopts = "--cov=orchestrator --cov-report html"
+[dependency-groups]
+dev = [
+    "ruff>=0.9.6",
+    "mypy>=1.15",
+    "types-PyYAML",
+    "pytest>=7.4",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.1",
+    "httpx>=0.25",
+]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py314"
 line-length = 88
 indent-width = 4
-
-extend-exclude = [
-    "__pycache__",
-    "dist",
-]
+extend-exclude = ["__pycache__", "dist", "build"]
 
 [tool.ruff.lint]
-select = [
-    "E",
-    "F",
-    "B",
-    "I",
-]
+select = ["E", "F", "B", "I"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
 
-[tool.poe.tasks]
-dev = { shell = "uvicorn orchestrator.main:app --reload --reload-dir orchestrator" }
-db = { shell = "rq worker tsdhn_queue" }
-clean = { shell = "rm -rf jobs configuracion_simulacion.json informe*.pdf" }
-format = { shell = "ruff format && ruff check --fix" }
-export = { shell = "poetry export -f requirements.txt --output requirements.txt --without-hashes" }
+[tool.mypy]
+python_version = "3.14"
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["packages/orchestrator/tests"]
+addopts = "-ra"
