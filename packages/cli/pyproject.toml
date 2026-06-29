@@ -1,0 +1,25 @@
+[project]
+name = "cli"
+version = "0.1.0"
+description = "TSDHN command-line client"
+requires-python = ">=3.14"
+readme = "readme.md"
+license = { text = "MIT" }
+authors = [
+    { name = "David Duran", email = "dadch1404@gmail.com" },
+]
+dependencies = [
+    "aiohttp>=3.11.12",
+    "rich>=13.9.4",
+]
+
+[project.scripts]
+tsdhn = "cli.cli:run"
+
+[build-system]
+requires = ["uv_build>=0.11.25,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "cli"
+module-root = "src"

@@ -55,76 +55,41 @@ Antes de comenzar, actualiza los paquetes del sistema:
 sudo apt update -y && sudo apt upgrade -y
 ```
 
-1. **Python** (con [pyenv](https://github.com/pyenv/pyenv)) es el lenguaje principal del proyecto. Utilizamos pyenv porque nos permite gestionar múltiples versiones de Python. Para instalarlo, ejecuta:
+1. **Python** se gestiona a través de [mise](https://mise.jdx.dev), que fija la versión declarada en [`mise.toml`](./mise.toml) (3.14.x) y crea el entorno virtual de forma reproducible. Para instalarlo:
 
    ```bash
-   curl -fsSL https://pyenv.run | bash
+   curl -fsSL https://mise.run | sh
    ```
 
-   <ins>Si estás usando Ubuntu a través de WSL</ins>, añade estas líneas a tu `.bashrc` [[1](https://stackoverflow.com/a/76483889)]:
+   Activa mise en tu shell (bash) [[1](https://mise.jdx.dev/getting-started.html#activate-mise)]:
 
    ```bash
-   cat << 'EOF' >> ~/.bashrc
-   export PYENV_ROOT="$HOME/.pyenv"
-   export PATH="$PYENV_ROOT/bin:$PATH"
-   eval "$(pyenv init -)"
-   EOF
-   ```
-
-   <ins>Si estás usando Ubuntu de forma nativa</ins>, usa esta configuración [[2](https://github.com/pyenv/pyenv?tab=readme-ov-file#bash)]:
-
-   ```bash
-   cat << 'EOF' >> ~/.bashrc
-   export PYENV_ROOT="$HOME/.pyenv"
-   [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-   eval "$(pyenv init - bash)"
-   EOF
-   ```
-
-   En ambos casos, aplica los cambios con:
-
-   ```bash
+   echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
    source ~/.bashrc
    ```
 
-   pyenv compila Python desde el código fuente, por lo que necesitas instalar las dependencias de compilación antes de continuar [[3](https://stackoverflow.com/a/74314165)] [[4](https://github.com/pyenv/pyenv/wiki#suggested-build-environment)]:
+   Instala la versión de Python declarada en el proyecto:
 
    ```bash
-   sudo apt install -y build-essential zlib1g-dev libffi-dev libssl-dev libbz2-dev libreadline-dev libsqlite3-dev liblzma-dev libncurses-dev tk-dev
-   pyenv install 3.12 && pyenv global 3.12
-   ```
-
-   **Alternativa**: Si prefieres usar el Python del sistema en lugar de pyenv (para entornos más simples), solo instala pip3:
-
-   ```bash
-   sudo apt install -y python3-pip
+   mise install
+   mise use python@3.14
    ```
 
    Verifica la instalación:
 
    ```bash
    python3 -V
-   pip3 -V
    ```
 
-2. [**Poetry**](https://python-poetry.org/docs) nos ayuda a gestionar dependencias de forma consistente entre dispositivos. Poetry crea entornos virtuales y asegura el uso de versiones específicas en nuestros paquetes de Python, evitando problemas de compatibilidad:
+2. [**uv**](https://docs.astral.sh/uv) es el gestor de paquetes y entornos del proyecto. uv reemplaza a `pip`, `poetry` y `pip-tools`: resuelve, bloquea e instala dependencias en un único `uv.lock`, y maneja múltiples paquetes en este monorepo:
 
    ```bash
-   curl -sSL https://install.python-poetry.org | python3 -
+   mise exec -- uv --version
    ```
 
-   Añade Poetry al <kbd>PATH</kbd>:
+   uv se instala automáticamente con `mise install` (ya está fijado en `mise.toml`).
 
-   ```bash
-   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-   source ~/.bashrc
-   ```
-
-   Verifica la instalación:
-
-   ```bash
-   poetry --version
-   ```
+   **Alternativa**: Si no usas mise, instala uv siguiendo las [instrucciones oficiales](https://docs.astral.sh/uv/getting-started/installation/).
 
 3. [**TTT SDK**](https://www.geoware-online.com/tsunami.html) (Tsunami Travel Time) calcula los tiempos de arribo de un tsunami a partir de la batimetría de una cuadrícula geográfica (el océano Pacífico en nuestro caso). Para instalarlo, necesitas Git LFS para poder descargar los datos y CMake para compilación:
 
@@ -280,37 +245,41 @@ sudo apt update -y && sudo apt upgrade -y
 
 ### Iniciar el proyecto
 
-1. Clona el repositorio e instala las dependencias:
+1. Clona el repositorio e instala las dependencias (incluye los dos paquetes `orchestrator` y `cli` del workspace):
 
    ```bash
    git clone https://github.com/totallynotdavid/picv-2025
-   cd picv-2025 && poetry install
+   cd picv-2025
+   mise install        # instala Python 3.12 y uv declarados en mise.toml
+   uv sync --all-packages
    ```
+
+   Esto crea un `.venv/` en la raíz con todos los paquetes del workspace instalados en modo editable.
 
 2. Valida la instalación con:
 
    ```bash
-   poetry run pytest # Todos los tests deben pasar
+   uv run pytest       # Todos los tests deben pasar
    ```
 
 3. Para iniciar la API, ejecuta:
 
    ```bash
-   poetry run start
+   uv run tsdhn-api
    ```
 
    La API estará disponible en `http://localhost:8000`.
 
-   Si estás modificando el código y quieres que la aplicación se recargue automáticamente cuando hagas cambios, entonces usa el siguiente comando en lugar de `poetry run start`:
+   Si estás modificando el código y quieres que la aplicación se recargue automáticamente cuando hagas cambios, entonces usa uvicorn directamente:
 
    ```bash
-   poetry poe dev
+   uv run uvicorn orchestrator.main:app --reload
    ```
 
    En un nuevo terminal, ejecuta el siguiente comando para iniciar el RQ worker:
 
    ```bash
-   poetry run rq worker tsdhn_queue
+   uv run rq worker tsdhn_queue
    ```
 
 > [!TIP]
@@ -318,32 +287,54 @@ sudo apt update -y && sudo apt upgrade -y
 
 ## Estructura del proyecto
 
-El repositorio se organiza en dos componentes principales:
+El repositorio es un **workspace de uv** con dos paquetes Python publicables más los activos del modelo Fortran y los datos de soporte:
 
 ```txt
 picv-2025/
-├── orchestrator/
-│   ├── core/
-│   │   ├── calculator.py        # Clase TsunamiCalculator y lógica del cálculo inicial
-│   │   ├── config.py            # Constantes globales y configuración del pipeline
-│   │   └── queue.py             # Gestión de cola de simulaciones
-│   ├── main.py                  # Punto de entrada de la API y definiciones de endpoints
-│   ├── models/
-│   │   └── schemas.py           # Schemas de validación y transformación de datos
-│   ├── modules/
-│   │   ├── maxola.py            # Generación de mapa de máxima altura de propagación del tsunami
-│   │   ├── point_ttt.py         # Generación del mapa de tiempos de arribo
-│   │   ├── reporte.py           # Generación del informe final
-│   │   ├── ttt_inverso.py       #
-│   │   └── ttt_max.py           # Generación de los mareogramas
-│   └── utils/
-│       └── geo.py               # Cálculos geográficos (distancias, formatos, etc.)
-└── model/                       # Archivos de datos y recursos del modelo
-    ├── pacifico.mat             # Datos de batimetría del Océano Pacífico
-    ├── maper1.mat               # Datos de puntos costeros
-    ├── mecfoc.dat               # Base de datos histórica de mecanismos focales
-    ├── puertos.txt              # Lista de puertos para cálculos de tiempo de llegada
-    └── job.run                  # (Deprecated) Script de ejecución de simulación en C Shell
+├── pyproject.toml               # Workspace root: declara miembros y tool.uv.workspace
+├── uv.lock                      # Lockfile único compartido por todos los paquetes
+├── mise.toml                    # Pinea Python 3.12 y uv
+├── packages/
+│   ├── orchestrator/            # Servicio FastAPI + RQ worker
+│   │   ├── pyproject.toml
+│   │   ├── src/orchestrator/
+│   │   │   ├── main.py          # Punto de entrada de la API y definiciones de endpoints
+│   │   │   ├── core/
+│   │   │   │   ├── calculator.py    # Clase TsunamiCalculator y lógica del cálculo inicial
+│   │   │   │   ├── config.py        # Constantes globales y configuración del pipeline
+│   │   │   │   └── queue.py         # Gestión de cola de simulaciones
+│   │   │   ├── models/
+│   │   │   │   └── schemas.py       # Schemas de validación y transformación de datos
+│   │   │   ├── modules/
+│   │   │   │   ├── maxola.py        # Mapa de máxima altura de propagación del tsunami
+│   │   │   │   ├── point_ttt.py     # Mapa de tiempos de arribo
+│   │   │   │   ├── reporte.py       # Informe final
+│   │   │   │   ├── ttt_inverso.py
+│   │   │   │   └── ttt_max.py       # Mareogramas
+│   │   │   └── utils/
+│   │   │       └── geo.py           # Cálculos geográficos (distancias, formatos, etc.)
+│   │   └── tests/                   # Suite de pytest del orchestrator
+│   └── cli/                    # Cliente CLI
+│       ├── pyproject.toml
+│       └── src/cli/
+│           ├── cli.py              # Entry point (`uv run tsdhn`)
+│           ├── main.py
+│           ├── api.py
+│           ├── config.py
+│           ├── constants.py
+│           ├── core.py
+│           └── ui.py
+├── model/                       # Activos del modelo Fortran (no es un paquete Python)
+│   ├── pacifico.mat             # Datos de batimetría del Océano Pacífico
+│   ├── maper1.mat               # Datos de puntos costeros
+│   ├── mecfoc.dat               # Base de datos histórica de mecanismos focales
+│   ├── puertos.txt              # Lista de puertos para cálculos de tiempo de llegada
+│   └── job.run                  # (Deprecated) Script de ejecución de simulación en C Shell
+├── data/                        # Datos auxiliares (no es un paquete Python)
+│   └── stations.yml
+└── utils/                       # Scripts de shell auxiliares (no es un paquete Python)
+    ├── copy-repo.sh
+    └── setup-env.sh
 ```
 
 ## Endpoints de la API
@@ -499,7 +490,7 @@ Además de las pruebas unitarias ubicadas en [`orchestrator/tests/`](orchestrato
 Para iniciar el CLI **en modo estándar**, ejecute:
 
 ```bash
-poetry run python -m cli.cli
+uv run tsdhn
 ```
 
 El CLI utiliza los parámetros predeterminados definidos en [`cli/constants.py`](cli/constants.py?plain=1#L8), los cuales pueden modificarse interactivamente al usar el CLI. Durante el proceso, para mantener los valores predeterminados, simplemente presiona <kbd>Enter</kbd> para continuar.
@@ -521,7 +512,7 @@ Para escenarios de depuración o desarrollo, el CLI ofrece un modo avanzado que 
 Para iniciar el CLI **en modo de desarrollo**, ejecute:
 
 ```bash
-poetry run python -m cli.cli --dev
+uv run tsdhn --dev
 ```
 
 Este modo permite omitir componentes específicos de la cadena de procesamiento definida en `PROCESSING_PIPELINE` en [`orchestrator/core/queue.py`](orchestrator/core/queue.py?plain=1#L95). Esta funcionalidad resulta especialmente útil considerando que la ejecución completa del modelo TSDHN puede requerir entre 25 y 50 minutos.
@@ -546,8 +537,8 @@ La(s) etapa(s) omitida(s) se guardan en `configuracion_simulacion.json` en el ca
 - Cuando termines de hacer cambios en el código, y antes de hacer commit, ejecuta:
 
   ```bash
-  poetry run pytest
-  poetry poe format
+  uv run pytest
+  uv run ruff format && uv run ruff check --fix
   ```
 
   para formatear el código y asegurarte de todo sigue funcionando correctamente.
