@@ -11,7 +11,7 @@
 </div>
 <!-- prettier-ignore-end -->
 
-El Orchestrator-TSDHN es una herramienta para la estimación de parámetros de tsunamis de origen lejano mediante simulaciones numéricas. Combina el **modelo TSDHN escrito en Fortran** (en la carpeta [`/model`](/model/)) con una **API escrita en Python** (en la carpeta [`/orchestrator`](/orchestrator/)) que procesa datos sísmicos iniciales, como la ubicación y la magnitud de un terremoto, para calcular variables como: dimensiones de ruptura sísmica, momento sísmico y desplazamiento de la corteza. Estos valores son utilizados finalmente en la simulación principal, cuyo resultado incluye un informe en formato PDF con mapas de propagación, gráficos de mareógrafos y datos técnicos, además de un archivo de texto con tiempos de arribo a estaciones costeras predefinidas.
+El Orchestrator-TSDHN es una herramienta para la estimación de parámetros de tsunamis de origen lejano mediante simulaciones numéricas. Combina el **modelo TSDHN escrito en Fortran** (en la carpeta [`/model`](/model/)) con una **API escrita en Python** (en la carpeta [`/api`](/api/)) que procesa datos sísmicos iniciales, como la ubicación y la magnitud de un terremoto, para calcular variables como: dimensiones de ruptura sísmica, momento sísmico y desplazamiento de la corteza. Estos valores son utilizados finalmente en la simulación principal, cuyo resultado incluye un informe en formato PDF con mapas de propagación, gráficos de mareógrafos y datos técnicos, además de un archivo de texto con tiempos de arribo a estaciones costeras predefinidas.
 
 > [!IMPORTANT]
 > La lógica de los cálculos numéricos reside en este repositorio, mientras que la [interfaz web](https://github.com/totallynotdavid/picv-2025-web) (que gestiona solicitudes y entrega el informe al usuario final) opera en un entorno separado.
@@ -250,7 +250,7 @@ sudo apt update -y && sudo apt upgrade -y
 
 ### Iniciar el proyecto
 
-1. Clona el repositorio e instala las dependencias (incluye los dos paquetes `orchestrator` y `cli` del workspace):
+1. Clona el repositorio e instala las dependencias (incluye los dos paquetes `tsdhn-api` y `tsdhn-cli` del workspace):
 
    ```bash
    git clone https://github.com/totallynotdavid/picv-2025
@@ -278,7 +278,7 @@ sudo apt update -y && sudo apt upgrade -y
    Si estás modificando el código y quieres que la aplicación se recargue automáticamente cuando hagas cambios, entonces usa uvicorn directamente:
 
    ```bash
-   uv run uvicorn orchestrator.main:app --reload
+   uv run uvicorn api.main:app --reload
    ```
 
    En un nuevo terminal, ejecuta el siguiente comando para iniciar el RQ worker:
@@ -300,9 +300,9 @@ picv-2025/
 ├── uv.lock                      # Lockfile único compartido por todos los paquetes
 ├── mise.toml                    # Pinea Python 3.12 y uv
 ├── packages/
-│   ├── orchestrator/            # Servicio FastAPI + RQ worker
+│   ├── api/                    # Servicio FastAPI + RQ worker (dist: tsdhn-api)
 │   │   ├── pyproject.toml
-│   │   ├── src/orchestrator/
+│   │   ├── api/                # importable module
 │   │   │   ├── main.py          # Punto de entrada de la API y definiciones de endpoints
 │   │   │   ├── core/
 │   │   │   │   ├── calculator.py    # Clase TsunamiCalculator y lógica del cálculo inicial
@@ -318,10 +318,10 @@ picv-2025/
 │   │   │   │   └── ttt_max.py       # Mareogramas
 │   │   │   └── utils/
 │   │   │       └── geo.py           # Cálculos geográficos (distancias, formatos, etc.)
-│   │   └── tests/                   # Suite de pytest del orchestrator
-│   └── cli/                    # Cliente CLI
+│   │   └── tests/                   # Suite de pytest del api package
+│   └── cli/                    # Cliente CLI (dist: tsdhn-cli)
 │       ├── pyproject.toml
-│       └── src/cli/
+│       └── cli/                # importable module
 │           ├── cli.py              # Entry point (`uv run tsdhn`)
 │           ├── main.py
 │           ├── api.py
@@ -346,7 +346,7 @@ picv-2025/
 
 El servicio expone varios endpoints para la gestión de simulaciones sísmicas. Todas las solicitudes deben incluir el encabezado HTTP `Content-Type: application/json` y utilizan identificadores UUIDv4 para gestionar las simulaciones.
 
-1. [`POST /run-simulation`](orchestrator/main.py?plain=1#L30) inicia una nueva simulación. Requiere un cuerpo JSON con parámetros sísmicos validados mediante modelos Pydantic ([`schemas.py`](orchestrator/models/schemas.py)).
+1. [`POST /run-simulation`](api/main.py?plain=1#L30) inicia una nueva simulación. Requiere un cuerpo JSON con parámetros sísmicos validados mediante modelos Pydantic ([`schemas.py`](api/models/schemas.py)).
 
    Los parámetros requeridos incluyen:
 
@@ -390,7 +390,7 @@ El servicio expone varios endpoints para la gestión de simulaciones sísmicas. 
 
    </details>
 
-2. [`GET /job-status/{job_id}`](orchestrator/main.py?plain=1#L47) provee información detallada sobre simulaciones en curso o finalizadas. La respuesta incluye:
+2. [`GET /job-status/{job_id}`](api/main.py?plain=1#L47) provee información detallada sobre simulaciones en curso o finalizadas. La respuesta incluye:
 
    - El estado actual de la simulación (queued, running, completed, failed)
    - Los parámetros de ruptura sísmica calculados
@@ -461,7 +461,7 @@ El servicio expone varios endpoints para la gestión de simulaciones sísmicas. 
 > [!TIP]
 > Los objetos `calculation` y `travel_times` se añaden inmediatamente después de ser calculados. No es necesario esperar a que finalice la simulación para obtener estos datos.
 
-3. [`GET /job-result/{job_id}`](orchestrator/main.py?plain=1#L61)permite descargar el informe técnico en formato PDF cuando el estado es `completed`. Requiere el encabezado `Accept: application/pdf`.
+3. [`GET /job-result/{job_id}`](api/main.py?plain=1#L61)permite descargar el informe técnico en formato PDF cuando el estado es `completed`. Requiere el encabezado `Accept: application/pdf`.
 
    Un ejemplo de uso directo sería:
 
@@ -469,7 +469,7 @@ El servicio expone varios endpoints para la gestión de simulaciones sísmicas. 
    http://localhost:8000/job-result/dee661ec-1c39-47e5-bb50-3926fa70bb8e
    ```
 
-4. [`GET /health`](orchestrator/main.py?plain=1#L97) verifica la disponibilidad del servicio y su conexión con Redis.
+4. [`GET /health`](api/main.py?plain=1#L97) verifica la disponibilidad del servicio y su conexión con Redis.
 
    Una respuesta esperada sería:
 
@@ -490,7 +490,7 @@ Todas las respuestas de error siguen el formato RFC 7807 con códigos HTTP semá
 
 ## Pruebas personalizadas
 
-Además de las pruebas unitarias ubicadas en [`orchestrator/tests/`](orchestrator/tests/), el repositorio incluye una interfaz de línea de comandos (CLI) para ejecutar simulaciones directamente mediante la API. Esta herramienta resulta particularmente útil para validaciones rápidas en entornos con recursos limitados o para realizar pruebas preliminares.
+Además de las pruebas unitarias ubicadas en [`api/tests/`](/api/tests/), el repositorio incluye una interfaz de línea de comandos (CLI) para ejecutar simulaciones directamente mediante la API. Esta herramienta resulta particularmente útil para validaciones rápidas en entornos con recursos limitados o para realizar pruebas preliminares.
 
 Para iniciar el CLI **en modo estándar**, ejecute:
 
@@ -520,7 +520,7 @@ Para iniciar el CLI **en modo de desarrollo**, ejecute:
 uv run tsdhn --dev
 ```
 
-Este modo permite omitir componentes específicos de la cadena de procesamiento definida en `PROCESSING_PIPELINE` en [`orchestrator/core/queue.py`](orchestrator/core/queue.py?plain=1#L95). Esta funcionalidad resulta especialmente útil considerando que la ejecución completa del modelo TSDHN puede requerir entre 25 y 50 minutos.
+Este modo permite omitir componentes específicos de la cadena de procesamiento definida en `PROCESSING_PIPELINE` en [`api/core/queue.py`](/api/core/queue.py?plain=1#L95). Esta funcionalidad resulta especialmente útil considerando que la ejecución completa del modelo TSDHN puede requerir entre 25 y 50 minutos.
 
 La(s) etapa(s) omitida(s) se guardan en `configuracion_simulacion.json` en el campo `skip_steps`. Este registro es temporal y no persiste entre ejecuciones del CLI, incluso en modo desarrollo. Deberás especificar nuevamente las etapas a omitir en cada ejecución.
 
@@ -529,7 +529,7 @@ La(s) etapa(s) omitida(s) se guardan en `configuracion_simulacion.json` en el ca
 
 ## Notas adicionales
 
-- La API guarda automáticamente algunos eventos en `tsunami_api.log`. Puedes configurar el logger en [`config.py`](/orchestrator/core/config.py) si deseas. El archivo de logs se crea cuando inicias la API.
+- La API guarda automáticamente algunos eventos en `tsunami_api.log`. Puedes configurar el logger en [`config.py`](/api/core/config.py) si deseas. El archivo de logs se crea cuando inicias la API.
 - Si estás haciendo pruebas y quieres ver los logs en tu terminal mientras usas `pytest`, solo necesitas cambiar una línea en [`pyproject.toml`](pyproject.toml):
 
   ```toml

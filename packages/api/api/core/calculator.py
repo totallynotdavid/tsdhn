@@ -3,20 +3,21 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
-from orchestrator.core.config import EARTH_RADIUS, GRAVITY, MODEL_DIR
-from orchestrator.models.schemas import (
+from scipy.interpolate import RegularGridInterpolator
+from scipy.io import loadmat
+
+from api.core.config import EARTH_RADIUS, GRAVITY, MODEL_DIR
+from api.models.schemas import (
     CalculationResponse,
     EarthquakeInput,
     TsunamiTravelResponse,
 )
-from orchestrator.utils.geo import (
+from api.utils.geo import (
     calculate_distance_to_coast,
     determine_epicenter_location,
     determine_tsunami_warning,
     format_arrival_time,
 )
-from scipy.interpolate import RegularGridInterpolator
-from scipy.io import loadmat
 
 logger = logging.getLogger(__name__)
 

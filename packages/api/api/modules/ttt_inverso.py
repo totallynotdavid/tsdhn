@@ -2,7 +2,7 @@ import logging
 import subprocess
 from pathlib import Path
 
-from orchestrator.core.executables import resolve
+from api.core.executables import resolve
 
 logger = logging.getLogger(__name__)
 

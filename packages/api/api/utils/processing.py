@@ -1,9 +1,9 @@
 import subprocess
 from pathlib import Path
 
-from orchestrator.core.config import ProcessingStep
-from orchestrator.utils.compiler import compile_fortran
-from orchestrator.utils.file_utils import make_executable, validate_files
+from api.core.config import ProcessingStep
+from api.utils.compiler import compile_fortran
+from api.utils.file_utils import make_executable, validate_files
 
 __all__ = ["ProcessingStep", "handle_command_step", "process_step"]
 

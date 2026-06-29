@@ -1,6 +1,6 @@
-# orchestrator
+# api
 
-TSDHN tsunami simulation orchestrator.
+TSDHN tsunami simulation orchestrator (FastAPI service + RQ worker).
 
 FastAPI service that exposes the simulation API and dispatches jobs to an
 RQ worker. See the workspace root [README](../../README.md) for full setup
@@ -16,5 +16,5 @@ uv run rq worker tsdhn_queue   # starts the RQ worker
 ## Development
 
 ```sh
-uv run --package orchestrator pytest
+uv run --package tsdhn-api pytest
 ```

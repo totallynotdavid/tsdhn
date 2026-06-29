@@ -9,10 +9,10 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from orchestrator.core.config import LOGGING_CONFIG
-from orchestrator.core.queue import JobStatus, tsdhn_queue
-from orchestrator.models.schemas import EarthquakeInput
-from orchestrator.utils.job_validators import (
+from api.core.config import LOGGING_CONFIG
+from api.core.queue import JobStatus, tsdhn_queue
+from api.models.schemas import EarthquakeInput
+from api.utils.job_validators import (
     sanitize_for_log,
     secure_path_construction,
     validate_job_id,

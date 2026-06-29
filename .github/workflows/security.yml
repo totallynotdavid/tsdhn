@@ -56,7 +56,7 @@ jobs:
                   cache-dependency-glob: "uv.lock"
 
             - name: Export locked requirements
-              # --no-emit-workspace drops the orchestrator/cli workspace
+              # --no-emit-workspace drops the api/cli workspace
               # members so pip-audit doesn't see them as editable installs
               # (which fail --strict even with --skip-editable).
               # --locked fails the job if uv.lock is stale.
