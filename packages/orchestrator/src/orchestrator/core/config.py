@@ -25,7 +25,7 @@ __all__ = [
 
 # Resolve repo root from this file's location.
 # Layout: <repo>/packages/orchestrator/src/orchestrator/core/config.py
-_REPO_ROOT: Path = Path(__file__).resolve().parents[4]
+_REPO_ROOT: Path = Path(__file__).resolve().parents[5]
 
 # Constants
 GRAVITY: float = 9.81  # m/s²
