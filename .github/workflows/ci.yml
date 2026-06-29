@@ -1,0 +1,144 @@
+name: CI
+
+on:
+    push:
+        branches: ["main"]
+    pull_request:
+    merge_group:
+    workflow_dispatch:
+
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    UV_VERSION: "0.11.25"
+    PYTHON_VERSION: "3.14"
+
+# Least-privilege by default. Each job opts into what it needs.
+permissions: {}
+
+jobs:
+    lint:
+        name: Lint
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: astral-sh/setup-uv@v8
+              with:
+                  version: ${{ env.UV_VERSION }}
+                  enable-cache: true
+                  cache-dependency-glob: "uv.lock"
+
+            - name: Sync dev tools
+              run: uv sync --all-packages --group dev --no-install-project
+
+            - name: Ruff check (incl. S = bandit-equivalent SAST)
+              run: uv run ruff check --select E,F,W,I,B,UP,S,SIM,RUF .
+
+            - name: Ruff format check
+              run: uv run ruff format --check .
+
+            - name: mypy strict
+              run: uv run mypy --strict packages
+
+    test:
+        name: Test (py${{ matrix.python-version }})
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                # Project targets py3.14 (requires-python = ">=3.14").
+                # Add 3.13/3.12 here only if you actually intend to support them.
+                python-version: ["3.14"]
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: astral-sh/setup-uv@v8
+              with:
+                  version: ${{ env.UV_VERSION }}
+                  python-version: ${{ matrix.python-version }}
+                  enable-cache: true
+                  cache-dependency-glob: "uv.lock"
+
+            # libgmt is needed by pygmt (a runtime dep of `orchestrator`).
+            # Install the system lib and create the libgmt.so symlink that
+            # pygmt expects. The symlink step is idempotent.
+            - name: Install GMT (libgmt) for pygmt
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends gmt libgmt-dev
+                  SO=$(ls /usr/lib/**/libgmt.so.* 2>/dev/null | head -n1)
+                  if [ -z "$SO" ]; then
+                      echo "::error::libgmt.so.* not found after apt install"
+                      ls -R /usr/lib | grep -i gmt || true
+                      exit 1
+                  fi
+                  sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
+
+            - name: Sync workspace
+              run: uv sync --all-packages --group dev
+
+            - name: Run tests
+              run: uv run pytest -n auto --maxfail=1 -q
+
+    coverage:
+        name: Coverage
+        runs-on: ubuntu-latest
+        # Only meaningful on the default branch or when explicitly dispatched,
+        # or on PRs from the same repo (forks can't update the gist anyway).
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+        permissions:
+            contents: read
+            statuses: write
+        env:
+            # Only attempt the badge update when the token is configured.
+            GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: astral-sh/setup-uv@v8
+              with:
+                  version: ${{ env.UV_VERSION }}
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  enable-cache: true
+                  cache-dependency-glob: "uv.lock"
+
+            - name: Install GMT (libgmt) for pygmt
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends gmt libgmt-dev
+                  SO=$(ls /usr/lib/**/libgmt.so.* 2>/dev/null | head -n1)
+                  [ -n "$SO" ] && sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
+
+            - name: Sync workspace
+              run: uv sync --all-packages --group dev
+
+            - name: Run tests with coverage
+              run: |
+                  uv run coverage run -m pytest
+                  uv run coverage report --fail-under=70
+                  uv run coverage json -o coverage.json
+
+            - name: Compute total coverage
+              id: cov
+              run: |
+                  TOTAL=$(python -c "import json;print(json.load(open('coverage.json'))['totals']['percent_covered_display'])")
+                  echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+                  echo "### Total coverage: ${TOTAL}%" >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Update coverage badge
+              if: env.GIST_TOKEN != ''
+              uses: schneegans/dynamic-badges-action@0e50b8b # v1.8.0
+              with:
+                  auth: ${{ secrets.GIST_TOKEN }}
+                  gistID: fb9b3bc6236ef7e8a1560403b5c58186
+                  filename: covbadge.json
+                  label: Coverage
+                  message: ${{ steps.cov.outputs.total }}%
+                  minColorRange: 40
+                  maxColorRange: 90
+                  valColorRange: ${{ steps.cov.outputs.total }}
