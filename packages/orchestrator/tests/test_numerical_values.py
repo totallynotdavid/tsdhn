@@ -1,15 +1,15 @@
 import pytest
 from orchestrator.core.calculator import TsunamiCalculator
-from orchestrator.models.schemas import EarthquakeInput
+from orchestrator.models.schemas import CalculationResponse, EarthquakeInput
 
 
 @pytest.fixture(scope="module")
-def calculator():
+def calculator() -> TsunamiCalculator:
     return TsunamiCalculator()
 
 
 @pytest.fixture(scope="module")
-def input_data():
+def input_data() -> EarthquakeInput:
     # todo: 'dia' is a string in our schema
     return EarthquakeInput(
         Mw=9.0, h=12.0, lat0=56.0, lon0=-156.0, hhmm="0000", dia="23"
@@ -48,18 +48,24 @@ expected_corners = [
 
 
 @pytest.fixture(scope="module")
-def calc_result(calculator, input_data):
+def calc_result(
+    calculator: TsunamiCalculator, input_data: EarthquakeInput
+) -> CalculationResponse:
     return calculator.calculate_earthquake_parameters(input_data)
 
 
 @pytest.mark.parametrize("param,expected", list(expected_basic.items()))
-def test_basic_parameters(calc_result, param, expected):
+def test_basic_parameters(
+    calc_result: CalculationResponse, param: str, expected: float
+) -> None:
     value = getattr(calc_result, param)
     assert value == pytest.approx(expected, rel=1e-6), f"Mismatch in {param}"
 
 
 @pytest.mark.parametrize("param,expected", list(expected_rect_params.items()))
-def test_rectangle_parameters(calc_result, param, expected):
+def test_rectangle_parameters(
+    calc_result: CalculationResponse, param: str, expected: float
+) -> None:
     rect_params = calc_result.rectangle_parameters
     assert rect_params[param] == pytest.approx(expected, rel=1e-6), (
         f"Mismatch in rectangle parameter: {param}"
@@ -67,7 +73,9 @@ def test_rectangle_parameters(calc_result, param, expected):
 
 
 @pytest.mark.parametrize("idx,expected_corner", list(enumerate(expected_corners)))
-def test_rectangle_corners(calc_result, idx, expected_corner):
+def test_rectangle_corners(
+    calc_result: CalculationResponse, idx: int, expected_corner: tuple[float, float]
+) -> None:
     computed_corner = calc_result.rectangle_corners[idx]
     assert computed_corner["lon"] == pytest.approx(expected_corner[0], rel=1e-6), (
         f"Corner {idx} longitude mismatch"
@@ -77,7 +85,7 @@ def test_rectangle_corners(calc_result, idx, expected_corner):
     )
 
 
-def test_focal_mechanism(calc_result):
+def test_focal_mechanism(calc_result: CalculationResponse) -> None:
     # Focal mechanism values are already tested in basic_parameters,
     # but added one more here for completeness
     assert calc_result.azimuth == pytest.approx(expected_basic["azimuth"], rel=1e-6)

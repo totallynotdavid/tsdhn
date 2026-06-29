@@ -1,6 +1,7 @@
 import logging
 import shutil
 import uuid
+from typing import Any
 
 from orchestrator.core.calculator import TsunamiCalculator
 from orchestrator.core.config import MASTER_PIPELINE, MODEL_DIR, REPO_ROOT
@@ -12,6 +13,8 @@ from redis import Redis
 from rq import Queue, get_current_job
 from rq.job import Job
 
+__all__ = ["JobStatus", "TSDHNQueue", "execute_pipeline", "tsdhn_queue"]
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,7 +25,7 @@ class TSDHNQueue:
 
     def enqueue_job(
         self, data: EarthquakeInput, skip_steps: list[str] | None = None
-    ) -> str:
+    ) -> str | None:
         skip_steps = skip_steps or []
         self._validate_skip_steps(skip_steps)
 
@@ -46,7 +49,7 @@ class TSDHNQueue:
             logger.exception("Job enqueue failed")
             raise RuntimeError(f"Failed to enqueue job: {e!s}") from e
 
-    def get_job_status(self, job_id: str) -> dict:
+    def get_job_status(self, job_id: str) -> dict[str, Any]:
         try:
             job = Job.fetch(job_id, connection=self.redis)
             status_map = {
@@ -75,21 +78,26 @@ class TSDHNQueue:
 
     def is_redis_connected(self) -> bool:
         try:
-            return self.redis.ping()
+            result: Any = self.redis.ping()
+            return bool(result)
         except Exception:
             return False
 
     @staticmethod
-    def _validate_skip_steps(skip_steps: list[str]):
+    def _validate_skip_steps(skip_steps: list[str]) -> None:
         valid_steps = {step.name for step in MASTER_PIPELINE}
         invalid = set(skip_steps) - valid_steps
         if invalid:
             raise ValueError(f"Invalid steps to skip: {', '.join(invalid)}")
 
 
-def execute_pipeline(data_dict: dict, skip_steps: list[str]):
+def execute_pipeline(
+    data_dict: dict[str, Any], skip_steps: list[str]
+) -> dict[str, str]:
     """Main pipeline executor"""
     job = get_current_job()
+    if job is None:
+        raise RuntimeError("No current job in worker context")
     job_id = job.id
     work_dir = REPO_ROOT / "jobs" / job_id
     data = EarthquakeInput(**data_dict)
@@ -98,9 +106,9 @@ def execute_pipeline(data_dict: dict, skip_steps: list[str]):
     try:
         setup_workspace(MODEL_DIR, work_dir)
 
-        def update_meta(details: str, **kwargs):
+        def update_meta(details: str, **kwargs: Any) -> None:
             job.meta.update({"details": details, **kwargs})
-            job.save_meta()
+            job.save_meta()  # type: ignore[no-untyped-call]
 
         # Phase 1: Initial calculations
         update_meta("Running earthquake calculations")
@@ -143,7 +151,7 @@ def execute_pipeline(data_dict: dict, skip_steps: list[str]):
         logger.exception(f"Pipeline failed for job {job_id}")
         if work_dir.exists():
             shutil.rmtree(work_dir, ignore_errors=True)
-        if job:
+        if job is not None:
             job.meta.update(
                 {
                     "status": JobStatus.FAILED.value,
@@ -151,7 +159,7 @@ def execute_pipeline(data_dict: dict, skip_steps: list[str]):
                     "details": "Pipeline failed - check error logs",
                 }
             )
-            job.save_meta()
+            job.save_meta()  # type: ignore[no-untyped-call]
         raise
 
 

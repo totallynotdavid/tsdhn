@@ -5,6 +5,8 @@ from orchestrator.core.config import ProcessingStep
 from orchestrator.utils.compiler import compile_fortran
 from orchestrator.utils.file_utils import make_executable, validate_files
 
+__all__ = ["ProcessingStep", "handle_command_step", "process_step"]
+
 
 def process_step(step: ProcessingStep, working_dir: Path) -> None:
     if step.python_callable:

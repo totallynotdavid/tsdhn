@@ -8,14 +8,14 @@ from orchestrator.utils.geo import (
 )
 
 
-def test_calculate_distance_to_coast():
+def test_calculate_distance_to_coast() -> None:
     coast_points = np.array([[-70.0, -20.0], [-71.0, -21.0]])
     distance = calculate_distance_to_coast(coast_points, -70.5, -20.5)
     assert isinstance(distance, float)
     assert distance > 0
 
 
-def test_format_arrival_time():
+def test_format_arrival_time() -> None:
     formatted_time = format_arrival_time(14.5, "15")
     assert isinstance(formatted_time, str)
     assert ":" in formatted_time
@@ -34,7 +34,9 @@ def test_format_arrival_time():
         (6.5, 30, -100, 10, "El epicentro esta en el Mar y NO genera Tsunami"),
     ],
 )
-def test_determine_tsunami_warning(Mw, h, h0, dist_min, expected):
+def test_determine_tsunami_warning(
+    Mw: float, h: float, h0: float, dist_min: float, expected: str
+) -> None:
     warning = determine_tsunami_warning(Mw, h, h0, dist_min)
     assert warning == expected
 
@@ -47,6 +49,8 @@ def test_determine_tsunami_warning(Mw, h, h0, dist_min, expected):
         (-100, 10, "mar"),
     ],
 )
-def test_determine_epicenter_location(h0, dist_min, expected):
+def test_determine_epicenter_location(
+    h0: float, dist_min: float, expected: str
+) -> None:
     location = determine_epicenter_location(h0, dist_min)
     assert location == expected

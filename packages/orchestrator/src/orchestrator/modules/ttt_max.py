@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
-def change_dir(destination: Path):
+def change_dir(destination: Path) -> Iterator[None]:
     """
     Context manager for changing the current working directory.
     """

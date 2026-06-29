@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime
+from typing import Any
 
 import anyio
 import uvicorn
@@ -34,7 +35,7 @@ app.add_middleware(
 @app.post("/run-simulation", status_code=status.HTTP_201_CREATED)
 async def run_simulation(
     data: EarthquakeInput, skip_steps: list[str] | None = None
-) -> dict:
+) -> dict[str, Any]:
     """Initialize complete simulation pipeline
 
     Parameters:
@@ -54,7 +55,7 @@ async def run_simulation(
 
 
 @app.get("/job-status/{job_id}", response_model=dict)
-async def get_job_status(job_id: str) -> dict:
+async def get_job_status(job_id: str) -> dict[str, Any]:
     try:
         return tsdhn_queue.get_job_status(job_id)
     except ValueError as e:
@@ -68,7 +69,7 @@ async def get_job_status(job_id: str) -> dict:
 
 
 @app.get("/job-result/{job_id}", response_class=FileResponse)
-async def get_job_result(job_id: str):
+async def get_job_result(job_id: str) -> FileResponse:
     """Retrieve final simulation report"""
     validate_job_id(job_id)
 
@@ -104,7 +105,7 @@ async def get_job_result(job_id: str):
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, Any]:
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
@@ -112,7 +113,7 @@ async def health_check():
     }
 
 
-def start_app():
+def start_app() -> None:
     # Default binds to loopback; set APP_HOST=0.0.0.0 in containers.
     uvicorn.run(
         app,
