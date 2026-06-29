@@ -9,7 +9,7 @@ from rq import Queue, get_current_job
 from rq.job import Job
 
 from orchestrator.core.calculator import TsunamiCalculator
-from orchestrator.core.config import MASTER_PIPELINE, MODEL_DIR
+from orchestrator.core.config import MASTER_PIPELINE, MODEL_DIR, REPO_ROOT
 from orchestrator.models.schemas import EarthquakeInput, JobStatus
 from orchestrator.utils.file_utils import sanitize_for_log, setup_workspace
 from orchestrator.utils.processing import process_step
@@ -94,13 +94,12 @@ def execute_pipeline(data_dict: dict, skip_steps: List[str]):
     """Main pipeline executor"""
     job = get_current_job()
     job_id = job.id
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    work_dir = repo_root / "jobs" / job_id
+    work_dir = REPO_ROOT / "jobs" / job_id
     data = EarthquakeInput(**data_dict)
     calculator = TsunamiCalculator()
 
     try:
-        setup_workspace(repo_root / MODEL_DIR, work_dir)
+        setup_workspace(MODEL_DIR, work_dir)
 
         def update_meta(details: str, **kwargs):
             job.meta.update({"details": details, **kwargs})
