@@ -1,5 +1,4 @@
 import pytest
-
 from orchestrator.core.calculator import TsunamiCalculator
 from orchestrator.models.schemas import EarthquakeInput
 

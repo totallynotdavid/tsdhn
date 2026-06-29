@@ -3,9 +3,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, cast
 
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
-from scipy.io import loadmat
-
 from orchestrator.core.config import EARTH_RADIUS, GRAVITY, MODEL_DIR
 from orchestrator.models.schemas import (
     CalculationResponse,
@@ -18,6 +15,8 @@ from orchestrator.utils.geo import (
     determine_tsunami_warning,
     format_arrival_time,
 )
+from scipy.interpolate import RegularGridInterpolator
+from scipy.io import loadmat
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +203,7 @@ class TsunamiCalculator:
                         travel_time, cast(str, data.dia)
                     )
                     distances[port_name] = distance
-                except (ValueError, IndexError):
+                except ValueError, IndexError:
                     continue
 
             return TsunamiTravelResponse(

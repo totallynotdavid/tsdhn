@@ -1,12 +1,7 @@
 import logging
 import shutil
 import uuid
-from pathlib import Path
 from typing import Dict, List, Optional
-
-from redis import Redis
-from rq import Queue, get_current_job
-from rq.job import Job
 
 from orchestrator.core.calculator import TsunamiCalculator
 from orchestrator.core.config import MASTER_PIPELINE, MODEL_DIR, REPO_ROOT
@@ -14,6 +9,9 @@ from orchestrator.models.schemas import EarthquakeInput, JobStatus
 from orchestrator.utils.file_utils import sanitize_for_log, setup_workspace
 from orchestrator.utils.processing import process_step
 from orchestrator.utils.system import check_dependencies
+from redis import Redis
+from rq import Queue, get_current_job
+from rq.job import Job
 
 logger = logging.getLogger(__name__)
 

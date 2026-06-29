@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from orchestrator.utils.geo import (
     calculate_distance_to_coast,
     determine_epicenter_location,

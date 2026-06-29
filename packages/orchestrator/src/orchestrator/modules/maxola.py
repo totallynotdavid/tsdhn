@@ -7,9 +7,8 @@ from typing import List, Tuple
 import numpy as np
 import pygmt
 import yaml
-from pygmt.helpers import GMTTempFile
-
 from orchestrator.modules.point_ttt import read_meca_spec
+from pygmt.helpers import GMTTempFile
 
 logger = logging.getLogger(__name__)
 
