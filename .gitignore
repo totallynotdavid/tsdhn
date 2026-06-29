@@ -13,6 +13,7 @@ uv.lock.local
 configuracion_*.json
 informe*.pdf
 hypo.dat
+requirements.lock.txt
 
 # Extensions
 *.npy
