@@ -55,13 +55,26 @@ jobs:
                   enable-cache: true
                   cache-dependency-glob: "uv.lock"
 
-            - name: Sync
-              run: uv sync --all-packages
+            - name: Export locked requirements
+              # --no-emit-workspace drops the orchestrator/cli workspace
+              # members so pip-audit doesn't see them as editable installs
+              # (which fail --strict even with --skip-editable).
+              # --locked fails the job if uv.lock is stale.
+              # https://docs.astral.sh/uv/reference/cli/#uv-export
+              run: |
+                  set -euxo pipefail
+                  uv export \
+                      --locked \
+                      --no-hashes \
+                      --all-packages \
+                      --no-emit-workspace \
+                      --output-file=requirements.lock.txt
 
             - name: pip-audit
-              # --skip-editable: workspace members come in as editable installs
-              # and pip-audit can choke on their synthetic metadata.
-              run: uv run pip-audit --strict --skip-editable
+              # uvx runs pip-audit in an isolated env so it doesn't sync
+              # the workspace (which would re-introduce editable installs).
+              # https://pypi.org/project/pip-audit/
+              run: uvx pip-audit --strict --requirement requirements.lock.txt
 
     gitleaks:
         name: Gitleaks (secrets)
