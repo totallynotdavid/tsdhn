@@ -9,22 +9,22 @@ authors = [
     { name = "David Duran", email = "dadch1404@gmail.com" },
 ]
 dependencies = [
-    "fastapi>=0.115.7,<0.116.0",
-    "uvicorn>=0.34.0,<0.35.0",
-    "pydantic>=2.10.6,<3.0.0",
-    "scipy>=1.18,<2.0",
-    "numpy>=2.5,<3.0",
-    "redis>=5.2.1,<6.0.0",
-    "rq>=2.1.0,<3.0.0",
-    "pygmt>=0.18.0,<0.19.0",
-    "pyyaml>=6.0.2,<7.0.0",
+    "fastapi==0.138.1",
+    "uvicorn==0.49.0",
+    "pydantic==2.13.4",
+    "scipy==1.18.0",
+    "numpy==2.5.0",
+    "redis==5.3.1",
+    "rq==2.10.0",
+    "pygmt==0.18.0",
+    "pyyaml==6.0.3",
 ]
 
 [project.scripts]
 tsdhn-api = "orchestrator.main:start_app"
 
 [build-system]
-requires = ["uv_build>=0.11.25,<0.12"]
+requires = ["uv_build==0.11.25"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
