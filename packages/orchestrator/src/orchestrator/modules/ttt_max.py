@@ -7,6 +7,11 @@ from pathlib import Path
 
 import numpy as np
 
+# This module reproduces three csh pipelines (`mareograma.csh`,
+# `mareograma2.csh`, `mareograma3.csh`). The `shell=True` calls are
+# required to preserve the original pipeline semantics
+# (`awk ... | gmt ...`, `>`, `>>`, command chaining).
+# ruff: noqa: S602
 logger = logging.getLogger(__name__)
 
 

@@ -1,7 +1,6 @@
 import asyncio
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Optional
 
 from cli.api import APIClient
 from cli.config import ConfigManager
@@ -10,12 +9,12 @@ from cli.ui import SimpleUI
 
 
 class SimulationManager:
-    def __init__(self, config: Dict, dev_mode: bool = False):
+    def __init__(self, config: dict, dev_mode: bool = False):
         self.config = config
         self.dev_mode = dev_mode
         self.config_manager = ConfigManager()
 
-    async def full_test_flow(self) -> Optional[str]:
+    async def full_test_flow(self) -> str | None:
         SimpleUI.print_header()
 
         async with APIClient(self.config["base_url"]) as client:
@@ -124,7 +123,7 @@ class SimulationManager:
                     add_separator=True,
                 )
 
-    async def _execute_calculation_steps(self, client: APIClient) -> Optional[str]:
+    async def _execute_calculation_steps(self, client: APIClient) -> str | None:
         description = "Iniciando simulación completa"
         endpoint = "run-simulation"
 
@@ -157,7 +156,7 @@ class SimulationManager:
             return job_id
 
         except Exception as e:
-            SimpleUI.show_error(f"Error en el paso 1: {str(e)}")
+            SimpleUI.show_error(f"Error en el paso 1: {e!s}")
             raise
 
 
@@ -228,7 +227,7 @@ class JobMonitor:
         }
         return status_map.get(raw_status.lower(), raw_status.capitalize())
 
-    async def _finalizar(self, client: APIClient, estado: Optional[dict]) -> None:
+    async def _finalizar(self, client: APIClient, estado: dict | None) -> None:
         duration = self._format_elapsed(int(time.time() - self.start_time))
 
         if estado is None:
@@ -253,4 +252,4 @@ class JobMonitor:
                 f.write(datos)
             SimpleUI.show_success(f"Informe guardado: {nombre}")
         except Exception as e:
-            SimpleUI.show_error(f"Error al descargar informe: {str(e)}")
+            SimpleUI.show_error(f"Error al descargar informe: {e!s}")

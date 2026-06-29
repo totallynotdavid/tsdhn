@@ -1,13 +1,12 @@
 import logging
 from pathlib import Path
-from typing import Dict
 
 import pygmt
 
 logger = logging.getLogger(__name__)
 
 
-def read_meca_spec(meca_file: Path) -> Dict[str, object]:
+def read_meca_spec(meca_file: Path) -> dict[str, object]:
     with meca_file.open("r") as f:
         line = f.readline().strip()
     values = line.split()

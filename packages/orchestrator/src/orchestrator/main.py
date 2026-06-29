@@ -1,6 +1,6 @@
 import logging
+import os
 from datetime import datetime
-from typing import Dict, List, Optional
 
 import anyio
 import uvicorn
@@ -33,8 +33,8 @@ app.add_middleware(
 
 @app.post("/run-simulation", status_code=status.HTTP_201_CREATED)
 async def run_simulation(
-    data: EarthquakeInput, skip_steps: Optional[List[str]] = None
-) -> Dict:
+    data: EarthquakeInput, skip_steps: list[str] | None = None
+) -> dict:
     """Initialize complete simulation pipeline
 
     Parameters:
@@ -53,14 +53,14 @@ async def run_simulation(
         ) from e
 
 
-@app.get("/job-status/{job_id}", response_model=Dict)
-async def get_job_status(job_id: str) -> Dict:
+@app.get("/job-status/{job_id}", response_model=dict)
+async def get_job_status(job_id: str) -> dict:
     try:
         return tsdhn_queue.get_job_status(job_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"Status check failed for {sanitize_for_log(job_id)}: {str(e)}")
+        logger.error(f"Status check failed for {sanitize_for_log(job_id)}: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Job status retrieval failed",
@@ -113,7 +113,13 @@ async def health_check():
 
 
 def start_app():
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    # Default binds to loopback; set APP_HOST=0.0.0.0 in containers.
+    uvicorn.run(
+        app,
+        host=os.environ.get("APP_HOST", "127.0.0.1"),
+        port=int(os.environ.get("APP_PORT", "8000")),
+        log_level="info",
+    )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
-import asyncio
-from typing import Any, Dict, Optional
+from typing import Any
 
 import aiohttp
 
@@ -10,7 +9,7 @@ from cli.ui import SimpleUI
 class APIClient:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     async def __aenter__(self):
         self._session = aiohttp.ClientSession(
@@ -44,14 +43,14 @@ class APIClient:
         except aiohttp.ClientResponseError as e:
             SimpleUI.show_error(f"Error HTTP {e.status}: {e.message}")
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             SimpleUI.show_error("Tiempo de espera agotado")
             raise
         except BrokenPipeError as e:
-            SimpleUI.show_error(f"Error de conexión: {str(e)}")
+            SimpleUI.show_error(f"Error de conexión: {e!s}")
             raise
         except aiohttp.ClientError as e:
-            SimpleUI.show_error(f"Error de conexión: {str(e)}")
+            SimpleUI.show_error(f"Error de conexión: {e!s}")
             raise
 
     async def check_connection(self) -> bool:
@@ -61,10 +60,10 @@ class APIClient:
         except Exception:
             return False
 
-    async def call_endpoint(self, endpoint: str, data: Dict, **kwargs) -> Dict:
+    async def call_endpoint(self, endpoint: str, data: dict, **kwargs) -> dict:
         return await self._request("POST", endpoint, json=data, **kwargs)
 
-    async def get_job_status(self, job_id: str) -> Dict:
+    async def get_job_status(self, job_id: str) -> dict:
         return await self._request("GET", f"job-status/{job_id}")
 
     async def download_report(self, job_id: str) -> bytes:

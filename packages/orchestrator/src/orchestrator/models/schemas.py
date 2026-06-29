@@ -1,7 +1,7 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, field_validator
 
@@ -18,8 +18,8 @@ class EarthquakeInput(BaseModel):
     h: float
     lat0: float
     lon0: float
-    dia: Optional[str] = "00"
-    hhmm: Optional[str] = "0000"
+    dia: str | None = "00"
+    hhmm: str | None = "0000"
 
     @field_validator("lon0")
     def convert_longitude(cls, v):
@@ -44,14 +44,14 @@ class CalculationResponse(BaseModel):
     azimuth: float
     dip: float
     epicenter_location: str
-    rectangle_parameters: Dict[str, float]
-    rectangle_corners: List[Dict[str, float]]
+    rectangle_parameters: dict[str, float]
+    rectangle_corners: list[dict[str, float]]
 
 
 class TsunamiTravelResponse(BaseModel):
-    arrival_times: Dict[str, str]
-    distances: Dict[str, float]
-    epicenter_info: Dict[str, str]
+    arrival_times: dict[str, str]
+    distances: dict[str, float]
+    epicenter_info: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -59,19 +59,19 @@ class CompilerConfig:
     source: str
     output: str
     compiler: str = "gfortran"
-    flags: List[str] = field(default_factory=list)
+    flags: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class ProcessingStep:
     name: str
-    command: Optional[List[str]] = None
-    python_callable: Optional[Callable[[Path], None]] = None
-    file_checks: List[Tuple[str, str]] = field(default_factory=list)
-    compiler_config: Optional[CompilerConfig] = None
-    pre_execute_checks: List[Tuple[str, str]] = field(default_factory=list)
-    extra_executables: List[str] = field(default_factory=list)
-    working_dir: Optional[str] = None
+    command: list[str] | None = None
+    python_callable: Callable[[Path], None] | None = None
+    file_checks: list[tuple[str, str]] = field(default_factory=list)
+    compiler_config: CompilerConfig | None = None
+    pre_execute_checks: list[tuple[str, str]] = field(default_factory=list)
+    extra_executables: list[str] = field(default_factory=list)
+    working_dir: str | None = None
 
     def __post_init__(self):
         if not (self.command is None) ^ (self.python_callable is None):
