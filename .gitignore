@@ -5,6 +5,10 @@
 /.cache/
 /.vscode-remote/
 
+# uv
+.venv/
+uv.lock.local
+
 # Files
 configuracion_*.json
 informe*.pdf
