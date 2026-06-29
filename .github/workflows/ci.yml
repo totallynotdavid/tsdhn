@@ -64,7 +64,7 @@ jobs:
                   enable-cache: true
                   cache-dependency-glob: "uv.lock"
 
-            # libgmt is needed by pygmt (a runtime dep of `orchestrator`).
+            # libgmt is needed by pygmt (a runtime dep of `tsdhn-api`).
             # Install the system lib and create the libgmt.so symlink that
             # pygmt expects. The symlink step is idempotent.
             - name: Install GMT (libgmt) for pygmt

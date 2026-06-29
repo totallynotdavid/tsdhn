@@ -2,12 +2,12 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from orchestrator.models.schemas import CompilerConfig, ProcessingStep
-from orchestrator.modules.maxola import generate_maxola_plot
-from orchestrator.modules.point_ttt import generate_ttt_map
-from orchestrator.modules.reporte import generate_reports_wrapper
-from orchestrator.modules.ttt_inverso import ttt_inverso_python
-from orchestrator.modules.ttt_max import process_tsunami_data
+from api.models.schemas import CompilerConfig, ProcessingStep
+from api.modules.maxola import generate_maxola_plot
+from api.modules.point_ttt import generate_ttt_map
+from api.modules.reporte import generate_reports_wrapper
+from api.modules.ttt_inverso import ttt_inverso_python
+from api.modules.ttt_max import process_tsunami_data
 
 __all__ = [
     "EARTH_RADIUS",
@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 # Resolve repo root from this file's location.
-# Layout: <repo>/packages/orchestrator/src/orchestrator/core/config.py
+# Layout: <repo>/packages/api/api/core/config.py
 _REPO_ROOT: Path = Path(__file__).resolve().parents[5]
 
 # Constants

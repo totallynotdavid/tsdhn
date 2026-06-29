@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from string import Template
 
-from orchestrator.core.executables import resolve
+from api.core.executables import resolve
 
 MONTH_MAP = {
     1: "Ene",

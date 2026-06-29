@@ -13,8 +13,8 @@ authors = [
 members = ["packages/*"]
 
 [tool.uv.sources]
-orchestrator = { workspace = true }
-cli = { workspace = true }
+tsdhn-api = { workspace = true }
+tsdhn-cli = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -50,15 +50,18 @@ extend-exclude = ["__pycache__", "dist", "build"]
 # RUF = ruff-specific
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["api", "cli"]
+
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*.py" = ["S101"]  # asserts are fine in tests
 # S603 is suppressed: every subprocess call uses arguments from
 # validated floats, local Path objects, or frozen dataclass fields.
-"packages/orchestrator/src/orchestrator/utils/compiler.py" = ["S603"]
-"packages/orchestrator/src/orchestrator/utils/processing.py" = ["S603"]
-"packages/orchestrator/src/orchestrator/modules/maxola.py" = ["S603"]
-"packages/orchestrator/src/orchestrator/modules/reporte.py" = ["S603"]
-"packages/orchestrator/src/orchestrator/modules/ttt_inverso.py" = ["S603"]
+"packages/api/api/utils/compiler.py" = ["S603"]
+"packages/api/api/utils/processing.py" = ["S603"]
+"packages/api/api/modules/maxola.py" = ["S603"]
+"packages/api/api/modules/reporte.py" = ["S603"]
+"packages/api/api/modules/ttt_inverso.py" = ["S603"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -86,5 +89,5 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/orchestrator/tests"]
+testpaths = ["packages/api/tests"]
 addopts = "-ra"

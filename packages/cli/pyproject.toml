@@ -1,5 +1,5 @@
 [project]
-name = "cli"
+name = "tsdhn-cli"
 version = "0.1.0"
 description = "TSDHN command-line client"
 requires-python = ">=3.14"
@@ -22,4 +22,4 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "cli"
-module-root = "src"
+module-root = ""

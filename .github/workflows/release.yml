@@ -43,18 +43,18 @@ jobs:
             - name: Sync with build group
               run: uv sync --all-packages --group dev --group build
 
-            - name: Build orchestrator
-              run: uv build --package orchestrator --out-dir dist/orchestrator
+            - name: Build tsdhn-api
+              run: uv build --package tsdhn-api --out-dir dist/api
 
-            - name: Build cli
-              run: uv build --package cli --out-dir dist/cli
+            - name: Build tsdhn-cli
+              run: uv build --package tsdhn-cli --out-dir dist/cli
 
             - name: Upload dist artifacts
               uses: actions/upload-artifact@v7
               with:
                   name: dist
                   path: |
-                      dist/orchestrator/*
+                      dist/api/*
                       dist/cli/*
 
     publish-pypi:
@@ -80,12 +80,12 @@ jobs:
                   subject-path: dist/**/*.tar.gz,dist/**/*.whl
                   show-summary: false
 
-            - name: Publish orchestrator
+            - name: Publish tsdhn-api
               uses: pypa/gh-action-pypi-publish@release/v1
               with:
-                  packages-dir: dist/orchestrator
+                  packages-dir: dist/api
 
-            - name: Publish cli
+            - name: Publish tsdhn-cli
               uses: pypa/gh-action-pypi-publish@release/v1
               with:
                   packages-dir: dist/cli

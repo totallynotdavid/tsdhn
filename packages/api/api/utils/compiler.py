@@ -1,8 +1,8 @@
 import subprocess
 from pathlib import Path
 
-from orchestrator.core.config import CompilerConfig
-from orchestrator.core.executables import resolve
+from api.core.config import CompilerConfig
+from api.core.executables import resolve
 
 __all__ = ["compile_fortran"]
 

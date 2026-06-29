@@ -6,9 +6,10 @@ from pathlib import Path
 import numpy as np
 import pygmt
 import yaml
-from orchestrator.core.executables import resolve
-from orchestrator.modules.point_ttt import read_meca_spec
 from pygmt.helpers import GMTTempFile
+
+from api.core.executables import resolve
+from api.modules.point_ttt import read_meca_spec
 
 logger = logging.getLogger(__name__)
 

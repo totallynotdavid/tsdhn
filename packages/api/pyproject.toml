@@ -1,5 +1,5 @@
 [project]
-name = "orchestrator"
+name = "tsdhn-api"
 version = "0.1.0"
 description = "TSDHN tsunami simulation orchestrator (FastAPI service + RQ worker)"
 requires-python = ">=3.14"
@@ -21,12 +21,12 @@ dependencies = [
 ]
 
 [project.scripts]
-tsdhn-api = "orchestrator.main:start_app"
+tsdhn-api = "api.main:start_app"
 
 [build-system]
 requires = ["uv_build==0.11.25"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "orchestrator"
-module-root = "src"
+module-name = "api"
+module-root = ""

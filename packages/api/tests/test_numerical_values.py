@@ -1,6 +1,7 @@
 import pytest
-from orchestrator.core.calculator import TsunamiCalculator
-from orchestrator.models.schemas import CalculationResponse, EarthquakeInput
+
+from api.core.calculator import TsunamiCalculator
+from api.models.schemas import CalculationResponse, EarthquakeInput
 
 
 @pytest.fixture(scope="module")
