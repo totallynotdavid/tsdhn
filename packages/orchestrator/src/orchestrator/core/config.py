@@ -9,10 +9,15 @@ from orchestrator.modules.reporte import generate_reports_wrapper
 from orchestrator.modules.ttt_inverso import ttt_inverso_python
 from orchestrator.modules.ttt_max import process_tsunami_data
 
+# Resolve repo root from this file's location.
+# Layout: <repo>/packages/orchestrator/src/orchestrator/core/config.py
+_REPO_ROOT: Path = Path(__file__).resolve().parents[4]
+
 # Constants
 GRAVITY: float = 9.81  # m/s²
 EARTH_RADIUS: float = 6370.8  # km
-MODEL_DIR: Path = Path("model")
+MODEL_DIR: Path = _REPO_ROOT / "model"
+REPO_ROOT: Path = _REPO_ROOT
 
 # Logging configuration
 LOGGING_CONFIG: Dict[str, Any] = {
