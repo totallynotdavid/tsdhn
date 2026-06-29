@@ -2,6 +2,8 @@ import logging
 import subprocess
 from pathlib import Path
 
+from orchestrator.core.executables import resolve
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,8 +48,15 @@ def ttt_inverso_python(working_dir: Path) -> None:
 
     # Execute ttt_client command
     try:
+        # `loc` is a formatted float pair, not user input.
         subprocess.run(
-            ["ttt_client", "cortado.i2", f"-E{loc}", "-Tttt.b", "-VL"],
+            [
+                str(resolve("ttt_client")),
+                "cortado.i2",
+                f"-E{loc}",
+                "-Tttt.b",
+                "-VL",
+            ],
             cwd=working_dir,
             check=True,
             stdout=subprocess.PIPE,
@@ -61,7 +70,7 @@ def ttt_inverso_python(working_dir: Path) -> None:
     # Process output grid with grdmath
     try:
         subprocess.run(
-            ["gmt", "grdmath", "ttt.b=bf", "1.0", "MUL", "=", "ttt.b=bf"],
+            [str(resolve("gmt")), "grdmath", "ttt.b=bf", "1.0", "MUL", "=", "ttt.b=bf"],
             cwd=working_dir,
             check=True,
             stdout=subprocess.PIPE,

@@ -52,6 +52,13 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*.py" = ["S101"]  # asserts are fine in tests
+# S603 is suppressed: every subprocess call uses arguments from
+# validated floats, local Path objects, or frozen dataclass fields.
+"packages/orchestrator/src/orchestrator/utils/compiler.py" = ["S603"]
+"packages/orchestrator/src/orchestrator/utils/processing.py" = ["S603"]
+"packages/orchestrator/src/orchestrator/modules/maxola.py" = ["S603"]
+"packages/orchestrator/src/orchestrator/modules/reporte.py" = ["S603"]
+"packages/orchestrator/src/orchestrator/modules/ttt_inverso.py" = ["S603"]
 
 [tool.ruff.format]
 quote-style = "double"

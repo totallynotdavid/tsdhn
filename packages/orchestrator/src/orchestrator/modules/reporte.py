@@ -4,7 +4,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from string import Template
-from typing import Dict, List
+
+from orchestrator.core.executables import resolve
 
 MONTH_MAP = {
     1: "Ene",
@@ -38,10 +39,10 @@ class EarthquakeData:
 
 @dataclass
 class TsunamiTravelData:
-    travel_times: List[float]
-    max_heights: List[float]
-    hours: List[int]
-    minutes: List[int]
+    travel_times: list[float]
+    max_heights: list[float]
+    hours: list[int]
+    minutes: list[int]
 
 
 @dataclass
@@ -61,7 +62,7 @@ def generate_reports_wrapper(working_dir: Path) -> None:
 
     for _ in range(2):  # Compile twice to resolve references
         subprocess.run(
-            ["pdflatex", "-interaction=nonstopmode", "reporte.tex"],
+            [str(resolve("pdflatex")), "-interaction=nonstopmode", "reporte.tex"],
             cwd=working_dir,
             check=True,
             stdout=subprocess.DEVNULL,
@@ -132,7 +133,7 @@ def read_ttt_max_dat(working_dir: Path) -> TsunamiTravelData:
 
     ttt, max_vals = zip(*data, strict=False)
     hours = [int(t // 60) for t in ttt]
-    minutes = [int(round(t % 60)) for t in ttt]
+    minutes = [round(t % 60) for t in ttt]
 
     return TsunamiTravelData(
         travel_times=list(ttt), max_heights=list(max_vals), hours=hours, minutes=minutes
@@ -154,7 +155,7 @@ def get_current_datetime_info() -> DatetimeInfo:
 
 def build_template_context(
     coords: EarthquakeData, ttt_data: TsunamiTravelData
-) -> Dict[str, str]:
+) -> dict[str, str]:
     return {
         "title": "REPORTE: ESTIMACIÓN DE PARÁMETROS DE TSUNAMI DE ORIGEN LEJANO",
         "author": "Cesar Jimenez",
@@ -184,7 +185,7 @@ def copy_template(working_dir: Path) -> None:
     shutil.copy(template_path, dest_path)
 
 
-def write_reporte_tex(context: Dict[str, str], working_dir: Path) -> None:
+def write_reporte_tex(context: dict[str, str], working_dir: Path) -> None:
     template_path = working_dir / "reporte_template.tex"
     out_path = working_dir / "reporte.tex"
 
@@ -200,7 +201,7 @@ def write_salida_txt(
     working_dir: Path,
 ) -> None:
     date_str, time_str = datetime_info.date_str, datetime_info.time_str
-    year, month, day = datetime_info.year_month_day
+    year, _month, day = datetime_info.year_month_day
     mes = datetime_info.month_abbr
 
     stations = [

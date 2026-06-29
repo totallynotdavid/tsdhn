@@ -1,6 +1,6 @@
 import shutil
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from orchestrator.models.schemas import CompilerConfig, ProcessingStep
 from orchestrator.modules.maxola import generate_maxola_plot
@@ -20,7 +20,7 @@ MODEL_DIR: Path = _REPO_ROOT / "model"
 REPO_ROOT: Path = _REPO_ROOT
 
 # Logging configuration
-LOGGING_CONFIG: Dict[str, Any] = {
+LOGGING_CONFIG: dict[str, Any] = {
     "filename": "tsunami_api.log",
     "level": "DEBUG",
     "format": "%(asctime)s - %(levelname)s - %(message)s",

@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, cast
+from typing import cast
 
 import numpy as np
 from orchestrator.core.config import EARTH_RADIUS, GRAVITY, MODEL_DIR
@@ -27,13 +27,13 @@ NM_CONVERSION = 60 * 1853  # Nautical miles to meters conversion
 class TsunamiCalculator:
     _data_loaded: bool = False
     _static_loaded: bool = False
-    vlon: Optional[np.ndarray] = None
-    vlat: Optional[np.ndarray] = None
-    bathymetry: Optional[np.ndarray] = None
-    bathy_interpolator: Optional[RegularGridInterpolator] = None
-    maper1: Optional[np.ndarray] = None
-    mechanism_data: Optional[np.ndarray] = None
-    ports: Optional[List[str]] = None
+    vlon: np.ndarray | None = None
+    vlat: np.ndarray | None = None
+    bathymetry: np.ndarray | None = None
+    bathy_interpolator: RegularGridInterpolator | None = None
+    maper1: np.ndarray | None = None
+    mechanism_data: np.ndarray | None = None
+    ports: list[str] | None = None
 
     def __init__(self):
         """Initialize calculator with preloaded data"""
@@ -107,7 +107,7 @@ class TsunamiCalculator:
             raise RuntimeError("Static file initialization failed") from e
 
     def calculate_earthquake_parameters(
-        self, data: EarthquakeInput, output_dir: Optional[Path] = None
+        self, data: EarthquakeInput, output_dir: Path | None = None
     ) -> CalculationResponse:
         """
         Calculate earthquake parameters and tsunami risk assessment.
@@ -177,8 +177,8 @@ class TsunamiCalculator:
             assert self.ports is not None, "Port data not loaded"
             assert data.hhmm is not None, "hhmm must be provided"
 
-            arrival_times: Dict[str, str] = {}
-            distances: Dict[str, float] = {}
+            arrival_times: dict[str, str] = {}
+            distances: dict[str, float] = {}
             time0 = float(data.hhmm[:2]) + float(data.hhmm[2:]) / 60  # Decimal hours
 
             for port in self.ports:
@@ -222,7 +222,7 @@ class TsunamiCalculator:
             logger.exception("Travel time calculation failed")
             raise RuntimeError("Tsunami travel time error") from e
 
-    def _get_focal_mechanism(self, lon0: float, lat0: float) -> Tuple[float, float]:
+    def _get_focal_mechanism(self, lon0: float, lat0: float) -> tuple[float, float]:
         """
         Find closest focal mechanism parameters
 
@@ -244,7 +244,7 @@ class TsunamiCalculator:
 
     def _calculate_rectangle_parameters(
         self, L: float, W: float, lon0: float, lat0: float, azimuth: float, dip: float
-    ) -> Tuple[Dict[str, float], List[Dict[str, float]]]:
+    ) -> tuple[dict[str, float], list[dict[str, float]]]:
         """
         Calculate fault plane geometry (corner points and parameters)
 
@@ -303,7 +303,7 @@ class TsunamiCalculator:
 
     def _calculate_travel_time(
         self, lon0: float, lat0: float, port_lon: float, port_lat: float, time0: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         Travel time calculation between two given points
 

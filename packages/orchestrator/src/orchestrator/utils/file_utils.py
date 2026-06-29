@@ -1,13 +1,12 @@
 import shutil
 from pathlib import Path
-from typing import List, Tuple
 
 
 def make_executable(file_path: Path) -> None:
     file_path.chmod(file_path.stat().st_mode | 0o111)
 
 
-def validate_files(cwd: Path, checks: List[Tuple[str, str]]) -> None:
+def validate_files(cwd: Path, checks: list[tuple[str, str]]) -> None:
     missing = []
     for filename, msg in checks:
         if not (cwd / filename).exists():

@@ -2,11 +2,11 @@ import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
 
 import numpy as np
 import pygmt
 import yaml
+from orchestrator.core.executables import resolve
 from orchestrator.modules.point_ttt import read_meca_spec
 from pygmt.helpers import GMTTempFile
 
@@ -51,7 +51,7 @@ class TidalStation:
     annotation_offset: str = "0.1c"
 
 
-def load_stations(config_dir: Path) -> List[TidalStation]:
+def load_stations(config_dir: Path) -> list[TidalStation]:
     stations_path = config_dir / "stations.yml"
     logger.info(f"Loading stations configuration: {stations_path}")
 
@@ -69,11 +69,11 @@ def load_stations(config_dir: Path) -> List[TidalStation]:
         return [TidalStation(**station) for station in data["stations"]]
 
     except (yaml.YAMLError, TypeError, KeyError) as e:
-        logger.error(f"Failed to parse stations configuration: {str(e)}")
-        raise ValueError(f"Invalid stations configuration: {str(e)}") from e
+        logger.error(f"Failed to parse stations configuration: {e!s}")
+        raise ValueError(f"Invalid stations configuration: {e!s}") from e
 
 
-def create_cpt_files(work_dir: Path) -> Tuple[Path, Path]:
+def create_cpt_files(work_dir: Path) -> tuple[Path, Path]:
     """Create custom color palette tables (CPT) for visualization"""
     depth_cpt = work_dir / "depth.cpt"
     hgt_cpt = work_dir / "hgt.cpt"
@@ -99,7 +99,7 @@ def create_cpt_files(work_dir: Path) -> Tuple[Path, Path]:
                 f.write("B 0 0 255\nF 255 0 0\nN 255 255 255\n")
 
     except pygmt.exceptions.GMTError as e:
-        logger.error(f"CPT creation failed: {str(e)}")
+        logger.error(f"CPT creation failed: {e!s}")
         raise RuntimeError("CPT generation error") from e
 
     return depth_cpt, hgt_cpt
@@ -143,7 +143,7 @@ def process_grid(work_dir: Path, grid_config: GridConfig) -> Path:
         return output_grid
 
     except (ValueError, OSError) as e:
-        logger.error(f"Grid processing failed: {str(e)}")
+        logger.error(f"Grid processing failed: {e!s}")
         raise RuntimeError("Grid processing error") from e
 
 
@@ -164,14 +164,15 @@ def write_grid_file(
             f.write(header)
             np.savetxt(f, data, fmt="%8.2f", delimiter="", newline="\n")
     except OSError as e:
-        logger.error(f"Grid write failed: {str(e)}")
+        logger.error(f"Grid write failed: {e!s}")
         raise RuntimeError("Grid file I/O error") from e
 
 
 def convert_grid_format(input_grid: Path, output_grid: Path) -> None:
     try:
+        gmt = str(resolve("gmt"))
         subprocess.run(
-            ["gmt", "grdconvert", str(input_grid), "-G" + str(output_grid)],
+            [gmt, "grdconvert", str(input_grid), "-G" + str(output_grid)],
             check=True,
             capture_output=True,
         )
@@ -195,7 +196,7 @@ def add_coastline(fig: pygmt.Figure, style_config: StyleConfig) -> None:
 
 
 def add_tidal_stations(
-    fig: pygmt.Figure, stations: List[TidalStation], style_config: StyleConfig
+    fig: pygmt.Figure, stations: list[TidalStation], style_config: StyleConfig
 ) -> None:
     active_stations = [s for s in stations if s.active]
 
@@ -227,7 +228,7 @@ def add_tidal_stations(
                 offset=station.annotation_offset,
             )
     except pygmt.exceptions.GMTError as e:
-        logger.warning(f"Tidal station plotting failed: {str(e)}")
+        logger.warning(f"Tidal station plotting failed: {e!s}")
 
 
 def add_meca_data(fig: pygmt.Figure, work_dir: Path, style_config: StyleConfig) -> None:
@@ -243,7 +244,7 @@ def add_meca_data(fig: pygmt.Figure, work_dir: Path, style_config: StyleConfig) 
                 convention="mt",
             )
         except Exception as e:
-            logger.warning(f"Mechanism plot failed: {str(e)}")
+            logger.warning(f"Mechanism plot failed: {e!s}")
 
 
 def add_legend(fig: pygmt.Figure, style_config: StyleConfig) -> None:
@@ -263,12 +264,12 @@ def add_legend(fig: pygmt.Figure, style_config: StyleConfig) -> None:
     )
 
 
-def cleanup_files(file_paths: List[Path]) -> None:
+def cleanup_files(file_paths: list[Path]) -> None:
     for path in file_paths:
         try:
             path.unlink(missing_ok=True)
         except (PermissionError, OSError) as e:
-            logger.debug(f"Cleanup failed for {path}: {str(e)}")
+            logger.debug(f"Cleanup failed for {path}: {e!s}")
 
 
 def generate_maxola_plot(work_dir: Path) -> None:
@@ -277,7 +278,7 @@ def generate_maxola_plot(work_dir: Path) -> None:
 
     stations = load_stations(CONFIG_DIR)
 
-    files_to_cleanup: List[Path] = []
+    files_to_cleanup: list[Path] = []
 
     pygmt.config(
         MAP_FRAME_TYPE="plain",
@@ -318,7 +319,7 @@ def generate_maxola_plot(work_dir: Path) -> None:
         logger.info(f"Tsunami visualization created: {work_dir / 'maxola'}")
 
     except Exception as e:
-        logger.error(f"Plot generation failed: {str(e)}")
+        logger.error(f"Plot generation failed: {e!s}")
         raise
     finally:
         cleanup_files(files_to_cleanup)

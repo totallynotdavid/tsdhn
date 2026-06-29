@@ -1,14 +1,13 @@
 import logging
 import shutil
 import uuid
-from typing import Dict, List, Optional
 
 from orchestrator.core.calculator import TsunamiCalculator
 from orchestrator.core.config import MASTER_PIPELINE, MODEL_DIR, REPO_ROOT
+from orchestrator.core.executables import ensure_all
 from orchestrator.models.schemas import EarthquakeInput, JobStatus
 from orchestrator.utils.file_utils import sanitize_for_log, setup_workspace
 from orchestrator.utils.processing import process_step
-from orchestrator.utils.system import check_dependencies
 from redis import Redis
 from rq import Queue, get_current_job
 from rq.job import Job
@@ -22,7 +21,7 @@ class TSDHNQueue:
         self.queue = Queue("tsdhn_queue", connection=redis_conn)
 
     def enqueue_job(
-        self, data: EarthquakeInput, skip_steps: Optional[List[str]] = None
+        self, data: EarthquakeInput, skip_steps: list[str] | None = None
     ) -> str:
         skip_steps = skip_steps or []
         self._validate_skip_steps(skip_steps)
@@ -45,9 +44,9 @@ class TSDHNQueue:
             return job_id
         except Exception as e:
             logger.exception("Job enqueue failed")
-            raise RuntimeError(f"Failed to enqueue job: {str(e)}") from e
+            raise RuntimeError(f"Failed to enqueue job: {e!s}") from e
 
-    def get_job_status(self, job_id: str) -> Dict:
+    def get_job_status(self, job_id: str) -> dict:
         try:
             job = Job.fetch(job_id, connection=self.redis)
             status_map = {
@@ -71,7 +70,7 @@ class TSDHNQueue:
                 else None,
             }
         except Exception as e:
-            logger.error(f"Invalid job ID {sanitize_for_log(job_id)}: {str(e)}")
+            logger.error(f"Invalid job ID {sanitize_for_log(job_id)}: {e!s}")
             raise ValueError("Invalid or expired job ID") from e
 
     def is_redis_connected(self) -> bool:
@@ -81,14 +80,14 @@ class TSDHNQueue:
             return False
 
     @staticmethod
-    def _validate_skip_steps(skip_steps: List[str]):
+    def _validate_skip_steps(skip_steps: list[str]):
         valid_steps = {step.name for step in MASTER_PIPELINE}
         invalid = set(skip_steps) - valid_steps
         if invalid:
             raise ValueError(f"Invalid steps to skip: {', '.join(invalid)}")
 
 
-def execute_pipeline(data_dict: dict, skip_steps: List[str]):
+def execute_pipeline(data_dict: dict, skip_steps: list[str]):
     """Main pipeline executor"""
     job = get_current_job()
     job_id = job.id
@@ -122,7 +121,7 @@ def execute_pipeline(data_dict: dict, skip_steps: List[str]):
         )
 
         # Phase 3: Main simulation pipeline
-        check_dependencies()
+        ensure_all()
         for step in MASTER_PIPELINE:
             if step.name in skip_steps:
                 logger.info(f"Skipping step: {step.name}")
@@ -148,7 +147,7 @@ def execute_pipeline(data_dict: dict, skip_steps: List[str]):
             job.meta.update(
                 {
                     "status": JobStatus.FAILED.value,
-                    "error": f"{type(e).__name__}: {str(e)}",
+                    "error": f"{type(e).__name__}: {e!s}",
                     "details": "Pipeline failed - check error logs",
                 }
             )
