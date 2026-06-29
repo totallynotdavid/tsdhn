@@ -4,10 +4,20 @@ on:
         branches: ["main"]
         paths:
             - "orchestrator/**"
+            - "cli/**"
+            - "packages/**"
+            - "pyproject.toml"
+            - "uv.lock"
+            - ".github/workflows/coverage.yml"
     pull_request:
         branches: ["main"]
         paths:
             - "orchestrator/**"
+            - "cli/**"
+            - "packages/**"
+            - "pyproject.toml"
+            - "uv.lock"
+            - ".github/workflows/coverage.yml"
     workflow_dispatch:
 
 permissions:
@@ -22,22 +32,28 @@ jobs:
 
             - uses: actions/setup-python@v5
               with:
-                  python-version: "3.12.3"
+                  python-version: "3.14"
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v6
+              with:
+                  version: "0.11.25"
+                  enable-cache: true
+                  cache-dependency-glob: "uv.lock"
 
             - name: gmt (#33) fix for libgmt symlink
               run: |
                   sudo apt-get install -y gmt libgmt-dev
                   sudo find /usr -name "libgmt.so.*" -exec sudo ln -sf {} $(dirname {})/libgmt.so \;
 
-            - uses: snok/install-poetry@8081dddc3955298b06b8552cef6c12d7d58da755 # v1.4.1
-
-            - run: poetry install --with dev
+            - name: Sync workspace
+              run: uv sync --all-packages --group dev
 
             - name: Run tests with coverage
               run: |
-                  poetry run coverage run -m pytest
-                  poetry run coverage report
-                  poetry run coverage json
+                  uv run coverage run -m pytest
+                  uv run coverage report
+                  uv run coverage json
                   export TOTAL=$(python -c "import json;print(json.load(open('coverage.json'))['totals']['percent_covered_display'])")
                   echo "total=$TOTAL" >> $GITHUB_ENV
                   echo "### Total coverage: ${TOTAL}%" >> $GITHUB_STEP_SUMMARY
