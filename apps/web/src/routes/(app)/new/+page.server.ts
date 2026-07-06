@@ -4,6 +4,7 @@ import { zod4 } from "sveltekit-superforms/adapters";
 
 import { defaultEarthquake, earthquakeSchema, toEarthquakeInput } from "$lib/schema/earthquake";
 import { backend } from "$lib/server/api";
+import { dispatchSimulation } from "$lib/server/dispatch";
 import { createSimulation } from "$lib/server/simulations";
 
 import type { Actions, PageServerLoad } from "./$types";
@@ -21,22 +22,23 @@ export const actions: Actions = {
     if (!form.valid) return fail(400, { form });
 
     const input = toEarthquakeInput(form.data);
-    const client = backend(fetch);
-    const { data, error: apiError } = await client.POST("/api/v1/simulations", {
-      body: { input, skip_steps: [] },
+    const appJobId = crypto.randomUUID();
+    const skipSteps: string[] = [];
+
+    await createSimulation({
+      id: appJobId,
+      userId: user.id,
+      params: input,
+      skipSteps,
+      status: "pending_dispatch",
     });
 
-    if (apiError || !data) {
+    const client = backend(fetch);
+    const dispatch = await dispatchSimulation({ id: appJobId, params: input, skipSteps }, client);
+    if (!dispatch.ok) {
       return message(form, "No se pudo iniciar la simulación.", { status: 502 });
     }
 
-    await createSimulation({
-      id: data.id,
-      userId: user.id,
-      params: input,
-      status: "queued",
-    });
-
-    redirect(303, `/simulations/${data.id}`);
+    redirect(303, `/simulations/${appJobId}`);
   },
 };

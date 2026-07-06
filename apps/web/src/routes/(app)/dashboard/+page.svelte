@@ -5,10 +5,13 @@
   let { data } = $props();
 
   const STATUS: Record<string, { label: string; class: string }> = {
+    pending_dispatch: { label: "Preparando", class: "bg-neutral-100 text-neutral-600" },
+    dispatch_failed: { label: "No enviada", class: "bg-red-100 text-red-700" },
     queued: { label: "En cola", class: "bg-neutral-100 text-neutral-600" },
     running: { label: "Ejecutándose", class: "bg-brand-100 text-brand-700" },
     completed: { label: "Completada", class: "bg-green-100 text-green-700" },
     failed: { label: "Fallida", class: "bg-red-100 text-red-700" },
+    cancelled: { label: "Cancelada", class: "bg-neutral-100 text-neutral-600" },
   };
 
   function badge(status: string) {
