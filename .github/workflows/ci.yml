@@ -142,3 +142,71 @@ jobs:
                   minColorRange: 40
                   maxColorRange: 90
                   valColorRange: ${{ steps.cov.outputs.total }}
+
+    web:
+        name: Web (lint, format, types)
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1.3.14"
+
+            - name: Install JS workspace
+              run: bun install --frozen-lockfile
+
+            - name: Oxlint
+              run: bun run lint
+
+            - name: Oxfmt check
+              run: bun run fmt:check
+
+            - name: Svelte type check
+              run: bun --filter web check
+
+    contract:
+        name: API client contract (no drift)
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: astral-sh/setup-uv@v8.2.0
+              with:
+                  version: ${{ env.UV_VERSION }}
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  enable-cache: true
+                  cache-dependency-glob: "uv.lock"
+
+            # api.main imports pygmt (via core), which needs libgmt at import time.
+            - name: Install GMT (libgmt) for pygmt
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends gmt libgmt-dev
+                  SO=$(ls /usr/lib/**/libgmt.so.* 2>/dev/null | head -n1)
+                  [ -n "$SO" ] && sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
+
+            - name: Sync workspace
+              run: uv sync --all-packages --group dev
+
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1.3.14"
+
+            - name: Install JS workspace
+              run: bun install --frozen-lockfile
+
+            - name: Regenerate client
+              run: bun run gen:client
+
+            - name: Fail on drift
+              run: |
+                  if ! git diff --quiet libs/api-client; then
+                      echo "::error::@tsdhn/api-client is stale. Run 'bun run gen:client' and commit."
+                      git diff libs/api-client
+                      exit 1
+                  fi
