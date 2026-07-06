@@ -8,30 +8,46 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import Button from "$lib/components/ui/Button.svelte";
 
-  let { data } = $props();
-  type SimulationStatus = components["schemas"]["SimulationStatus"];
+  let { data, form } = $props();
+  type JobStatusResponse = components["schemas"]["JobStatusResponse"];
 
   const params = $derived(data.sim.params as EarthquakeInput);
   const simulationId = $derived(data.sim.id);
 
-  function statusFromSnapshot(): SimulationStatus {
+  function statusFromSnapshot(): JobStatusResponse {
     return (
       data.status ?? {
-        id: data.sim.id,
+        app_job_id: data.sim.id,
+        compute_job_id: data.sim.computeJobId ?? "",
         status: data.sim.status,
+        details: data.sim.details,
+        step: data.sim.step,
+        step_index: data.sim.stepIndex,
+        total_steps: data.sim.totalSteps,
+        calculation: data.sim.calculation as JobStatusResponse["calculation"],
+        travel_times: data.sim.travelTimes as JobStatusResponse["travel_times"],
+        result_bucket: data.sim.resultBucket,
+        result_key: data.sim.resultKey,
         error: data.sim.error,
+        finished_at: data.sim.finishedAt?.toISOString() ?? null,
         report_available: data.sim.reportAvailable,
       }
     );
   }
 
   function isTerminal(status: string): boolean {
-    return status === "completed" || status === "failed";
+    return (
+      status === "completed" ||
+      status === "failed" ||
+      status === "dispatch_failed" ||
+      status === "cancelled"
+    );
   }
 
-  let live = $state<SimulationStatus>(statusFromSnapshot());
+  let live = $state<JobStatusResponse>(statusFromSnapshot());
 
   const terminal = $derived(isTerminal(live.status));
+  const retryable = $derived(live.status === "pending_dispatch" || live.status === "dispatch_failed");
   const percent = $derived(
     live.step_index !== null && live.step_index !== undefined && live.total_steps
       ? Math.round((live.step_index / live.total_steps) * 100)
@@ -43,10 +59,13 @@
   );
 
   const STATUS_LABEL: Record<string, string> = {
+    pending_dispatch: "Preparando",
+    dispatch_failed: "No enviada",
     queued: "En cola",
     running: "Ejecutándose",
     completed: "Completada",
     failed: "Fallida",
+    cancelled: "Cancelada",
   };
 
   $effect(() => {
@@ -54,12 +73,12 @@
     const initial = statusFromSnapshot();
     live = initial;
 
-    if (isTerminal(initial.status)) return;
+    if (isTerminal(initial.status) || !data.sim.computeJobId) return;
 
     const es = new EventSource(`/simulations/${id}/events`);
     es.onmessage = (event) => {
       try {
-        const next = JSON.parse(event.data) as SimulationStatus;
+        const next = JSON.parse(event.data) as JobStatusResponse;
         live = next;
         if (isTerminal(next.status)) {
           es.close();
@@ -111,10 +130,22 @@
       </div>
     {/if}
 
-    {#if live.status === "failed"}
+    {#if live.status === "failed" || live.status === "dispatch_failed"}
       <Alert tone="error" title="La simulación falló">
         {live.error ?? "Error desconocido."}
       </Alert>
+    {/if}
+
+    {#if form?.retryError}
+      <Alert tone="error" title="No se pudo reenviar">
+        {form.retryError}
+      </Alert>
+    {/if}
+
+    {#if retryable}
+      <form method="POST" action="?/retry">
+        <Button type="submit" variant="outline">Reenviar simulación</Button>
+      </form>
     {/if}
 
     {#if live.calculation}

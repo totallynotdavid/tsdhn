@@ -14,15 +14,16 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
 
   await Promise.all(
     simulations
-      .filter((s) => s.status === "queued" || s.status === "running")
+      .filter((s) => s.computeJobId && (s.status === "queued" || s.status === "running"))
       .map(async (s) => {
-        const { data } = await client.GET("/api/v1/simulations/{sim_id}", {
-          params: { path: { sim_id: s.id } },
+        const { data } = await client.GET("/api/v1/jobs/{app_job_id}", {
+          params: { path: { app_job_id: s.id } },
         });
         if (data) {
-          await syncStatus(s.id, data.status, data.report_available, data.error);
+          await syncStatus(s.id, data.status, data.report_available, data);
           s.status = data.status;
           s.reportAvailable = data.report_available;
+          s.error = data.error ?? null;
         }
       }),
   );
