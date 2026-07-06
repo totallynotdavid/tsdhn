@@ -179,7 +179,3 @@ fprintf(fid2, '%4.2f\r\n', lat0);
 fprintf(fid2, '%3.0f\r\n', h);
 fprintf(fid2, '%3.1f\r\n', Mw);
 fclose(fid2);
-
-% Prepare the TSDHN run
-system('chmod 775 job.run');
-system('./job.run');
