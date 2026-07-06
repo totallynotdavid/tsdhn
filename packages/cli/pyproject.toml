@@ -1,7 +1,7 @@
 [project]
 name = "tsdhn-cli"
 version = "0.1.0"
-description = "TSDHN command-line client"
+description = "CLI: run simulations directly via the shared core"
 requires-python = ">=3.14"
 readme = "readme.md"
 license = { text = "MIT" }
@@ -9,12 +9,13 @@ authors = [
     { name = "David Duran", email = "dadch1404@gmail.com" },
 ]
 dependencies = [
-    "aiohttp==3.14.1",
+    "tsdhn-core",
+    "typer==0.20.0",
     "rich==15.0.0",
 ]
 
 [project.scripts]
-tsdhn = "cli.cli:run"
+tsdhn = "cli.main:main"
 
 [build-system]
 requires = ["uv_build==0.11.25"]
