@@ -23,13 +23,15 @@ gmt grdimage $grdfile=bs -R$REGION -J$SIZE -C$cptfile -K -P >> $psfile
 
 gmt pscoast -R$REGION -J$SIZE -B$AXIS -Dl -N1 -W0.5,40 -G155 -P -O -K >> $psfile
 
+# Contour variants stay here while GMT map output stabilizes.
 #gmt grdcontour $tttbfile=bf -R$REGION -J$SIZE -C60 -A60f16 -Wc.5,30,- -Wa.5,30,- -K -O -P -V >> $psfile
 gmt grdcontour $tttbfile=bf -R$REGION -J$SIZE -C1 -A1.f1+uh -Wc.5,30,- -Wa.5,30,- -K -O -P -V >> $psfile
 #gmt grdcontour $tttbfile=bf -R$REGION -J$SIZE -C1 -A1+f9p -Wc.5,30,- -Wa.5,30,- -K -O -P -V >> $psfile
 #gmt grdcontour $dspgrid -J$SIZE -R$REGION -C0.02 -A0.02+f9p -W0.10,255/0/0 -L0.001/10 -K -O -V >> $psfile
 
-#Mecanismo Focal CMT
+# CMT focal mechanism.
 gmt psmeca $cmtfile -R$REGION -J$SIZE -Sa0.29c -G0/0/0 -P -O -V -K >> $psfile
+
 #gmt psmeca -R$REGION -J$SIZE -Sa0.32c -G0/0/0 -P -O -V -K <<EOF>> $psfile
 #-78.00 -12.00  21.0 330 15 90 8.1 0 0
 #EOF
