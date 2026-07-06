@@ -1,0 +1,19 @@
+{
+  "type": "module",
+  "workspaces": ["apps/*", "libs/*"],
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt --no-error-on-unmatched-pattern apps libs",
+    "fmt:check": "oxfmt --check --no-error-on-unmatched-pattern apps libs",
+    "web:dev": "bun --filter web dev",
+    "web:build": "bun --filter web build",
+    "web:check": "bun --filter web check",
+    "gen:client": "bun run scripts/gen-client.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "oxfmt": "^0.57.0",
+    "oxlint": "^1.72.0"
+  }
+}

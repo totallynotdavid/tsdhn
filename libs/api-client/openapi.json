@@ -1,0 +1,771 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TSDHN API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Version",
+        "operationId": "version_api_v1_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calculations": {
+      "post": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Create Calculation",
+        "description": "Quick, synchronous earthquake parameters + tsunami travel times.",
+        "operationId": "create_calculation_api_v1_calculations_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EarthquakeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalculationPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulations": {
+      "post": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Create Simulation",
+        "description": "Enqueue the long-running pipeline and return its id immediately.",
+        "operationId": "create_simulation_api_v1_simulations_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulations/{sim_id}": {
+      "get": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Get Simulation",
+        "operationId": "get_simulation_api_v1_simulations__sim_id__get",
+        "parameters": [
+          {
+            "name": "sim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sim Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulations/{sim_id}/events": {
+      "get": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Simulation Events",
+        "description": "Server-sent progress stream; the BFF may use this or poll the status route.",
+        "operationId": "simulation_events_api_v1_simulations__sim_id__events_get",
+        "parameters": [
+          {
+            "name": "sim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sim Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulations/{sim_id}/report": {
+      "get": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Get Report",
+        "operationId": "get_report_api_v1_simulations__sim_id__report_get",
+        "parameters": [
+          {
+            "name": "sim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sim Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CalculationPreview": {
+        "properties": {
+          "calculation": {
+            "$ref": "#/components/schemas/CalculationResponse"
+          },
+          "travel_times": {
+            "$ref": "#/components/schemas/TsunamiTravelResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calculation",
+          "travel_times"
+        ],
+        "title": "CalculationPreview",
+        "description": "Synchronous preview returned before committing to a ~1h simulation."
+      },
+      "CalculationResponse": {
+        "properties": {
+          "length": {
+            "type": "number",
+            "title": "Length"
+          },
+          "width": {
+            "type": "number",
+            "title": "Width"
+          },
+          "dislocation": {
+            "type": "number",
+            "title": "Dislocation"
+          },
+          "seismic_moment": {
+            "type": "number",
+            "title": "Seismic Moment"
+          },
+          "tsunami_warning": {
+            "type": "string",
+            "title": "Tsunami Warning"
+          },
+          "distance_to_coast": {
+            "type": "number",
+            "title": "Distance To Coast"
+          },
+          "azimuth": {
+            "type": "number",
+            "title": "Azimuth"
+          },
+          "dip": {
+            "type": "number",
+            "title": "Dip"
+          },
+          "epicenter_location": {
+            "type": "string",
+            "title": "Epicenter Location"
+          },
+          "rectangle_parameters": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Rectangle Parameters"
+          },
+          "rectangle_corners": {
+            "items": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rectangle Corners"
+          }
+        },
+        "type": "object",
+        "required": [
+          "length",
+          "width",
+          "dislocation",
+          "seismic_moment",
+          "tsunami_warning",
+          "distance_to_coast",
+          "azimuth",
+          "dip",
+          "epicenter_location",
+          "rectangle_parameters",
+          "rectangle_corners"
+        ],
+        "title": "CalculationResponse"
+      },
+      "EarthquakeInput": {
+        "properties": {
+          "Mw": {
+            "type": "number",
+            "title": "Mw"
+          },
+          "h": {
+            "type": "number",
+            "title": "H"
+          },
+          "lat0": {
+            "type": "number",
+            "title": "Lat0"
+          },
+          "lon0": {
+            "type": "number",
+            "title": "Lon0"
+          },
+          "dia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dia",
+            "default": "00"
+          },
+          "hhmm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhmm",
+            "default": "0000"
+          }
+        },
+        "type": "object",
+        "required": [
+          "Mw",
+          "h",
+          "lat0",
+          "lon0"
+        ],
+        "title": "EarthquakeInput"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "redis_connected": {
+            "type": "boolean",
+            "title": "Redis Connected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp",
+          "redis_connected"
+        ],
+        "title": "HealthStatus"
+      },
+      "SimulationCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "SimulationCreated"
+      },
+      "SimulationRequest": {
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/EarthquakeInput"
+          },
+          "skip_steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skip Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input"
+        ],
+        "title": "SimulationRequest"
+      },
+      "SimulationStatus": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "step_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Index"
+          },
+          "total_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Steps"
+          },
+          "calculation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalculationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "travel_times": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TsunamiTravelResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "report_available": {
+            "type": "boolean",
+            "title": "Report Available",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "SimulationStatus"
+      },
+      "TsunamiTravelResponse": {
+        "properties": {
+          "arrival_times": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Arrival Times"
+          },
+          "distances": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Distances"
+          },
+          "epicenter_info": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Epicenter Info"
+          }
+        },
+        "type": "object",
+        "required": [
+          "arrival_times",
+          "distances",
+          "epicenter_info"
+        ],
+        "title": "TsunamiTravelResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VersionInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "VersionInfo"
+      }
+    }
+  }
+}
