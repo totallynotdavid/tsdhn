@@ -10,7 +10,8 @@ The app uses a server-side web backend pattern:
 - The service token stays in server-side code.
 - SQLite/libSQL stores data managed by the web app, such as users and submitted simulation
   records.
-- Redis and the API backend manage live simulation progress.
+- The FastAPI compute plane manages live simulation progress, worker state, and
+  MinIO artifact pointers.
 
 ## Commands
 
@@ -75,9 +76,10 @@ uses SvelteKit's request-aware `fetch` for server-side calls.
 Current server-side backend calls include:
 
 - `POST /api/v1/calculations` from [`src/routes/api/calculations/+server.ts`](./src/routes/api/calculations/+server.ts)
-- `POST /api/v1/simulations` from [`src/routes/(app)/new/+page.server.ts`](./src/routes/%28app%29/new/+page.server.ts)
-- `GET /api/v1/simulations/{id}/events` proxied by [`src/routes/(app)/simulations/[id]/events/+server.ts`](./src/routes/%28app%29/simulations/%5Bid%5D/events/+server.ts)
-- `GET /api/v1/simulations/{id}/report` proxied by [`src/routes/(app)/simulations/[id]/report/+server.ts`](./src/routes/%28app%29/simulations/%5Bid%5D/report/+server.ts)
+- `POST /api/v1/jobs` from [`src/lib/server/dispatch.ts`](./src/lib/server/dispatch.ts)
+- `GET /api/v1/jobs/{id}` from app-owned simulation pages and dashboard status sync
+- `GET /api/v1/jobs/{id}/events` proxied by [`src/routes/(app)/simulations/[id]/events/+server.ts`](./src/routes/%28app%29/simulations/%5Bid%5D/events/+server.ts)
+- `GET /api/v1/jobs/{id}/report` proxied by [`src/routes/(app)/simulations/[id]/report/+server.ts`](./src/routes/%28app%29/simulations/%5Bid%5D/report/+server.ts)
 
 ## Docker
 

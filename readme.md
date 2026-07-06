@@ -13,8 +13,8 @@
 
 TSDHN orchestrator runs tsunami simulation workflows from earthquake source
 parameters. The repository contains the shared numerical core, a FastAPI
-backend, an RQ worker, a CLI for researchers, a SvelteKit web app, and the generated
-TypeScript API client used by the web server.
+compute plane, a Procrastinate worker, a CLI for researchers, a SvelteKit web
+app, and the generated TypeScript API client used by the web server.
 
 ## Documentation
 
@@ -37,20 +37,22 @@ TypeScript API client used by the web server.
 flowchart LR
     Browser[Browser] --> Web[SvelteKit web app]
     Web -->|server-side Bearer token| API[FastAPI /api/v1]
-    API -->|enqueue job| Redis[(Redis / RQ)]
-    Worker[RQ worker] -->|consume tsdhn_queue| Redis
+    API -->|create job + defer task| PG[(Compute Postgres)]
+    Worker[Procrastinate worker] -->|claim task + update status| PG
     Worker --> Core[tsdhn-core]
     CLI[tsdhn CLI] --> Core
     Core --> Model[model assets]
     Core --> Tools[Fortran, GMT, TTT, Typst]
-    Worker --> Jobs[(jobs directory)]
+    Worker --> MinIO[(MinIO artifacts)]
+    Worker --> Jobs[(temporary jobs directory)]
     Web --> DB[(SQLite/libSQL)]
 ```
 
 The browser talks to the SvelteKit app. The SvelteKit server calls the FastAPI
 backend with `BACKEND_SERVICE_TOKEN`; that token is never sent to browser code.
-Long simulations run in the RQ worker, which calls `tsdhn-core` and writes job
-artifacts under `TSDHN_JOBS_DIR`.
+Long simulations run in the Procrastinate worker, which calls `tsdhn-core`,
+updates `compute_jobs` in Postgres, and writes completed reports and metadata to
+MinIO.
 
 ## Quick start
 
@@ -93,10 +95,10 @@ scientific backend under WSL 2; Microsoft documents the setup in the
 | `mise run test` | Run the Python test suite with `pytest -n auto` |
 | `mise run lint` | Run Ruff and mypy for Python packages |
 | `mise run api` | Start the FastAPI service with `tsdhn-api` |
-| `mise run worker` | Start the RQ worker with `tsdhn-worker` |
+| `mise run worker` | Start the Procrastinate worker with `tsdhn-worker` |
 | `mise run web-dev` | Start the SvelteKit dev server |
 | `mise run gen-client` | Export FastAPI OpenAPI JSON and regenerate TypeScript types |
-| `docker compose up -d` | Run Redis, libSQL, API, and worker |
+| `docker compose up -d` | Run Postgres, MinIO, libSQL, API, and worker |
 | `docker compose --profile web up` | Run the backend stack plus the SvelteKit web app |
 
 ## Workspace
@@ -110,7 +112,7 @@ picv-2025/
 │   └── api-client/           # Generated TypeScript client from FastAPI OpenAPI
 ├── model/                    # TSDHN model assets and legacy Fortran sources
 ├── packages/
-│   ├── api/                  # FastAPI service and RQ worker
+│   ├── api/                  # FastAPI compute service and Procrastinate worker
 │   ├── cli/                  # Typer/Rich CLI for researchers
 │   └── core/                 # Shared numerical core and simulation pipeline
 ├── scripts/
@@ -131,7 +133,7 @@ Non-container backend runs need:
 - `TSDHN_MODEL_DIR` pointing at the model asset directory.
 - `TSDHN_TOOLS_DIR` pointing at prebuilt `fault_plane`, `deform`, and `tsunami`
   executables when command pipeline steps are active.
-- `TSDHN_JOBS_DIR` for queued simulation workspaces when running the API worker.
+- `TSDHN_JOBS_DIR` for temporary simulation workspaces when running the API worker.
 
 The Docker API image sets these paths to `/app/model`, `/app/tools`, and
 `/app/jobs`.
@@ -148,7 +150,7 @@ Non-container runs must provide the same external tools:
 - [TTT SDK](https://www.geoware-online.com/tsunami.html), including
   `ttt_client`
 - [Typst](https://typst.app/docs/)
-- Redis, `ps2eps`, and `csh`
+- `ps2eps` and `csh`
 
 </details>
 

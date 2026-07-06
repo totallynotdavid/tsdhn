@@ -5,7 +5,7 @@ earthquake source calculations, tsunami travel-time calculations, runtime path
 validation, workspace preparation, and the ordered TSDHN processing pipeline.
 
 The API service and CLI both depend on this package. The core does not import
-FastAPI, Redis, RQ, Typer, or web application code.
+FastAPI, Procrastinate, MinIO, Typer, or web application code.
 
 ## Public interfaces
 
