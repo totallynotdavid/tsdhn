@@ -1,0 +1,137 @@
+<script lang="ts">
+  import { invalidateAll } from "$app/navigation";
+  import type { components } from "@tsdhn/api-client";
+
+  import type { EarthquakeInput } from "$lib/schema/earthquake";
+  import SourceParams from "$lib/components/SourceParams.svelte";
+  import Map from "$lib/components/Map.svelte";
+  import Alert from "$lib/components/ui/Alert.svelte";
+  import Button from "$lib/components/ui/Button.svelte";
+
+  let { data } = $props();
+  type SimulationStatus = components["schemas"]["SimulationStatus"];
+
+  const params = $derived(data.sim.params as EarthquakeInput);
+  const simulationId = $derived(data.sim.id);
+
+  function statusFromSnapshot(): SimulationStatus {
+    return (
+      data.status ?? {
+        id: data.sim.id,
+        status: data.sim.status,
+        error: data.sim.error,
+        report_available: data.sim.reportAvailable,
+      }
+    );
+  }
+
+  function isTerminal(status: string): boolean {
+    return status === "completed" || status === "failed";
+  }
+
+  let live = $state<SimulationStatus>(statusFromSnapshot());
+
+  const terminal = $derived(isTerminal(live.status));
+  const percent = $derived(
+    live.step_index !== null && live.step_index !== undefined && live.total_steps
+      ? Math.round((live.step_index / live.total_steps) * 100)
+      : null,
+  );
+
+  const faultCorners = $derived(
+    live.calculation?.rectangle_corners?.map((c) => ({ lat: c.lat, lon: c.lon })) ?? null,
+  );
+
+  const STATUS_LABEL: Record<string, string> = {
+    queued: "En cola",
+    running: "Ejecutándose",
+    completed: "Completada",
+    failed: "Fallida",
+  };
+
+  $effect(() => {
+    const id = simulationId;
+    const initial = statusFromSnapshot();
+    live = initial;
+
+    if (isTerminal(initial.status)) return;
+
+    const es = new EventSource(`/simulations/${id}/events`);
+    es.onmessage = (event) => {
+      try {
+        const next = JSON.parse(event.data) as SimulationStatus;
+        live = next;
+        if (isTerminal(next.status)) {
+          es.close();
+          void invalidateAll();
+        }
+      } catch {
+        /* ignore malformed frames */
+      }
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
+  });
+</script>
+
+<svelte:head><title>Simulación · TSDHN</title></svelte:head>
+
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <a href="/dashboard" class="text-sm text-brand-600 hover:underline">← Mis simulaciones</a>
+    <h1 class="mt-1 text-2xl font-bold text-neutral-900">
+      Mw {params.Mw} · {params.lat0}, {params.lon0}
+    </h1>
+  </div>
+  <span class="rounded-full bg-neutral-100 px-3 py-1 text-sm font-medium text-neutral-700">
+    {STATUS_LABEL[live.status] ?? live.status}
+  </span>
+</div>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+  <div class="space-y-6">
+    {#if !terminal}
+      <div class="rounded-xl border border-neutral-200 bg-white p-6">
+        <div class="mb-3 flex items-center gap-3">
+          <span class="size-3 animate-pulse rounded-full bg-brand-500"></span>
+          <p class="font-medium text-neutral-900">{live.details ?? "Procesando…"}</p>
+        </div>
+        {#if percent !== null}
+          <div class="h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+            <div class="h-full rounded-full bg-brand-500 transition-all" style="width: {percent}%"></div>
+          </div>
+          <p class="mt-2 text-sm text-neutral-500">
+            Paso {live.step_index} de {live.total_steps}{live.step ? ` · ${live.step}` : ""}
+          </p>
+        {/if}
+        <p class="mt-3 text-xs text-neutral-400">
+          Esta simulación puede tardar alrededor de una hora. Puede cerrar esta página y volver
+          más tarde.
+        </p>
+      </div>
+    {/if}
+
+    {#if live.status === "failed"}
+      <Alert tone="error" title="La simulación falló">
+        {live.error ?? "Error desconocido."}
+      </Alert>
+    {/if}
+
+    {#if live.calculation}
+      <div class="rounded-xl border border-neutral-200 bg-white p-6">
+        <h2 class="mb-3 text-lg font-semibold text-neutral-900">Parámetros de la fuente</h2>
+        <SourceParams calculation={live.calculation} />
+      </div>
+    {/if}
+
+    {#if live.status === "completed" && live.report_available}
+      <a href="/simulations/{data.sim.id}/report">
+        <Button class="w-full">Descargar reporte (PDF)</Button>
+      </a>
+    {/if}
+  </div>
+
+  <div class="lg:sticky lg:top-6 lg:self-start">
+    <Map lat={params.lat0} lon={params.lon0} {faultCorners} interactive={false} />
+  </div>
+</div>

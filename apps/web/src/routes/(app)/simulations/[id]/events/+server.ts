@@ -1,0 +1,25 @@
+import { error } from "@sveltejs/kit";
+
+import { backendRaw } from "$lib/server/api";
+import { getSimulation } from "$lib/server/simulations";
+
+import type { RequestHandler } from "./$types";
+
+/** Proxy backend progress only after the simulation owner is verified. */
+export const GET: RequestHandler = async ({ params, locals, fetch }) => {
+  if (!locals.user) error(401);
+  const sim = await getSimulation(locals.user.id, params.id);
+  if (!sim) error(404);
+
+  const { url, headers } = backendRaw();
+  const upstream = await fetch(`${url}/api/v1/simulations/${params.id}/events`, { headers });
+  if (!upstream.ok || !upstream.body) error(502, "No hay flujo de progreso disponible.");
+
+  return new Response(upstream.body, {
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      connection: "keep-alive",
+    },
+  });
+};
