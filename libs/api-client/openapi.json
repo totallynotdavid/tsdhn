@@ -53,7 +53,6 @@
           "simulations"
         ],
         "summary": "Create Calculation",
-        "description": "Quick, synchronous earthquake parameters + tsunami travel times.",
         "operationId": "create_calculation_api_v1_calculations_post",
         "parameters": [
           {
@@ -113,7 +112,6 @@
           "simulations"
         ],
         "summary": "Create Simulation",
-        "description": "Enqueue the long-running pipeline and return its id immediately.",
         "operationId": "create_simulation_api_v1_simulations_post",
         "parameters": [
           {
@@ -231,7 +229,6 @@
           "simulations"
         ],
         "summary": "Simulation Events",
-        "description": "Server-sent progress stream; the BFF may use this or poll the status route.",
         "operationId": "simulation_events_api_v1_simulations__sim_id__events_get",
         "parameters": [
           {
@@ -351,7 +348,7 @@
           "travel_times"
         ],
         "title": "CalculationPreview",
-        "description": "Synchronous preview returned before committing to a ~1h simulation."
+        "description": "Preview data returned before committing to a queued simulation."
       },
       "CalculationResponse": {
         "properties": {

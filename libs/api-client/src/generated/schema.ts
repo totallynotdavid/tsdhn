@@ -47,10 +47,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Create Calculation
-         * @description Quick, synchronous earthquake parameters + tsunami travel times.
-         */
+        /** Create Calculation */
         post: operations["create_calculation_api_v1_calculations_post"];
         delete?: never;
         options?: never;
@@ -67,10 +64,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Create Simulation
-         * @description Enqueue the long-running pipeline and return its id immediately.
-         */
+        /** Create Simulation */
         post: operations["create_simulation_api_v1_simulations_post"];
         delete?: never;
         options?: never;
@@ -102,10 +96,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Simulation Events
-         * @description Server-sent progress stream; the BFF may use this or poll the status route.
-         */
+        /** Simulation Events */
         get: operations["simulation_events_api_v1_simulations__sim_id__events_get"];
         put?: never;
         post?: never;
@@ -138,7 +129,7 @@ export interface components {
     schemas: {
         /**
          * CalculationPreview
-         * @description Synchronous preview returned before committing to a ~1h simulation.
+         * @description Preview data returned before committing to a queued simulation.
          */
         CalculationPreview: {
             calculation: components["schemas"]["CalculationResponse"];
