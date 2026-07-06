@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,8 +12,6 @@ from core.utils.file_utils import prepare_simulation_workspace
 from core.utils.processing import process_step
 
 __all__ = ["ProgressCallback", "SimulationResult", "run_simulation"]
-
-logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
