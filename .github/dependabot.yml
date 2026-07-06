@@ -18,6 +18,14 @@ updates:
               patterns: ["*"]
 
     - package-ecosystem: "docker"
+      directory: "/deploy"
+      schedule:
+          interval: "weekly"
+      groups:
+          dockerfile:
+              patterns: ["*"]
+
+    - package-ecosystem: "docker"
       directory: "/.devcontainer"
       schedule:
           interval: "weekly"
