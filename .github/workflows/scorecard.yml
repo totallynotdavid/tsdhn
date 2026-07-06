@@ -1,7 +1,7 @@
 name: OpenSSF Scorecard
 
 on:
-    branch_protection: {}
+    branch_protection_rule: {}
     schedule:
         - cron: "0 4 * * 6"
     workflow_dispatch:
