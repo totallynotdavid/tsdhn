@@ -1,17 +1,19 @@
+from pathlib import Path
+
 import pytest
 
-from api.core.calculator import TsunamiCalculator
-from api.models.schemas import CalculationResponse, EarthquakeInput
+from core.calculator import TsunamiCalculator, parse_port_line
+from core.schemas import CalculationResponse, EarthquakeInput
 
 
 @pytest.fixture(scope="module")
 def calculator() -> TsunamiCalculator:
-    return TsunamiCalculator()
+    model_dir = Path(__file__).resolve().parents[3] / "model"
+    return TsunamiCalculator(model_dir)
 
 
 @pytest.fixture(scope="module")
 def input_data() -> EarthquakeInput:
-    # todo: 'dia' is a string in our schema
     return EarthquakeInput(
         Mw=9.0, h=12.0, lat0=56.0, lon0=-156.0, hhmm="0000", dia="23"
     )
@@ -87,10 +89,29 @@ def test_rectangle_corners(
 
 
 def test_focal_mechanism(calc_result: CalculationResponse) -> None:
-    # Focal mechanism values are already tested in basic_parameters,
-    # but added one more here for completeness
+    # The nearest-mechanism lookup should stay stable for this epicenter.
     assert calc_result.azimuth == pytest.approx(expected_basic["azimuth"], rel=1e-6)
     assert calc_result.dip == pytest.approx(expected_basic["dip"], rel=1e-6)
+
+
+def test_port_line_parsing_uses_semantic_name() -> None:
+    port = parse_port_line(" -77.1667  -12.06888  % Callao       C")
+
+    assert port is not None
+    assert port.name == "Callao"
+    assert port.lon == pytest.approx(-77.1667)
+    assert port.lat == pytest.approx(-12.06888)
+
+
+def test_tsunami_travel_times_are_keyed_by_port_name(
+    calculator: TsunamiCalculator,
+) -> None:
+    travel = calculator.calculate_tsunami_travel_times(
+        EarthquakeInput(Mw=8.8, h=20, lat0=-12.0, lon0=-77.0, hhmm="1234", dia="05")
+    )
+
+    assert "Callao" in travel.arrival_times
+    assert not any(name.startswith("-") for name in travel.arrival_times)
 
 
 if __name__ == "__main__":

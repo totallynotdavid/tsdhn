@@ -1,6 +1,7 @@
 import logging
 import subprocess
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 
 import numpy as np
@@ -8,15 +9,12 @@ import pygmt
 import yaml
 from pygmt.helpers import GMTTempFile
 
-from api.core.executables import resolve
-from api.modules.point_ttt import read_meca_spec
+from core.executables import resolve
+from core.modules.point_ttt import read_meca_spec
 
 logger = logging.getLogger(__name__)
 
-CONFIG_DIR = Path("data")
 
-
-# Grid configuration
 @dataclass(frozen=True)
 class GridConfig:
     ncols: int = 2461
@@ -30,7 +28,6 @@ class GridConfig:
         object.__setattr__(self, "cellsize", self.dx / 1000.0 / 111.1994)
 
 
-# Style configuration
 @dataclass(frozen=True)
 class StyleConfig:
     font_primary: str = "10p,Helvetica-Bold,black"
@@ -52,16 +49,11 @@ class TidalStation:
     annotation_offset: str = "0.1c"
 
 
-def load_stations(config_dir: Path) -> list[TidalStation]:
-    stations_path = config_dir / "stations.yml"
-    logger.info(f"Loading stations configuration: {stations_path}")
-
-    if not stations_path.exists():
-        logger.error(f"Stations configuration file not found: {stations_path}")
-        raise FileNotFoundError(f"Stations file not found: {stations_path}")
-
+def load_stations() -> list[TidalStation]:
+    stations_path = files("core.modules.data").joinpath("stations.yml")
+    logger.info("Loading stations configuration: %s", stations_path)
     try:
-        with open(stations_path) as f:
+        with stations_path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         if not data or "stations" not in data:
@@ -75,7 +67,7 @@ def load_stations(config_dir: Path) -> list[TidalStation]:
 
 
 def create_cpt_files(work_dir: Path) -> tuple[Path, Path]:
-    """Create custom color palette tables (CPT) for visualization"""
+    """Create GMT color palette tables for depth and wave height."""
     depth_cpt = work_dir / "depth.cpt"
     hgt_cpt = work_dir / "hgt.cpt"
 
@@ -95,7 +87,7 @@ def create_cpt_files(work_dir: Path) -> tuple[Path, Path]:
             )
             Path(temp_cpt.name).rename(hgt_cpt)
 
-            # Append B, F, N entries to height CPT
+            # GMT uses B, F, and N rows for below-range, above-range, and NaN colors.
             with open(hgt_cpt, "a") as f:
                 f.write("B 0 0 255\nF 255 0 0\nN 255 255 255\n")
 
@@ -107,7 +99,7 @@ def create_cpt_files(work_dir: Path) -> tuple[Path, Path]:
 
 
 def process_grid(work_dir: Path, grid_config: GridConfig) -> Path:
-    """Process and normalize grid data for visualization"""
+    """Normalize the legacy max-height grid into GMT ASCII grid format."""
     grid_path = work_dir / "zfolder" / "zmax_a.grd"
 
     if not grid_path.exists():
@@ -115,7 +107,6 @@ def process_grid(work_dir: Path, grid_config: GridConfig) -> Path:
         raise FileNotFoundError(f"Grid file not found: {grid_path}")
 
     try:
-        # Load and validate grid data
         data = np.loadtxt(grid_path, dtype=np.float32)
         expected_size = grid_config.ncols * grid_config.nrows
 
@@ -125,11 +116,9 @@ def process_grid(work_dir: Path, grid_config: GridConfig) -> Path:
                 f"Data size mismatch: Expected {expected_size}, got {data.size}"
             )
 
-        # Reshape and process grid data
         arr = data.reshape((grid_config.ncols, grid_config.nrows), order="F")
         processed = np.flipud(arr.T)
 
-        # Normalize values
         max_val = np.nanmax(processed)
         normalized = np.divide(
             12.0 * processed,
@@ -138,7 +127,6 @@ def process_grid(work_dir: Path, grid_config: GridConfig) -> Path:
             where=(max_val != 0),
         )
 
-        # Write processed grid to file
         output_grid = work_dir / "maximo.grd"
         write_grid_file(output_grid, normalized, grid_config)
         return output_grid
@@ -205,11 +193,9 @@ def add_tidal_stations(
         logger.warning("No active tidal stations found")
         return
 
-    # Create array of station coordinates
     stations_array = np.array([(s.lon - 1, s.lat) for s in active_stations])
 
     try:
-        # Plot markers
         fig.plot(
             x=stations_array[:, 0],
             y=stations_array[:, 1],
@@ -218,7 +204,6 @@ def add_tidal_stations(
             fill=style_config.tidal_fill,
         )
 
-        # Add station names
         for station in active_stations:
             fig.text(
                 x=station.lon,
@@ -277,7 +262,7 @@ def generate_maxola_plot(work_dir: Path) -> None:
     grid_config = GridConfig()
     style_config = StyleConfig()
 
-    stations = load_stations(CONFIG_DIR)
+    stations = load_stations()
 
     files_to_cleanup: list[Path] = []
 
@@ -315,8 +300,7 @@ def generate_maxola_plot(work_dir: Path) -> None:
         add_meca_data(fig, work_dir, style_config)
         add_legend(fig, style_config)
 
-        # Save the figure
-        fig.psconvert(prefix=str(work_dir / "maxola"), fmt="E")
+        fig.savefig(str(work_dir / "maxola.svg"))
         logger.info(f"Tsunami visualization created: {work_dir / 'maxola'}")
 
     except Exception as e:

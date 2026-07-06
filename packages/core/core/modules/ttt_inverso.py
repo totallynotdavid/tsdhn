@@ -2,20 +2,13 @@ import logging
 import subprocess
 from pathlib import Path
 
-from api.core.executables import resolve
+from core.executables import resolve
 
 logger = logging.getLogger(__name__)
 
 
 def ttt_inverso_python(working_dir: Path) -> None:
-    """
-    Read coordinates from meca.dat, format them, and execute:
-    - ttt_client
-    - grdmath (not yet implemented in pygmt)
-
-    Args:
-        working_dir: The working directory for the ttt_inverso process.
-    """
+    """Run ttt_client and grdmath from meca.dat epicenter coordinates."""
     meca_path = working_dir.parent / "meca.dat"
     if not meca_path.exists():
         raise FileNotFoundError(f"Required file {meca_path} not found.")
@@ -32,7 +25,7 @@ def ttt_inverso_python(working_dir: Path) -> None:
         except ValueError as e:
             raise ValueError(f"Invalid coordinate values in {meca_path}: {e}") from e
 
-    # Determine formatting based on yep's value
+    # ttt_client expects fixed-width latitude text with width based on sign/magnitude.
     if yep <= -10.0:
         x_fmt, y_fmt = "{:6.2f}", "{:6.2f}"
     elif yep < 0.0:
@@ -42,11 +35,9 @@ def ttt_inverso_python(working_dir: Path) -> None:
     else:  # yep >= 10.0
         x_fmt, y_fmt = "{:6.2f}", "{:5.2f}"
 
-    # Format coordinates
     loc = f"{x_fmt.format(xep)}/{y_fmt.format(yep)}"
     logger.info(f"Formatted location: {loc}")
 
-    # Execute ttt_client command
     try:
         # `loc` is a formatted float pair, not user input.
         subprocess.run(
@@ -67,7 +58,6 @@ def ttt_inverso_python(working_dir: Path) -> None:
         logger.exception(f"ttt_client execution failed: {e}")
         raise
 
-    # Process output grid with grdmath
     try:
         subprocess.run(
             [str(resolve("gmt")), "grdmath", "ttt.b=bf", "1.0", "MUL", "=", "ttt.b=bf"],

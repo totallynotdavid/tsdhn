@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
@@ -6,13 +7,14 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.io import loadmat
 
-from api.core.config import EARTH_RADIUS, GRAVITY, MODEL_DIR
-from api.models.schemas import (
+from core.config import EARTH_RADIUS, GRAVITY
+from core.runtime import model_dir_from_env, validate_model_dir
+from core.schemas import (
     CalculationResponse,
     EarthquakeInput,
     TsunamiTravelResponse,
 )
-from api.utils.geo import (
+from core.utils.geo import (
     calculate_distance_to_coast,
     determine_epicenter_location,
     determine_tsunami_warning,
@@ -21,90 +23,104 @@ from api.utils.geo import (
 
 logger = logging.getLogger(__name__)
 
-# This constant is used in rectangle corner calculations
+# Legacy corner formulas use 60 nautical miles per degree.
 NM_CONVERSION = 60 * 1853  # Nautical miles to meters conversion
 
 
-class TsunamiCalculator:
-    _data_loaded: bool = False
-    _static_loaded: bool = False
-    xa: np.ndarray
-    ya: np.ndarray
-    vlon: np.ndarray | None = None
-    vlat: np.ndarray | None = None
-    bathymetry: np.ndarray | None = None
-    bathy_interpolator: RegularGridInterpolator | None = None
-    maper1: np.ndarray | None = None
-    mechanism_data: np.ndarray | None = None
-    ports: list[str] | None = None
+@dataclass(frozen=True)
+class Port:
+    name: str
+    lon: float
+    lat: float
 
-    def __init__(self) -> None:
-        """Initialize calculator with preloaded data"""
+
+def parse_port_line(line: str) -> Port | None:
+    data, _, comment = line.partition("%")
+    parts = data.split()
+    if len(parts) < 2:
+        logger.warning("Insufficient coordinate data in port line: '%s'", line.strip())
+        return None
+
+    try:
+        lon = float(parts[0])
+        lat = float(parts[1])
+    except ValueError:
+        logger.warning("Invalid coordinate data in port line: '%s'", line.strip())
+        return None
+
+    name_parts = comment.split()
+    if len(name_parts) > 1 and len(name_parts[-1]) == 1:
+        name_parts = name_parts[:-1]
+    name = " ".join(name_parts) or f"{lat:.4f},{lon:.4f}"
+    return Port(name=name, lon=lon, lat=lat)
+
+
+class TsunamiCalculator:
+    def __init__(self, model_dir: Path | None = None) -> None:
+        self.model_dir = (
+            validate_model_dir(model_dir.resolve())
+            if model_dir is not None
+            else model_dir_from_env()
+        )
+        self.xa: np.ndarray
+        self.ya: np.ndarray
+        self.vlon: np.ndarray | None = None
+        self.vlat: np.ndarray | None = None
+        self.bathymetry: np.ndarray | None = None
+        self.bathy_interpolator: RegularGridInterpolator | None = None
+        self.maper1: np.ndarray | None = None
+        self.mechanism_data: np.ndarray | None = None
+        self.ports: list[str] | None = None
         self._ensure_data_loaded()
 
-    @classmethod
-    def _ensure_data_loaded(cls) -> None:
-        """Lazy-load required data once"""
-        if not cls._data_loaded:
-            cls._load_geographic_data()
-        if not cls._static_loaded:
-            cls._load_static_files()
+    def _ensure_data_loaded(self) -> None:
+        self._load_geographic_data()
+        self._load_static_files()
 
-    @classmethod
-    def _load_geographic_data(cls) -> None:
+    def _load_geographic_data(self) -> None:
         try:
-            # Load Pacific bathymetry matrix
-            pacifico_path = MODEL_DIR / "pacifico.mat"
+            pacifico_path = self.model_dir / "pacifico.mat"
             pacifico = loadmat(pacifico_path)
 
-            cls.xa = pacifico["xa"].flatten()
-            cls.ya = pacifico["ya"].flatten()
-            cls.bathymetry = pacifico["A"]
+            self.xa = pacifico["xa"].flatten()
+            self.ya = pacifico["ya"].flatten()
+            self.bathymetry = pacifico["A"]
 
-            # Adjust longitude values and validate orientation
-            cls.vlon = cls.xa - 360
-            cls.vlat = cls.ya
-            if cls.vlat[0] > cls.vlat[-1]:
-                cls.vlat = cls.vlat[::-1]
-                cls.bathymetry = cls.bathymetry[::-1, :]
+            # Bathymetry uses 0..360 longitudes. Calculations use -180..180.
+            self.vlon = self.xa - 360
+            self.vlat = self.ya
+            if self.vlat[0] > self.vlat[-1]:
+                self.vlat = self.vlat[::-1]
+                self.bathymetry = self.bathymetry[::-1, :]
 
-            # Create bathymetry interpolator
-            cls.bathy_interpolator = RegularGridInterpolator(
-                (cls.vlat, cls.vlon),
-                cls.bathymetry,
+            self.bathy_interpolator = RegularGridInterpolator(
+                (self.vlat, self.vlon),
+                self.bathymetry,
                 bounds_error=False,
                 fill_value=None,
             )
 
-            # Load coastal points data
-            maper1_path = MODEL_DIR / "maper1.mat"
-            cls.maper1 = loadmat(maper1_path)["A"]
-
-            cls._data_loaded = True
+            maper1_path = self.model_dir / "maper1.mat"
+            self.maper1 = loadmat(maper1_path)["A"]
         except Exception as e:
             logger.exception("Failed to load bathymetric data")
             raise RuntimeError("Bathymetric data initialization failed") from e
 
-    @classmethod
-    def _load_static_files(cls) -> None:
+    def _load_static_files(self) -> None:
         try:
-            # Load focal mechanism data
-            mech_path = MODEL_DIR / "mecfoc.dat"
-            cls.mechanism_data = np.loadtxt(mech_path)
+            mech_path = self.model_dir / "mecfoc.dat"
+            self.mechanism_data = np.loadtxt(mech_path)
 
-            # Adjust longitude values
-            cls.mechanism_data[:, 0] = np.where(
-                cls.mechanism_data[:, 0] > 0,
-                cls.mechanism_data[:, 0] - 360,
-                cls.mechanism_data[:, 0],
+            # CMT data uses eastern positive degrees. Lookup uses western negatives.
+            self.mechanism_data[:, 0] = np.where(
+                self.mechanism_data[:, 0] > 0,
+                self.mechanism_data[:, 0] - 360,
+                self.mechanism_data[:, 0],
             )
 
-            # Load port locations
-            puertos_path = MODEL_DIR / "puertos.txt"
+            puertos_path = self.model_dir / "puertos.txt"
             with open(puertos_path) as f:
-                cls.ports = f.readlines()
-
-            cls._static_loaded = True
+                self.ports = f.readlines()
         except Exception as e:
             logger.exception("Failed to load static files")
             raise RuntimeError("Static file initialization failed") from e
@@ -112,19 +128,19 @@ class TsunamiCalculator:
     def calculate_earthquake_parameters(
         self, data: EarthquakeInput, output_dir: Path | None = None
     ) -> CalculationResponse:
-        """
-        Calculate earthquake parameters and tsunami risk assessment.
-        It also generates a hypo.dat file which will be used in the main simulation.
-        """
+        """Calculate source parameters and write hypo.dat for the simulation."""
         try:
-            # Calculate rupture parameters
+            # Papazachos et al. (2004) magnitude scaling relations.
             L = 10 ** (0.55 * data.Mw - 2.19)  # Rupture length (km)
             W = 10 ** (0.31 * data.Mw - 0.63)  # Rupture width (km)
+
+            # Hanks and Kanamori moment magnitude relation.
             M0 = 10 ** (1.5 * data.Mw + 9.1)  # Seismic moment (N*m)
+
+            # Seismic moment definition solved for average slip.
             u = 4.5e10  # Rigidity (N/m^2)
             D = M0 / (u * (L * 1000) * (W * 1000))  # Dislocation (m)
 
-            # Get focal mechanism parameters
             azimuth, dip = self._get_focal_mechanism(data.lon0, data.lat0)
 
             # Fault plane geometry
@@ -135,7 +151,6 @@ class TsunamiCalculator:
             if self.maper1 is None:
                 raise RuntimeError("Coastal data not loaded")
 
-            # Location analysis
             distance_to_coast = calculate_distance_to_coast(
                 self.maper1[:, :2], data.lon0, data.lat0
             )
@@ -150,7 +165,6 @@ class TsunamiCalculator:
             location = determine_epicenter_location(h0, distance_to_coast)
             warning = determine_tsunami_warning(data.Mw, data.h, h0, distance_to_coast)
 
-            # Generate hypo.dat file (for model execution)
             self._write_hypo_dat(data, output_dir or Path.cwd())
 
             return CalculationResponse(
@@ -173,9 +187,6 @@ class TsunamiCalculator:
     def calculate_tsunami_travel_times(
         self, data: EarthquakeInput
     ) -> TsunamiTravelResponse:
-        """
-        Calculate tsunami arrival times at monitored locations
-        """
         try:
             if self.ports is None:
                 raise RuntimeError("Port data not loaded")
@@ -190,24 +201,23 @@ class TsunamiCalculator:
                 if len(port) < 15:
                     continue
 
-                parts = port.split()
-                if len(parts) < 3:
-                    logger.warning(f"Insufficient data in port line: '{port.strip()}'")
+                parsed_port = parse_port_line(port)
+                if parsed_port is None:
                     continue
 
-                port_name = port[:15].strip()
                 try:
-                    port_lon = float(parts[0])
-                    port_lat = float(parts[1])
-
                     distance, travel_time = self._calculate_travel_time(
-                        data.lon0, data.lat0, port_lon, port_lat, time0
+                        data.lon0,
+                        data.lat0,
+                        parsed_port.lon,
+                        parsed_port.lat,
+                        time0,
                     )
 
-                    arrival_times[port_name] = format_arrival_time(
+                    arrival_times[parsed_port.name] = format_arrival_time(
                         travel_time, cast(str, data.dia)
                     )
-                    distances[port_name] = distance
+                    distances[parsed_port.name] = distance
                 except ValueError, IndexError:
                     continue
 
@@ -228,16 +238,7 @@ class TsunamiCalculator:
             raise RuntimeError("Tsunami travel time error") from e
 
     def _get_focal_mechanism(self, lon0: float, lat0: float) -> tuple[float, float]:
-        """
-        Find closest focal mechanism parameters
-
-        Args:
-            lon0: Longitude of epicenter
-            lat0: Latitude of epicenter
-
-        Returns:
-            Tuple of (azimuth, dip)
-        """
+        """Use the nearest Global CMT mechanism because inputs omit strike."""
         if self.mechanism_data is None:
             raise RuntimeError("Mechanism data not loaded")
 
@@ -246,36 +247,20 @@ class TsunamiCalculator:
             + (self.mechanism_data[:, 1] - lat0) ** 2
         )
         closest_idx = np.argmin(distances)
-        return self.mechanism_data[closest_idx, 2], 18.0  # azimuth, dip
+        # The MATLAB model fixes dip at 18 degrees after selecting strike.
+        return self.mechanism_data[closest_idx, 2], 18.0
 
     def _calculate_rectangle_parameters(
         self, L: float, W: float, lon0: float, lat0: float, azimuth: float, dip: float
     ) -> tuple[dict[str, float], list[dict[str, float]]]:
-        """
-        Calculate fault plane geometry (corner points and parameters)
-
-        Args:
-            L: Rupture length in km.
-            W: Rupture width in km.
-            lon0: Epicenter longitude.
-            lat0: Epicenter latitude.
-            azimuth: Fault strike in degrees.
-            dip: Dip angle in degrees (fixed at 18 in MATLAB).
-
-        Returns:
-            A tuple containing:
-            - A dictionary of rectangle parameters:
-              L1, W1, beta, alfa, h1, a1, b1, xo, yo.
-            - A list of dictionaries for the rectangle corners
-              (each with 'lon' and 'lat').
-        """
-        L1 = L * 1000  # Convert to meters
+        """Return the MATLAB-compatible fault-plane parameters and corners."""
+        L1 = L * 1000  # Meters.
         W1 = W * 1000 * np.cos(np.deg2rad(dip))
         beta = np.degrees(np.arctan(W1 / L1))
         alfa = azimuth - 270
         h1 = np.hypot(L1, W1)
 
-        # Calculate rectangle parameters
+        # Report keys preserve the legacy MATLAB parameter names.
         params = {
             "L1": L1,
             "W1": W1,
@@ -288,7 +273,7 @@ class TsunamiCalculator:
             "yo": lat0 - (0.5 * h1 * np.sin(np.deg2rad(alfa + beta)) / 1000) / 110,
         }
 
-        # Corner calculations
+        # Legacy geometry expresses fault-plane offsets in degree-space nautical miles.
         angles = -np.radians([(azimuth - 90), azimuth])
 
         r = np.array([L1, W1]) / NM_CONVERSION
@@ -310,57 +295,39 @@ class TsunamiCalculator:
     def _calculate_travel_time(
         self, lon0: float, lat0: float, port_lon: float, port_lat: float, time0: float
     ) -> tuple[float, float]:
-        """
-        Travel time calculation between two given points
-
-        Args:
-            lon0:       Source longitude
-            lat0:       Source latitude
-            port_lon:   Destination longitude
-            port_lat:   Destination latitude
-            time0:      Initial time
-
-        Returns:
-            Tuple of (distance, travel_time)
-        """
-        # Convert to spherical coordinates
         t1 = np.pi / 2 - np.radians(lat0)
         f1 = np.radians(lon0)
         t2 = np.pi / 2 - np.radians(port_lat)
         f2 = np.radians(port_lon)
 
-        # Great circle distance calculation (spherical law of cosines)
+        # Spherical law of cosines.
         cos_alpha = np.sin(t1) * np.sin(t2) * np.cos(f1 - f2) + np.cos(t1) * np.cos(t2)
         alpha = np.arccos(np.clip(cos_alpha, -1, 1))
         distance = EARTH_RADIUS * alpha
 
-        # Travel time estimation based on distance and location
+        # Far-field and outside-Peru paths use empirical speed shortcuts.
         if distance >= 750:
             travel_time = distance / 790 + 0.2
         elif not (-19 <= lat0 <= 0) and distance < 750:
             travel_time = distance / 700
         else:
-            # Detailed path analysis
             n_points = 100
             delta = np.degrees(alpha) / n_points
             vu = np.array([port_lon - lon0, port_lat - lat0]) / distance * 110
 
             indices = np.arange(n_points + 1)[:, None]
 
-            # Each row: P = P0 + (i * delta) * vu
-            path_points = (
-                np.array([lon0, lat0]) + indices * delta * vu
-            )  # shape (n+1, 2)
-            bath_points = path_points[:, [1, 0]]  # Swap to (lat, lon)
+            # Bathymetry interpolation expects (lat, lon), not path (lon, lat).
+            path_points = np.array([lon0, lat0]) + indices * delta * vu
+            bath_points = path_points[:, [1, 0]]
 
             if self.bathy_interpolator is None:
                 raise RuntimeError("Bathymetry interpolator not loaded")
 
-            # Bathymetry interpolation
             h = np.abs(self.bathy_interpolator(bath_points))
             v = np.sqrt(GRAVITY * h) * 3.6  # Velocity in km/h
 
-            # Simpson's rule integration
+            # Simpson's rule integration.
             delta_dist = (alpha / n_points) * EARTH_RADIUS
             y = 1 / v
             integral = (
@@ -371,7 +338,7 @@ class TsunamiCalculator:
 
             travel_time = 0.5 * integral
 
-            # Empirical adjustments to travel time
+            # Empirical corrections match the legacy arrival-time calibration.
             if travel_time > 3.0:
                 travel_time = distance / 733 + 0.25
             elif 1.4 < travel_time < 3.0:
@@ -380,7 +347,6 @@ class TsunamiCalculator:
         return distance, travel_time + time0
 
     def _write_hypo_dat(self, data: EarthquakeInput, output_dir: Path) -> None:
-        """Write earthquake parameters to hypo.dat"""
         try:
             output_dir.mkdir(parents=True, exist_ok=True)
             hypo_path = output_dir / "hypo.dat"

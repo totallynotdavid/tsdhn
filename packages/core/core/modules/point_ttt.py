@@ -29,16 +29,7 @@ def read_meca_spec(meca_file: Path) -> dict[str, object]:
 
 
 def generate_ttt_map(working_dir: Path) -> None:
-    """
-    Generate a TTT map using GMT via pygmt.
-    Validates input files, configures GMT settings, creates the plot,
-    and saves it as an EPS file.
-
-    Expected files:
-        - "cortado.i2" (grid file)
-        - "ttt.b" (contour file)
-        - "meca.dat" (meca file, located in the parent directory of working_dir)
-    """
+    """Generate the TTT SVG from legacy model outputs in the job workspace."""
     region = [120.0, 300.0, -65.0, 61.0]
     projection = "M16c"
     frame_parameters = ["WsNe", "xa20f10", "ya20f10"]
@@ -53,10 +44,9 @@ def generate_ttt_map(working_dir: Path) -> None:
     grd_file = working_dir / grd_filename
     tttb_file = working_dir / tttb_filename
     meca_file = working_dir.parent / "meca.dat"
-    output_file = working_dir / "ttt.eps"
+    output_file = working_dir / "ttt.svg"
 
     try:
-        # Validate input files
         for file in (grd_file, tttb_file, meca_file):
             if not file.exists():
                 raise FileNotFoundError(f"Required file {file} not found.")
@@ -117,17 +107,15 @@ def generate_ttt_map(working_dir: Path) -> None:
             convention="mt",
         )
 
-        # Save output as EPS
+        # Save output as SVG
         fig.savefig(str(output_file))
 
-        # Verify output creation
         if not output_file.exists():
-            raise RuntimeError("Failed to generate TTT EPS file.")
+            raise RuntimeError("Failed to generate TTT SVG file.")
 
         logger.info("TTT map generated successfully.")
 
     except Exception as e:
-        # Cleanup on failure if output file exists
         if output_file.exists():
             output_file.unlink()
         logger.exception("TTT map generation failed: %s", e)

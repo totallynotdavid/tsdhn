@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from api.utils.geo import (
+from core.utils.geo import (
     calculate_distance_to_coast,
     determine_epicenter_location,
     determine_tsunami_warning,
@@ -21,7 +21,7 @@ def test_format_arrival_time() -> None:
     assert isinstance(formatted_time, str)
     assert ":" in formatted_time
 
-    # Test day rollover
+    # Arrival formatting rolls into the next day after 24 hours.
     rollover_time = format_arrival_time(25.5, "15")
     assert rollover_time.split()[0].startswith("01")
 

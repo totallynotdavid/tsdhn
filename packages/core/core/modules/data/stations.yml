@@ -1,5 +1,4 @@
 stations:
-  # Active stations
   - lon: 278.7173
     lat: -4.5751
     code: TALA
@@ -18,8 +17,6 @@ stations:
     name: Matarani
     active: true
     annotation_offset: 0.1c
-
-  # Inactive stations
   - lon: 281.0182
     lat: -8.227931
     code: Salav

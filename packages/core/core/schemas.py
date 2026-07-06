@@ -57,22 +57,12 @@ class TsunamiTravelResponse(BaseModel):
 
 
 @dataclass(frozen=True)
-class CompilerConfig:
-    source: str
-    output: str
-    compiler: str = "gfortran"
-    flags: list[str] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
 class ProcessingStep:
     name: str
     command: list[str] | None = None
     python_callable: Callable[[Path], Path | str | None] | None = None
+    system_executables: tuple[str, ...] = ()
     file_checks: list[tuple[str, str]] = field(default_factory=list)
-    compiler_config: CompilerConfig | None = None
-    pre_execute_checks: list[tuple[str, str]] = field(default_factory=list)
-    extra_executables: list[str] = field(default_factory=list)
     working_dir: str | None = None
 
     def __post_init__(self) -> None:
