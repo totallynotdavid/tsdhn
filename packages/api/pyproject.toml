@@ -23,7 +23,7 @@ tsdhn-api = "api.main:start_app"
 tsdhn-worker = "api.worker:main"
 
 [build-system]
-requires = ["uv_build==0.11.25"]
+requires = ["uv_build==0.11.26"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
