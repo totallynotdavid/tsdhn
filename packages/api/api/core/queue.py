@@ -1,22 +1,24 @@
 import logging
+import os
 import shutil
 import uuid
+from pathlib import Path
 from typing import Any
 
 from redis import Redis
 from rq import Queue, get_current_job
 from rq.job import Job
 
-from api.core.calculator import TsunamiCalculator
-from api.core.config import MASTER_PIPELINE, MODEL_DIR, REPO_ROOT
-from api.core.executables import ensure_all
-from api.models.schemas import EarthquakeInput, JobStatus
-from api.utils.file_utils import sanitize_for_log, setup_workspace
-from api.utils.processing import process_step
+from core.config import MASTER_PIPELINE
+from core.schemas import EarthquakeInput, JobStatus
+from core.simulation import run_simulation
+from core.utils.file_utils import sanitize_for_log
 
 __all__ = ["JobStatus", "TSDHNQueue", "execute_pipeline", "tsdhn_queue"]
 
 logger = logging.getLogger(__name__)
+
+JOBS_DIR: Path = Path(os.environ.get("TSDHN_JOBS_DIR", "jobs")).resolve()
 
 
 class TSDHNQueue:
@@ -59,19 +61,21 @@ class TSDHNQueue:
                 "finished": JobStatus.COMPLETED.value,
                 "failed": JobStatus.FAILED.value,
             }
+            status = status_map.get(job.get_status(), JobStatus.QUEUED.value)
 
             return {
-                "status": status_map.get(job.get_status(), JobStatus.QUEUED.value),
+                "status": status,
                 "calculation": job.meta.get("calculation"),
                 "travel_times": job.meta.get("travel_times"),
                 "details": job.meta.get("details"),
+                "step": job.meta.get("step"),
+                "step_index": job.meta.get("step_index"),
+                "total_steps": job.meta.get("total_steps"),
                 "error": job.meta.get("error"),
                 "created_at": job.created_at.isoformat() if job.created_at else None,
                 "started_at": job.started_at.isoformat() if job.started_at else None,
                 "ended_at": job.ended_at.isoformat() if job.ended_at else None,
-                "download_url": f"/job-result/{job_id}"
-                if job.meta.get("status") == JobStatus.COMPLETED.value
-                else None,
+                "report_available": status == JobStatus.COMPLETED.value,
             }
         except Exception as e:
             logger.error(f"Invalid job ID {sanitize_for_log(job_id)}: {e!s}")
@@ -95,73 +99,43 @@ class TSDHNQueue:
 def execute_pipeline(
     data_dict: dict[str, Any], skip_steps: list[str]
 ) -> dict[str, str]:
-    """Main pipeline executor"""
     job = get_current_job()
     if job is None:
         raise RuntimeError("No current job in worker context")
     job_id = job.id
-    work_dir = REPO_ROOT / "jobs" / job_id
+    work_dir = JOBS_DIR / job_id
     data = EarthquakeInput(**data_dict)
-    calculator = TsunamiCalculator()
+
+    def on_progress(message: str, details: dict[str, Any]) -> None:
+        job.meta.update({"status": JobStatus.RUNNING.value, "details": message})
+        job.meta.update(details)
+        job.save_meta()  # type: ignore[no-untyped-call]
 
     try:
-        setup_workspace(MODEL_DIR, work_dir)
-
-        def update_meta(details: str, **kwargs: Any) -> None:
-            job.meta.update({"details": details, **kwargs})
-            job.save_meta()  # type: ignore[no-untyped-call]
-
-        # Phase 1: Initial calculations
-        update_meta("Running earthquake calculations")
-        calc_result = calculator.calculate_earthquake_parameters(data, work_dir)
-        update_meta(
-            "Earthquake calculations complete",
-            calculation=calc_result.dict(),
-            status=JobStatus.RUNNING.value,
+        run_simulation(data, work_dir, skip_steps=skip_steps, on_progress=on_progress)
+        job.meta.update(
+            {
+                "status": JobStatus.COMPLETED.value,
+                "details": "Simulation completed successfully",
+            }
         )
-
-        # Phase 2: Tsunami travel times
-        update_meta("Calculating tsunami travel times")
-        tsunami_result = calculator.calculate_tsunami_travel_times(data)
-        update_meta(
-            "Tsunami calculations complete",
-            travel_times=tsunami_result.dict(),
-            status=JobStatus.RUNNING.value,
-        )
-
-        # Phase 3: Main simulation pipeline
-        ensure_all()
-        for step in MASTER_PIPELINE:
-            if step.name in skip_steps:
-                logger.info(f"Skipping step: {step.name}")
-                continue
-
-            update_meta(f"Processing {step.name}")
-            step_dir = work_dir / step.working_dir if step.working_dir else work_dir
-            step_dir.mkdir(parents=True, exist_ok=True)
-            process_step(step, step_dir)
-
-        update_meta(
-            "Simulation completed successfully",
-            status=JobStatus.COMPLETED.value,
-            download_url=f"/job-result/{job_id}",
-        )
+        job.save_meta()  # type: ignore[no-untyped-call]
         return {"status": "completed"}
-
     except Exception as e:
         logger.exception(f"Pipeline failed for job {job_id}")
         if work_dir.exists():
             shutil.rmtree(work_dir, ignore_errors=True)
-        if job is not None:
-            job.meta.update(
-                {
-                    "status": JobStatus.FAILED.value,
-                    "error": f"{type(e).__name__}: {e!s}",
-                    "details": "Pipeline failed - check error logs",
-                }
-            )
-            job.save_meta()  # type: ignore[no-untyped-call]
+        job.meta.update(
+            {
+                "status": JobStatus.FAILED.value,
+                "error": f"{type(e).__name__}: {e!s}",
+                "details": "Pipeline failed - check error logs",
+            }
+        )
+        job.save_meta()  # type: ignore[no-untyped-call]
         raise
 
 
-tsdhn_queue = TSDHNQueue(Redis(host="localhost", port=6379, db=0))
+tsdhn_queue = TSDHNQueue(
+    Redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
+)
