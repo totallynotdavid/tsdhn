@@ -1,11 +1,10 @@
 import datetime
-import shutil
 import subprocess
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
-from string import Template
 
-from api.core.executables import resolve
+from core.executables import resolve
 
 MONTH_MAP = {
     1: "Ene",
@@ -53,35 +52,32 @@ class DatetimeInfo:
     month_abbr: str
 
 
-class LatexTemplate(Template):
-    delimiter = "@"
-
-
 def generate_reports_wrapper(working_dir: Path) -> None:
     generate_reports(working_dir)
 
-    for _ in range(2):  # Compile twice to resolve references
-        subprocess.run(
-            [str(resolve("pdflatex")), "-interaction=nonstopmode", "reporte.tex"],
-            cwd=working_dir,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+    subprocess.run(
+        [
+            str(resolve("typst")),
+            "compile",
+            "--root",
+            str(working_dir),
+            str(working_dir / "reporte.typ"),
+            str(working_dir / "reporte.pdf"),
+        ],
+        cwd=working_dir,
+        check=True,
+    )
 
-    for f in ["reporte.aux", "reporte.out", "reporte.log", "reporte.tex"]:
-        (working_dir / f).unlink(missing_ok=True)
+    (working_dir / "reporte.typ").unlink(missing_ok=True)
 
 
 def generate_reports(working_dir: Path) -> None:
-    """Main entry point for report generation in the job workspace"""
     coords = read_meca_dat(working_dir)
     ttt_data = read_ttt_max_dat(working_dir)
     datetime_info = get_current_datetime_info()
 
-    context = build_template_context(coords, ttt_data)
-    copy_template(working_dir)
-    write_reporte_tex(context, working_dir)
+    context = build_template_context(coords, ttt_data, datetime_info)
+    write_reporte_typ(context, working_dir)
     write_salida_txt(coords, ttt_data, datetime_info, working_dir)
 
 
@@ -154,11 +150,17 @@ def get_current_datetime_info() -> DatetimeInfo:
 
 
 def build_template_context(
-    coords: EarthquakeData, ttt_data: TsunamiTravelData
+    coords: EarthquakeData,
+    ttt_data: TsunamiTravelData,
+    datetime_info: DatetimeInfo,
 ) -> dict[str, str]:
     return {
         "title": "REPORTE: ESTIMACIÓN DE PARÁMETROS DE TSUNAMI DE ORIGEN LEJANO",
         "author": "Cesar Jimenez",
+        "date": (
+            f"{datetime_info.year_month_day[2]} {datetime_info.month_abbr} "
+            f"{datetime_info.year_month_day[0]}"
+        ),
         "lat": f"{coords.latitude:.2f}",
         "lon": f"{coords.longitude:.2f}",
         "depth": f"{coords.depth:.1f}",
@@ -168,29 +170,27 @@ def build_template_context(
         "rake": f"{coords.rake:.1f}",
         "station1_name": "Talara",
         "station1_time": f"{ttt_data.hours[1]}:{ttt_data.minutes[1]:02d}",
-        "station1_max": f"{ttt_data.max_heights[1]:6.2f}",
+        "station1_max": f"{ttt_data.max_heights[1]:.2f}",
         "station2_name": "Callao",
         "station2_time": f"{ttt_data.hours[8]}:{ttt_data.minutes[8]:02d}",
-        "station2_max": f"{ttt_data.max_heights[8]:6.2f}",
+        "station2_max": f"{ttt_data.max_heights[8]:.2f}",
         "station3_name": "Matarani",
         "station3_time": f"{ttt_data.hours[14]}:{ttt_data.minutes[14]:02d}",
-        "station3_max": f"{ttt_data.max_heights[14]:6.2f}",
+        "station3_max": f"{ttt_data.max_heights[14]:.2f}",
     }
 
 
-def copy_template(working_dir: Path) -> None:
-    """Copy LaTeX template from package resources to job directory"""
-    template_path = Path(__file__).parent / "templates" / "reporte_template.tex"
-    dest_path = working_dir / "reporte_template.tex"
-    shutil.copy(template_path, dest_path)
+def write_reporte_typ(context: dict[str, str], working_dir: Path) -> None:
+    template = (
+        files("core.modules.templates")
+        .joinpath("reporte_template.typ")
+        .read_text(encoding="utf-8")
+    )
+    rendered = template
+    for key, value in context.items():
+        rendered = rendered.replace(f"%%{key}%%", value)
 
-
-def write_reporte_tex(context: dict[str, str], working_dir: Path) -> None:
-    template_path = working_dir / "reporte_template.tex"
-    out_path = working_dir / "reporte.tex"
-
-    template = template_path.read_text(encoding="utf-8")
-    rendered = LatexTemplate(template).substitute(context)
+    out_path = working_dir / "reporte.typ"
     out_path.write_text(rendered, encoding="utf-8")
 
 

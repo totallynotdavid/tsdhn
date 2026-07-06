@@ -3,7 +3,6 @@ from typing import Any
 
 import numpy as np
 
-# Constants
 EARTH_RADIUS = 6371.0  # in kilometers
 DEG_TO_KM = (EARTH_RADIUS * np.pi) / 180.0
 
@@ -11,15 +10,6 @@ DEG_TO_KM = (EARTH_RADIUS * np.pi) / 180.0
 def calculate_distance_to_coast(
     coast_points: np.ndarray, lon0: float, lat0: float
 ) -> float:
-    """
-    Compute the distance from the epicenter (lon0, lat0) to the closest point
-    on the coast. The coast_points array is assumed to have the format:
-    [ [lon, lat], [lon, lat], ... ].
-
-    The minimal angular distance (in degrees) is converted to kilometers using the
-    Earth's radius.
-    """
-    # Compute Euclidean distance in degree space using np.hypot
     distances = np.hypot(coast_points[:, 0] - lon0, coast_points[:, 1] - lat0)
     min_deg: np.floating[Any] = distances.min()
     return float(min_deg) * DEG_TO_KM
