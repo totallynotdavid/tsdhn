@@ -48,6 +48,8 @@ jobs:
     test:
         name: Test (py${{ matrix.python-version }})
         runs-on: ubuntu-latest
+        env:
+            TSDHN_MODEL_DIR: ${{ github.workspace }}/model
         strategy:
             fail-fast: false
             matrix:
@@ -95,8 +97,8 @@ jobs:
             contents: read
             statuses: write
         env:
-            # Only attempt the badge update when the token is configured.
-            GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+            GIST_TOKEN: ${{ secrets.GIST_TOKEN }} # used for badge update
+            TSDHN_MODEL_DIR: ${{ github.workspace }}/model
         steps:
             - uses: actions/checkout@v7
 
