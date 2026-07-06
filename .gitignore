@@ -1,26 +1,16 @@
-# Folders
 /jobs/
-# devcontainer artifacts
-/.dotnet/
-/.cache/
-/.vscode-remote/
 
-# uv
 .venv/
-uv.lock.local
+uv.lock
 
-# Files
-configuracion_*.json
-informe*.pdf
 hypo.dat
-requirements.lock.txt
 
-# Extensions
 *.npy
 *.log
 
-# Generated Folders
-.coverage/
-*/ruff_cache/*
+.coverage
+coverage.json
 **/__pycache__/*
 .ruff_cache/
+
+node_modules/
