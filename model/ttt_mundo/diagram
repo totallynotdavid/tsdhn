@@ -19,34 +19,34 @@ gmt grdimage $i2file=bs -J$SIZE -R$REGION -C$cptfile -K -P -X3.0c -Y5.0c -V \
 gmt pscoast -J$SIZE -R$REGION -B$AXIS -N1 -G150 -W1,30 -Dh -K -O -V \
 -Lf-90.0/-28.0/-11.0/400+lkm >> $psfile
 
-# Aftershocks
+# Aftershock locations.
 awk '{print $3, $2}' replicas.txt | gmt psxy -R$REGION -J$SIZE -Sc0.18 -G255/0/0 -W0.5 -P -O -K >> $psfile
 
-# Mainshock June 2001
+# June 2001 mainshock candidate.
 #gmt psxy -J$SIZE -R$REGION -Sa0.6c -G0/0/139 -W1/255 -P -K -O -V \
 #<<END >> $psfile
 #-73.64 -16.26
 #END
 
-# Station aric (28 min)
+# Arica contour: 28 min.
 set ttt1grd = aric.b
 gmt grdcontour $ttt1grd=bf -J$SIZE -R$REGION -A28f10 -Gd5c -Wa1,30,- -L1/28 -K -O -V >> $psfile
 
-# Station 1 (126 min)
+# DART 32412 contour: 126 min.
 #set ttt1grd = dart32412.b
 #gmt grdcontour $ttt1grd=bf -J$SIZE -R$REGION -A126f10 -Gd5c -Wa1,30,- -L1/126 -K -O -V >> $psfile
 
-# Station 2 (18 min)
+# DART 32401 contour: 18 min.
 set ttt2grd = dart32401.b
 gmt grdcontour $ttt2grd=bf -J$SIZE -R$REGION -A18f10 -Gd5c \
 -Wa1,30,- -L1/18 -K -O -V >> $psfile
 
-# Station 3 (58 min)
+# DART 32402 contour: 58 min.
 set ttt3grd = dart32402.b
 gmt grdcontour $ttt3grd=bf -J$SIZE -R$REGION -A58f10 -Gd5c \
 -Wa1,30,- -L1/58 -K -O -V >> $psfile
 
-# Station 4 (216 min)
+# DART 32413 contour: 216 min.
 set ttt3grd = dart32413.b
 gmt grdcontour $ttt3grd=bf -J$SIZE -R$REGION -A216f10 -Gd5c \
 -Wa1,30,- -L1/216 -K -O -V >> $psfile
