@@ -1,4 +1,4 @@
-# FastAPI and RQ run in this image for the self-hosted backend.
+# FastAPI and the Procrastinate worker run in this image for the self-hosted backend.
 #
 # Builds on the TSDHN toolchain base, which provides the scientific runtime:
 # GMT, Intel Fortran, Typst, and ttt_client. The base ships Python 3.12 for
@@ -39,7 +39,11 @@ RUN mkdir -p /app/tools \
 
 ENV APP_HOST=0.0.0.0 \
     APP_PORT=8000 \
-    REDIS_URL=redis://redis:6379/0 \
+    COMPUTE_DATABASE_URL=postgresql://tsdhn:tsdhn@postgres:5432/tsdhn_compute \
+    MINIO_ENDPOINT=minio:9000 \
+    MINIO_ACCESS_KEY=minioadmin \
+    MINIO_SECRET_KEY=minioadmin \
+    MINIO_BUCKET=tsdhn-results \
     TSDHN_MODEL_DIR=/app/model \
     TSDHN_TOOLS_DIR=/app/tools \
     TSDHN_JOBS_DIR=/app/jobs

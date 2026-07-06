@@ -1,21 +1,43 @@
 # Self-hosted backend stack for TSDHN.
 #
-#   docker compose up -d            # redis + libsql + api + worker
+#   docker compose up -d            # postgres + minio + libsql + api + worker
 #   docker compose --profile web up # also build & run the SvelteKit app (adapter-node)
 #
 # The backend is self-hosted because it needs the Fortran/GMT/Typst toolchain.
 # Edge web deployments should point BACKEND_URL and DATABASE_URL at these services.
 
 services:
-  redis:
-    image: redis:7-alpine
+  postgres:
+    image: postgres:18-alpine
     restart: unless-stopped
+    environment:
+      POSTGRES_DB: tsdhn_compute
+      POSTGRES_USER: tsdhn
+      POSTGRES_PASSWORD: tsdhn
     volumes:
-      - redis-data:/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U tsdhn -d tsdhn_compute"]
       interval: 10s
       timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2025-10-15T17-29-55Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   libsql:
@@ -28,22 +50,47 @@ services:
     volumes:
       - libsql-data:/var/lib/sqld
 
+  compute-migrate:
+    build:
+      context: .
+      dockerfile: deploy/api.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      COMPUTE_DATABASE_URL: postgresql://tsdhn:tsdhn@postgres:5432/tsdhn_compute
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-tsdhn-results}
+    command:
+      [
+        "sh",
+        "-lc",
+        "uv run --no-dev procrastinate --app=api.core.procrastinate_app.app schema --apply && uv run --no-dev tsdhn-compute-migrate",
+      ]
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
     restart: unless-stopped
     depends_on:
-      redis:
+      compute-migrate:
+        condition: service_completed_successfully
+      minio:
         condition: service_healthy
     environment:
-      REDIS_URL: redis://redis:6379/0
+      COMPUTE_DATABASE_URL: postgresql://tsdhn:tsdhn@postgres:5432/tsdhn_compute
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-tsdhn-results}
       BACKEND_SERVICE_TOKEN: ${BACKEND_SERVICE_TOKEN:?set BACKEND_SERVICE_TOKEN in .env}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
     ports:
       - "8000:8000"
-    volumes:
-      - jobs-data:/app/jobs
 
   worker:
     build:
@@ -51,10 +98,16 @@ services:
       dockerfile: deploy/api.Dockerfile
     restart: unless-stopped
     depends_on:
-      redis:
+      compute-migrate:
+        condition: service_completed_successfully
+      minio:
         condition: service_healthy
     environment:
-      REDIS_URL: redis://redis:6379/0
+      COMPUTE_DATABASE_URL: postgresql://tsdhn:tsdhn@postgres:5432/tsdhn_compute
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-tsdhn-results}
       TSDHN_MODEL_DIR: /app/model
       TSDHN_TOOLS_DIR: /app/tools
       TSDHN_JOBS_DIR: /app/jobs
@@ -81,6 +134,7 @@ services:
       - "3000:3000"
 
 volumes:
-  redis-data:
+  postgres-data:
+  minio-data:
   libsql-data:
   jobs-data:
