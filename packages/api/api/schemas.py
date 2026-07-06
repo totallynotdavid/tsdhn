@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 from core.schemas import CalculationResponse, EarthquakeInput, TsunamiTravelResponse
@@ -5,9 +7,9 @@ from core.schemas import CalculationResponse, EarthquakeInput, TsunamiTravelResp
 __all__ = [
     "CalculationPreview",
     "HealthStatus",
-    "SimulationCreated",
-    "SimulationRequest",
-    "SimulationStatus",
+    "JobCreated",
+    "JobRequest",
+    "JobStatusResponse",
     "VersionInfo",
 ]
 
@@ -19,17 +21,23 @@ class CalculationPreview(BaseModel):
     travel_times: TsunamiTravelResponse
 
 
-class SimulationRequest(BaseModel):
+class JobRequest(BaseModel):
+    app_job_id: UUID
     input: EarthquakeInput
     skip_steps: list[str] = Field(default_factory=list)
 
 
-class SimulationCreated(BaseModel):
-    id: str
+class JobCreated(BaseModel):
+    app_job_id: str
+    compute_job_id: str
+    status: str
+    result_bucket: str | None = None
+    result_key: str | None = None
 
 
-class SimulationStatus(BaseModel):
-    id: str
+class JobStatusResponse(BaseModel):
+    app_job_id: str
+    compute_job_id: str
     status: str
     details: str | None = None
     step: str | None = None
@@ -37,17 +45,20 @@ class SimulationStatus(BaseModel):
     total_steps: int | None = None
     calculation: CalculationResponse | None = None
     travel_times: TsunamiTravelResponse | None = None
+    result_bucket: str | None = None
+    result_key: str | None = None
     error: str | None = None
     created_at: str | None = None
     started_at: str | None = None
-    ended_at: str | None = None
+    finished_at: str | None = None
     report_available: bool = False
 
 
 class HealthStatus(BaseModel):
     status: str
     timestamp: str
-    redis_connected: bool
+    database_connected: bool
+    storage_connected: bool
 
 
 class VersionInfo(BaseModel):

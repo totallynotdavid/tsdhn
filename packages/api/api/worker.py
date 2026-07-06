@@ -1,8 +1,7 @@
 import logging
-import os
 
-from redis import Redis
-from rq import Queue, Worker
+from api.core.procrastinate_app import app
+from api.core.settings import PROCRASTINATE_QUEUE
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -10,10 +9,11 @@ logging.basicConfig(
 
 
 def main() -> None:
-    redis = Redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
-    queue = Queue("tsdhn_queue", connection=redis)
-    worker = Worker([queue], connection=redis)
-    worker.work(with_scheduler=True)
+    app.open()
+    try:
+        app.run_worker(queues=[PROCRASTINATE_QUEUE])
+    finally:
+        app.close()
 
 
 if __name__ == "__main__":
