@@ -1,8 +1,6 @@
 {
-    "name": "Orchestrator-TSDHN Dev",
-
-    "image": "ghcr.io/totallynotdavid/seismic-toolkit-dev:main",
-
+    "name": "TSDHN",
+    "image": "ghcr.io/totallynotdavid/tsdhn-dev:main",
     "workspaceFolder": "/app",
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
 
@@ -17,12 +15,10 @@
     "forwardPorts": [8000],
     "portsAttributes": {
         "8000": {
-            "label": "Orchestrator-TSDHN App",
+            "label": "TSDHN API",
             "onAutoForward": "notify"
         }
     },
-
-    "postStartCommand": "sudo ln -s /lib/x86_64-linux-gnu/libgmt.so.6 /lib/x86_64-linux-gnu/libgmt.so",
 
     "customizations": {
         "vscode": {
@@ -30,14 +26,7 @@
                 "python.defaultInterpreterPath": "/opt/venv/bin/python",
                 "python.linting.pylintEnabled": true,
                 "python.linting.enabled": true,
-                "python.formatting.provider": "black",
-                "python.formatting.blackPath": "/opt/venv/bin/black",
                 "editor.formatOnSave": true,
-                "[python]": {
-                    "editor.codeActionsOnSave": {
-                        "source.organizeImports": "always"
-                    }
-                },
                 "terminal.integrated.defaultProfile.linux": "bash",
                 "terminal.integrated.profiles.linux": {
                     "bash": {
@@ -48,12 +37,7 @@
             },
 
             "extensions": [
-                "ms-python.python",
-                "ms-python.vscode-pylint",
-                "ms-python.black-formatter",
-                "redhat.vscode-yaml",
-                "tamasfe.even-better-toml",
-                "GitHub.copilot"
+                "ms-python.python"
             ]
         }
     }

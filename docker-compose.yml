@@ -1,0 +1,86 @@
+# Self-hosted backend stack for TSDHN.
+#
+#   docker compose up -d            # redis + libsql + api + worker
+#   docker compose --profile web up # also build & run the SvelteKit app (adapter-node)
+#
+# The backend is self-hosted because it needs the Fortran/GMT/Typst toolchain.
+# Edge web deployments should point BACKEND_URL and DATABASE_URL at these services.
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  libsql:
+    image: ghcr.io/tursodatabase/libsql-server:v0.24.32
+    restart: unless-stopped
+    environment:
+      SQLD_NODE: primary
+    ports:
+      - "8080:8080" # libSQL HTTP (Drizzle / @libsql/client connect here)
+    volumes:
+      - libsql-data:/var/lib/sqld
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/api.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      BACKEND_SERVICE_TOKEN: ${BACKEND_SERVICE_TOKEN:?set BACKEND_SERVICE_TOKEN in .env}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - jobs-data:/app/jobs
+
+  worker:
+    build:
+      context: .
+      dockerfile: deploy/api.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      TSDHN_MODEL_DIR: /app/model
+      TSDHN_TOOLS_DIR: /app/tools
+      TSDHN_JOBS_DIR: /app/jobs
+    command: ["uv", "run", "--no-dev", "tsdhn-worker"]
+    volumes:
+      - jobs-data:/app/jobs
+
+  web:
+    profiles: ["web"]
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+      - libsql
+    environment:
+      BACKEND_URL: http://api:8000
+      BACKEND_SERVICE_TOKEN: ${BACKEND_SERVICE_TOKEN:?set BACKEND_SERVICE_TOKEN in .env}
+      DATABASE_URL: http://libsql:8080
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+
+volumes:
+  redis-data:
+  libsql-data:
+  jobs-data:
