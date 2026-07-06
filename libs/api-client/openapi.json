@@ -50,7 +50,7 @@
     "/api/v1/calculations": {
       "post": {
         "tags": [
-          "simulations"
+          "jobs"
         ],
         "summary": "Create Calculation",
         "operationId": "create_calculation_api_v1_calculations_post",
@@ -106,13 +106,13 @@
         }
       }
     },
-    "/api/v1/simulations": {
+    "/api/v1/jobs": {
       "post": {
         "tags": [
-          "simulations"
+          "jobs"
         ],
-        "summary": "Create Simulation",
-        "operationId": "create_simulation_api_v1_simulations_post",
+        "summary": "Create Job",
+        "operationId": "create_job_api_v1_jobs_post",
         "parameters": [
           {
             "name": "authorization",
@@ -136,7 +136,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SimulationRequest"
+                "$ref": "#/components/schemas/JobRequest"
               }
             }
           }
@@ -147,7 +147,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SimulationCreated"
+                  "$ref": "#/components/schemas/JobCreated"
                 }
               }
             }
@@ -165,21 +165,21 @@
         }
       }
     },
-    "/api/v1/simulations/{sim_id}": {
+    "/api/v1/jobs/{app_job_id}": {
       "get": {
         "tags": [
-          "simulations"
+          "jobs"
         ],
-        "summary": "Get Simulation",
-        "operationId": "get_simulation_api_v1_simulations__sim_id__get",
+        "summary": "Get Job",
+        "operationId": "get_job_api_v1_jobs__app_job_id__get",
         "parameters": [
           {
-            "name": "sim_id",
+            "name": "app_job_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Sim Id"
+              "title": "App Job Id"
             }
           },
           {
@@ -205,7 +205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SimulationStatus"
+                  "$ref": "#/components/schemas/JobStatusResponse"
                 }
               }
             }
@@ -223,21 +223,21 @@
         }
       }
     },
-    "/api/v1/simulations/{sim_id}/events": {
+    "/api/v1/jobs/{app_job_id}/events": {
       "get": {
         "tags": [
-          "simulations"
+          "jobs"
         ],
-        "summary": "Simulation Events",
-        "operationId": "simulation_events_api_v1_simulations__sim_id__events_get",
+        "summary": "Job Events",
+        "operationId": "job_events_api_v1_jobs__app_job_id__events_get",
         "parameters": [
           {
-            "name": "sim_id",
+            "name": "app_job_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Sim Id"
+              "title": "App Job Id"
             }
           },
           {
@@ -279,21 +279,21 @@
         }
       }
     },
-    "/api/v1/simulations/{sim_id}/report": {
+    "/api/v1/jobs/{app_job_id}/report": {
       "get": {
         "tags": [
-          "simulations"
+          "jobs"
         ],
-        "summary": "Get Report",
-        "operationId": "get_report_api_v1_simulations__sim_id__report_get",
+        "summary": "Get Job Report",
+        "operationId": "get_job_report_api_v1_jobs__app_job_id__report_get",
         "parameters": [
           {
-            "name": "sim_id",
+            "name": "app_job_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Sim Id"
+              "title": "App Job Id"
             }
           },
           {
@@ -314,7 +314,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "307": {
             "description": "Successful Response"
           },
           "422": {
@@ -497,34 +497,76 @@
             "type": "string",
             "title": "Timestamp"
           },
-          "redis_connected": {
+          "database_connected": {
             "type": "boolean",
-            "title": "Redis Connected"
+            "title": "Database Connected"
+          },
+          "storage_connected": {
+            "type": "boolean",
+            "title": "Storage Connected"
           }
         },
         "type": "object",
         "required": [
           "status",
           "timestamp",
-          "redis_connected"
+          "database_connected",
+          "storage_connected"
         ],
         "title": "HealthStatus"
       },
-      "SimulationCreated": {
+      "JobCreated": {
         "properties": {
-          "id": {
+          "app_job_id": {
             "type": "string",
-            "title": "Id"
+            "title": "App Job Id"
+          },
+          "compute_job_id": {
+            "type": "string",
+            "title": "Compute Job Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "result_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Bucket"
+          },
+          "result_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Key"
           }
         },
         "type": "object",
         "required": [
-          "id"
+          "app_job_id",
+          "compute_job_id",
+          "status"
         ],
-        "title": "SimulationCreated"
+        "title": "JobCreated"
       },
-      "SimulationRequest": {
+      "JobRequest": {
         "properties": {
+          "app_job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "App Job Id"
+          },
           "input": {
             "$ref": "#/components/schemas/EarthquakeInput"
           },
@@ -538,15 +580,20 @@
         },
         "type": "object",
         "required": [
+          "app_job_id",
           "input"
         ],
-        "title": "SimulationRequest"
+        "title": "JobRequest"
       },
-      "SimulationStatus": {
+      "JobStatusResponse": {
         "properties": {
-          "id": {
+          "app_job_id": {
             "type": "string",
-            "title": "Id"
+            "title": "App Job Id"
+          },
+          "compute_job_id": {
+            "type": "string",
+            "title": "Compute Job Id"
           },
           "status": {
             "type": "string",
@@ -616,6 +663,28 @@
               }
             ]
           },
+          "result_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Bucket"
+          },
+          "result_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Key"
+          },
           "error": {
             "anyOf": [
               {
@@ -649,7 +718,7 @@
             ],
             "title": "Started At"
           },
-          "ended_at": {
+          "finished_at": {
             "anyOf": [
               {
                 "type": "string"
@@ -658,7 +727,7 @@
                 "type": "null"
               }
             ],
-            "title": "Ended At"
+            "title": "Finished At"
           },
           "report_available": {
             "type": "boolean",
@@ -668,10 +737,11 @@
         },
         "type": "object",
         "required": [
-          "id",
+          "app_job_id",
+          "compute_job_id",
           "status"
         ],
-        "title": "SimulationStatus"
+        "title": "JobStatusResponse"
       },
       "TsunamiTravelResponse": {
         "properties": {

@@ -6,27 +6,27 @@ probes); `router` carries the service-token dependency on every data route.
 import json
 import logging
 import tempfile
+import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 
 import anyio
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 
 from api import __version__
-from api.core.queue import JobStatus, tsdhn_queue
+from api.core.jobs import JobStatus, compute_jobs
 from api.schemas import (
     CalculationPreview,
     HealthStatus,
-    SimulationCreated,
-    SimulationRequest,
-    SimulationStatus,
+    JobCreated,
+    JobRequest,
+    JobStatusResponse,
     VersionInfo,
 )
 from api.security import require_service_token
-from api.utils.job_validators import secure_path_construction, validate_job_id
 from core.calculator import TsunamiCalculator
 from core.schemas import EarthquakeInput
 
@@ -45,16 +45,23 @@ ops_router = APIRouter(prefix="/api/v1", tags=["ops"])
 router = APIRouter(
     prefix="/api/v1",
     dependencies=[Depends(require_service_token)],
-    tags=["simulations"],
+    tags=["jobs"],
 )
 
 
 @ops_router.get("/health", response_model=HealthStatus)
 async def health() -> HealthStatus:
+    database_connected = await anyio.to_thread.run_sync(
+        compute_jobs.is_database_connected
+    )
+    storage_connected = await anyio.to_thread.run_sync(
+        compute_jobs.is_storage_connected
+    )
     return HealthStatus(
-        status="healthy",
+        status="healthy" if database_connected and storage_connected else "degraded",
         timestamp=datetime.now().isoformat(),
-        redis_connected=tsdhn_queue.is_redis_connected(),
+        database_connected=database_connected,
+        storage_connected=storage_connected,
     )
 
 
@@ -78,13 +85,21 @@ async def create_calculation(data: EarthquakeInput) -> CalculationPreview:
 
 
 @router.post(
-    "/simulations",
-    response_model=SimulationCreated,
+    "/jobs",
+    response_model=JobCreated,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_simulation(req: SimulationRequest) -> SimulationCreated:
+async def create_job(req: JobRequest) -> JobCreated:
+    app_job_id = str(req.app_job_id)
     try:
-        job_id = tsdhn_queue.enqueue_job(data=req.input, skip_steps=req.skip_steps)
+        job_status = await anyio.to_thread.run_sync(
+            partial(
+                compute_jobs.create_or_get_job,
+                data=req.input,
+                skip_steps=req.skip_steps,
+                external_id=app_job_id,
+            )
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
@@ -96,35 +111,32 @@ async def create_simulation(req: SimulationRequest) -> SimulationCreated:
             detail="Failed to start simulation pipeline",
         ) from e
 
-    if job_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to start simulation pipeline",
-        )
-    return SimulationCreated(id=job_id)
+    return JobCreated(app_job_id=app_job_id, **job_status)
 
 
-@router.get("/simulations/{sim_id}", response_model=SimulationStatus)
-async def get_simulation(sim_id: str) -> SimulationStatus:
+@router.get("/jobs/{app_job_id}", response_model=JobStatusResponse)
+async def get_job(app_job_id: str) -> JobStatusResponse:
     try:
-        job_status = tsdhn_queue.get_job_status(sim_id)
+        job_status = await anyio.to_thread.run_sync(
+            compute_jobs.get_job_status, app_job_id
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    return SimulationStatus(id=sim_id, **job_status)
+    return JobStatusResponse(app_job_id=app_job_id, **job_status)
 
 
-@router.get("/simulations/{sim_id}/events")
-async def simulation_events(sim_id: str) -> StreamingResponse:
+@router.get("/jobs/{app_job_id}/events")
+async def job_events(app_job_id: str) -> StreamingResponse:
     async def stream() -> AsyncIterator[str]:
         while True:
             try:
                 job_status = await anyio.to_thread.run_sync(
-                    tsdhn_queue.get_job_status, sim_id
+                    compute_jobs.get_job_status, app_job_id
                 )
             except ValueError:
                 yield f"event: error\ndata: {json.dumps({'error': 'unknown job'})}\n\n"
                 return
-            yield f"data: {json.dumps(job_status)}\n\n"
+            yield f"data: {json.dumps({'app_job_id': app_job_id, **job_status})}\n\n"
             if job_status["status"] in _TERMINAL:
                 return
             await anyio.sleep(2)
@@ -132,25 +144,23 @@ async def simulation_events(sim_id: str) -> StreamingResponse:
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
-@router.get("/simulations/{sim_id}/report", response_class=FileResponse)
-async def get_report(sim_id: str) -> FileResponse:
-    validate_job_id(sim_id)
+@router.get("/jobs/{app_job_id}/report", response_class=RedirectResponse)
+async def get_job_report(app_job_id: str) -> RedirectResponse:
+    try:
+        uuid.UUID(app_job_id, version=4)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid job identifier"
+        ) from e
 
-    job_status = tsdhn_queue.get_job_status(sim_id)
-    if job_status["status"] != JobStatus.COMPLETED.value:
+    try:
+        report_url = await anyio.to_thread.run_sync(
+            compute_jobs.get_report_url, app_job_id
+        )
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_425_TOO_EARLY,
-            detail="Job processing not complete",
-        )
+            detail="Report is not available",
+        ) from e
 
-    report_path = secure_path_construction(sim_id) / "reporte.pdf"
-    if not await anyio.to_thread.run_sync(report_path.exists):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Report not generated"
-        )
-
-    return FileResponse(
-        report_path,
-        filename=f"tsdhn_report_{sim_id}.pdf",
-        media_type="application/pdf",
-    )
+    return RedirectResponse(report_url)

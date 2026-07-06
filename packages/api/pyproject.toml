@@ -1,7 +1,7 @@
 [project]
 name = "tsdhn-api"
 version = "0.1.0"
-description = "TSDHN tsunami simulation orchestrator (FastAPI service + RQ worker)"
+description = "TSDHN tsunami simulation orchestrator (FastAPI service + Procrastinate worker)"
 requires-python = ">=3.14"
 readme = "readme.md"
 license = { text = "MIT" }
@@ -13,14 +13,16 @@ dependencies = [
     "fastapi==0.138.1",
     "uvicorn==0.49.0",
     "pydantic==2.13.4",
-    "redis==5.3.1",
-    "rq==2.10.0",
     "anyio==4.14.1",
+    "psycopg[binary]>=3.3.4",
+    "minio>=7.2.20",
+    "procrastinate>=3.9.0",
 ]
 
 [project.scripts]
 tsdhn-api = "api.main:start_app"
 tsdhn-worker = "api.worker:main"
+tsdhn-compute-migrate = "api.migrate:main"
 
 [build-system]
 requires = ["uv_build==0.11.25"]

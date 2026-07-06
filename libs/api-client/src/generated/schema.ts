@@ -55,7 +55,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/simulations": {
+    "/api/v1/jobs": {
         parameters: {
             query?: never;
             header?: never;
@@ -64,23 +64,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Simulation */
-        post: operations["create_simulation_api_v1_simulations_post"];
+        /** Create Job */
+        post: operations["create_job_api_v1_jobs_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/simulations/{sim_id}": {
+    "/api/v1/jobs/{app_job_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Simulation */
-        get: operations["get_simulation_api_v1_simulations__sim_id__get"];
+        /** Get Job */
+        get: operations["get_job_api_v1_jobs__app_job_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -89,15 +89,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/simulations/{sim_id}/events": {
+    "/api/v1/jobs/{app_job_id}/events": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Simulation Events */
-        get: operations["simulation_events_api_v1_simulations__sim_id__events_get"];
+        /** Job Events */
+        get: operations["job_events_api_v1_jobs__app_job_id__events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -106,15 +106,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/simulations/{sim_id}/report": {
+    "/api/v1/jobs/{app_job_id}/report": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Report */
-        get: operations["get_report_api_v1_simulations__sim_id__report_get"];
+        /** Get Job Report */
+        get: operations["get_job_report_api_v1_jobs__app_job_id__report_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -196,24 +196,41 @@ export interface components {
             status: string;
             /** Timestamp */
             timestamp: string;
-            /** Redis Connected */
-            redis_connected: boolean;
+            /** Database Connected */
+            database_connected: boolean;
+            /** Storage Connected */
+            storage_connected: boolean;
         };
-        /** SimulationCreated */
-        SimulationCreated: {
-            /** Id */
-            id: string;
+        /** JobCreated */
+        JobCreated: {
+            /** App Job Id */
+            app_job_id: string;
+            /** Compute Job Id */
+            compute_job_id: string;
+            /** Status */
+            status: string;
+            /** Result Bucket */
+            result_bucket?: string | null;
+            /** Result Key */
+            result_key?: string | null;
         };
-        /** SimulationRequest */
-        SimulationRequest: {
+        /** JobRequest */
+        JobRequest: {
+            /**
+             * App Job Id
+             * Format: uuid
+             */
+            app_job_id: string;
             input: components["schemas"]["EarthquakeInput"];
             /** Skip Steps */
             skip_steps?: string[];
         };
-        /** SimulationStatus */
-        SimulationStatus: {
-            /** Id */
-            id: string;
+        /** JobStatusResponse */
+        JobStatusResponse: {
+            /** App Job Id */
+            app_job_id: string;
+            /** Compute Job Id */
+            compute_job_id: string;
             /** Status */
             status: string;
             /** Details */
@@ -226,14 +243,18 @@ export interface components {
             total_steps?: number | null;
             calculation?: components["schemas"]["CalculationResponse"] | null;
             travel_times?: components["schemas"]["TsunamiTravelResponse"] | null;
+            /** Result Bucket */
+            result_bucket?: string | null;
+            /** Result Key */
+            result_key?: string | null;
             /** Error */
             error?: string | null;
             /** Created At */
             created_at?: string | null;
             /** Started At */
             started_at?: string | null;
-            /** Ended At */
-            ended_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
             /**
              * Report Available
              * @default false
@@ -359,7 +380,7 @@ export interface operations {
             };
         };
     };
-    create_simulation_api_v1_simulations_post: {
+    create_job_api_v1_jobs_post: {
         parameters: {
             query?: never;
             header?: {
@@ -370,7 +391,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SimulationRequest"];
+                "application/json": components["schemas"]["JobRequest"];
             };
         };
         responses: {
@@ -380,7 +401,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationCreated"];
+                    "application/json": components["schemas"]["JobCreated"];
                 };
             };
             /** @description Validation Error */
@@ -394,14 +415,14 @@ export interface operations {
             };
         };
     };
-    get_simulation_api_v1_simulations__sim_id__get: {
+    get_job_api_v1_jobs__app_job_id__get: {
         parameters: {
             query?: never;
             header?: {
                 authorization?: string | null;
             };
             path: {
-                sim_id: string;
+                app_job_id: string;
             };
             cookie?: never;
         };
@@ -413,7 +434,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SimulationStatus"];
+                    "application/json": components["schemas"]["JobStatusResponse"];
                 };
             };
             /** @description Validation Error */
@@ -427,14 +448,14 @@ export interface operations {
             };
         };
     };
-    simulation_events_api_v1_simulations__sim_id__events_get: {
+    job_events_api_v1_jobs__app_job_id__events_get: {
         parameters: {
             query?: never;
             header?: {
                 authorization?: string | null;
             };
             path: {
-                sim_id: string;
+                app_job_id: string;
             };
             cookie?: never;
         };
@@ -460,21 +481,21 @@ export interface operations {
             };
         };
     };
-    get_report_api_v1_simulations__sim_id__report_get: {
+    get_job_report_api_v1_jobs__app_job_id__report_get: {
         parameters: {
             query?: never;
             header?: {
                 authorization?: string | null;
             };
             path: {
-                sim_id: string;
+                app_job_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            200: {
+            307: {
                 headers: {
                     [name: string]: unknown;
                 };
