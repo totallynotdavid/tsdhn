@@ -1,6 +1,6 @@
 [project]
 name = "tsdhn-cli"
-version = "0.1.0"
+version = "0.1.1"
 description = "CLI: run simulations directly via the shared core"
 requires-python = ">=3.14"
 readme = "readme.md"
