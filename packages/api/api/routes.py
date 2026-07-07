@@ -6,7 +6,6 @@ probes); `router` carries the service-token dependency on every data route.
 import json
 import logging
 import tempfile
-import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
 from functools import lru_cache, partial
@@ -19,11 +18,6 @@ from fastapi.responses import StreamingResponse
 from api import __version__
 from api.core.jobs import (
     JobStatus,
-    ReportInvariantError,
-    ReportMissingError,
-    ReportNotReadyError,
-    ReportStorageError,
-    ReportTooLargeError,
     compute_jobs,
 )
 from api.schemas import (
@@ -35,8 +29,8 @@ from api.schemas import (
     VersionInfo,
 )
 from api.security import require_service_token
-from core.calculator import TsunamiCalculator
-from core.schemas import EarthquakeInput
+from tsdhn.calculator import TsunamiCalculator
+from tsdhn.domain import EarthquakeInput
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +98,6 @@ async def create_job(req: JobRequest) -> JobCreated:
             partial(
                 compute_jobs.create_or_get_job,
                 data=req.input,
-                skip_steps=req.skip_steps,
                 external_id=app_job_id,
             )
         )
@@ -150,55 +143,3 @@ async def job_events(app_job_id: str) -> StreamingResponse:
             await anyio.sleep(2)
 
     return StreamingResponse(stream(), media_type="text/event-stream")
-
-
-@router.get("/jobs/{app_job_id}/report")
-async def get_job_report(app_job_id: str) -> StreamingResponse:
-    try:
-        uuid.UUID(app_job_id, version=4)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid job identifier"
-        ) from e
-
-    try:
-        report = await anyio.to_thread.run_sync(
-            compute_jobs.get_report_download, app_job_id
-        )
-    except ReportNotReadyError as e:
-        raise HTTPException(
-            status_code=status.HTTP_425_TOO_EARLY,
-            detail="Report is not available",
-        ) from e
-    except ReportMissingError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Report was not found",
-        ) from e
-    except ReportTooLargeError as e:
-        raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail="Report exceeds the download size limit",
-        ) from e
-    except ReportStorageError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Report storage is unavailable",
-        ) from e
-    except ReportInvariantError as e:
-        logger.exception("Report download invariant failed for job %s", app_job_id)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Report metadata is inconsistent",
-        ) from e
-
-    return StreamingResponse(
-        report.chunks,
-        media_type=report.content_type,
-        headers={
-            "Content-Disposition": 'attachment; filename="reporte.pdf"',
-            "Content-Length": str(report.size),
-            "Cache-Control": "private, no-store",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )

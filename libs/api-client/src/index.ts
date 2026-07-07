@@ -11,7 +11,7 @@ export interface TsdhnClientOptions {
 }
 
 /**
- * The service token must stay on the server and never reach the browser.
+ * Server-only client. It attaches the backend service token to every request.
  */
 export function createTsdhnClient(options: TsdhnClientOptions): Client<paths> {
   return createClient<paths>({

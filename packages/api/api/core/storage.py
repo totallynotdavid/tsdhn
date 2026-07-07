@@ -3,7 +3,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
-from pathlib import Path
 from typing import Any
 
 import urllib3
@@ -16,6 +15,7 @@ from api.core.settings import (
     MINIO_SECRET_KEY,
     MINIO_SECURE,
 )
+from tsdhn.engine import ArtifactBundle
 
 __all__ = ["ArtifactStore", "StoredObjectInfo", "artifact_store"]
 
@@ -57,22 +57,26 @@ class ArtifactStore:
         *,
         app_job_id: str,
         compute_job_id: str,
-        report_path: Path,
+        bundle: ArtifactBundle,
         metadata: dict[str, Any],
     ) -> tuple[str, str]:
         self.ensure_bucket()
 
         prefix = f"simulations/{app_job_id}"
-        report_key = f"{prefix}/reporte.pdf"
         metadata_key = f"{prefix}/metadata.json"
 
-        self._client.fput_object(
-            bucket_name=self.bucket,
-            object_name=report_key,
-            file_path=str(report_path),
-            content_type="application/pdf",
-            metadata={"app-job-id": app_job_id, "compute-job-id": compute_job_id},
-        )
+        for artifact in bundle.artifacts:
+            self._client.fput_object(
+                bucket_name=self.bucket,
+                object_name=f"{prefix}/artifacts/{artifact.path.name}",
+                file_path=str(artifact.path),
+                content_type=artifact.content_type,
+                metadata={
+                    "app-job-id": app_job_id,
+                    "compute-job-id": compute_job_id,
+                    "artifact-name": artifact.name,
+                },
+            )
 
         payload = json.dumps(metadata, ensure_ascii=True, separators=(",", ":")).encode(
             "utf-8"
@@ -85,7 +89,7 @@ class ArtifactStore:
             content_type="application/json",
         )
 
-        return self.bucket, report_key
+        return self.bucket, metadata_key
 
     def stat_object(self, object_name: str) -> StoredObjectInfo:
         result = self._client.stat_object(
