@@ -9,6 +9,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 env:
   APP_JOB_ID: 4cfe522f-7e7d-46e0-96ca-7b98743fb9f5
@@ -32,6 +33,13 @@ jobs:
         run: |
           docker version
           docker compose version
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Validate compose config
         run: docker compose config --quiet
