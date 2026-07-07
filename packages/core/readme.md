@@ -68,7 +68,7 @@ tsunami
 5. `ttt_max`
 6. `ttt_inverso`
 7. `point_ttt`
-8. `copy_ttt_svg`
+8. `copy_ttt_pdf`
 9. `generate_reports`
 
 `run_simulation()` accepts `skip_steps` for technical debugging. Skipped steps

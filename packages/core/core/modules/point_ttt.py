@@ -29,7 +29,7 @@ def read_meca_spec(meca_file: Path) -> dict[str, object]:
 
 
 def generate_ttt_map(working_dir: Path) -> None:
-    """Generate the TTT SVG from legacy model outputs in the job workspace."""
+    """Generate the TTT map from legacy model outputs in the job workspace."""
     region = [120.0, 300.0, -65.0, 61.0]
     projection = "M16c"
     frame_parameters = ["WsNe", "xa20f10", "ya20f10"]
@@ -44,7 +44,7 @@ def generate_ttt_map(working_dir: Path) -> None:
     grd_file = working_dir / grd_filename
     tttb_file = working_dir / tttb_filename
     meca_file = working_dir.parent / "meca.dat"
-    output_file = working_dir / "ttt.svg"
+    output_file = working_dir / "ttt.pdf"
 
     try:
         for file in (grd_file, tttb_file, meca_file):
@@ -107,11 +107,10 @@ def generate_ttt_map(working_dir: Path) -> None:
             convention="mt",
         )
 
-        # Save output as SVG
         fig.savefig(str(output_file))
 
         if not output_file.exists():
-            raise RuntimeError("Failed to generate TTT SVG file.")
+            raise RuntimeError("Failed to generate TTT PDF file.")
 
         logger.info("TTT map generated successfully.")
 

@@ -44,7 +44,7 @@ PROCESSING_PIPELINE = [
         name="maxola",
         python_callable=generate_maxola_plot,
         system_executables=("gmt",),
-        file_checks=[("maxola.svg", "Maxola output missing")],
+        file_checks=[("maxola.pdf", "Maxola output missing")],
     ),
     ProcessingStep(
         name="ttt_max",
@@ -70,13 +70,13 @@ TTT_MUNDO_STEPS = [
         python_callable=generate_ttt_map,
         system_executables=("gmt",),
         working_dir="ttt_mundo",
-        file_checks=[("ttt.svg", "ttt.svg not generated")],
+        file_checks=[("ttt.pdf", "ttt.pdf not generated")],
     ),
     ProcessingStep(
-        name="copy_ttt_svg",
-        python_callable=lambda wd: shutil.copy(wd / "ttt.svg", wd.parent / "ttt.svg"),
+        name="copy_ttt_pdf",
+        python_callable=lambda wd: shutil.copy(wd / "ttt.pdf", wd.parent / "ttt.pdf"),
         working_dir="ttt_mundo",
-        file_checks=[("../ttt.svg", "ttt.svg not copied to parent directory")],
+        file_checks=[("../ttt.pdf", "ttt.pdf not copied to parent directory")],
     ),
 ]
 
