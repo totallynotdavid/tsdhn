@@ -1,15 +1,24 @@
 import logging
 import shutil
 import uuid
+from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
 
 import psycopg
+from minio.error import S3Error
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from api.core.procrastinate_app import app
-from api.core.settings import COMPUTE_DATABASE_URL, JOBS_DIR, PROCRASTINATE_QUEUE
+from api.core.settings import (
+    COMPUTE_DATABASE_URL,
+    JOBS_DIR,
+    MINIO_BUCKET,
+    PROCRASTINATE_QUEUE,
+    REPORT_DOWNLOAD_MAX_BYTES,
+)
 from api.core.storage import artifact_store, iso
 from core.config import MASTER_PIPELINE
 from core.schemas import EarthquakeInput, JobStatus
@@ -19,6 +28,12 @@ from core.utils.file_utils import sanitize_for_log
 __all__ = [
     "ComputeJobs",
     "JobStatus",
+    "ReportDownload",
+    "ReportInvariantError",
+    "ReportMissingError",
+    "ReportNotReadyError",
+    "ReportStorageError",
+    "ReportTooLargeError",
     "compute_jobs",
     "install_compute_schema",
     "run_simulation_task",
@@ -28,6 +43,34 @@ logger = logging.getLogger(__name__)
 
 JobRow = dict[str, Any]
 DB_CONNECT_TIMEOUT_SECONDS = 2
+REPORT_CONTENT_TYPE = "application/pdf"
+
+
+@dataclass(frozen=True)
+class ReportDownload:
+    content_type: str
+    size: int
+    chunks: Iterator[bytes]
+
+
+class ReportNotReadyError(ValueError):
+    pass
+
+
+class ReportMissingError(ValueError):
+    pass
+
+
+class ReportInvariantError(RuntimeError):
+    pass
+
+
+class ReportStorageError(RuntimeError):
+    pass
+
+
+class ReportTooLargeError(RuntimeError):
+    pass
 
 
 COMPUTE_JOBS_SCHEMA = """
@@ -260,11 +303,38 @@ class ComputeJobs:
             raise ValueError("Invalid or unknown job ID")
         return _status_from_row(row)
 
-    def get_report_url(self, app_job_id: str) -> str:
+    def get_report_download(self, app_job_id: str) -> ReportDownload:
         status = self.get_job_status(app_job_id)
         if status["status"] != JobStatus.COMPLETED.value or not status["result_key"]:
-            raise ValueError("Report not available")
-        return artifact_store.presigned_get_url(str(status["result_key"]))
+            raise ReportNotReadyError("Report is not available")
+
+        expected_key = f"simulations/{app_job_id}/reporte.pdf"
+        result_bucket = status["result_bucket"]
+        result_key = str(status["result_key"])
+        if result_bucket != MINIO_BUCKET or result_key != expected_key:
+            raise ReportInvariantError("Completed job points to an unexpected report")
+
+        try:
+            info = artifact_store.stat_object(result_key)
+        except S3Error as e:
+            if e.code in {"NoSuchBucket", "NoSuchKey", "NoSuchObject"}:
+                raise ReportMissingError("Report object was not found") from e
+            raise ReportStorageError("Report storage is unavailable") from e
+        except Exception as e:
+            raise ReportStorageError("Report storage is unavailable") from e
+
+        if info.size > REPORT_DOWNLOAD_MAX_BYTES:
+            raise ReportTooLargeError("Report object exceeds the download size limit")
+
+        content_type = (info.content_type or "").split(";", 1)[0].strip().lower()
+        if content_type != REPORT_CONTENT_TYPE:
+            raise ReportInvariantError("Report object has an unexpected content type")
+
+        return ReportDownload(
+            content_type=REPORT_CONTENT_TYPE,
+            size=info.size,
+            chunks=artifact_store.stream_object(result_key),
+        )
 
     def is_database_connected(self) -> bool:
         try:

@@ -10,6 +10,7 @@ __all__ = [
     "MINIO_SECRET_KEY",
     "MINIO_SECURE",
     "PROCRASTINATE_QUEUE",
+    "REPORT_DOWNLOAD_MAX_BYTES",
 ]
 
 COMPUTE_DATABASE_URL = os.environ.get(
@@ -30,3 +31,6 @@ MINIO_SECURE = os.environ.get("MINIO_SECURE", "false").lower() in {
     "true",
     "yes",
 }
+REPORT_DOWNLOAD_MAX_BYTES = int(
+    os.environ.get("REPORT_DOWNLOAD_MAX_BYTES", str(50 * 1024 * 1024))
+)

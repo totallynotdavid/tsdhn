@@ -14,10 +14,18 @@ from pathlib import Path
 
 import anyio
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from api import __version__
-from api.core.jobs import JobStatus, compute_jobs
+from api.core.jobs import (
+    JobStatus,
+    ReportInvariantError,
+    ReportMissingError,
+    ReportNotReadyError,
+    ReportStorageError,
+    ReportTooLargeError,
+    compute_jobs,
+)
 from api.schemas import (
     CalculationPreview,
     HealthStatus,
@@ -144,8 +152,8 @@ async def job_events(app_job_id: str) -> StreamingResponse:
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
-@router.get("/jobs/{app_job_id}/report", response_class=RedirectResponse)
-async def get_job_report(app_job_id: str) -> RedirectResponse:
+@router.get("/jobs/{app_job_id}/report")
+async def get_job_report(app_job_id: str) -> StreamingResponse:
     try:
         uuid.UUID(app_job_id, version=4)
     except ValueError as e:
@@ -154,13 +162,43 @@ async def get_job_report(app_job_id: str) -> RedirectResponse:
         ) from e
 
     try:
-        report_url = await anyio.to_thread.run_sync(
-            compute_jobs.get_report_url, app_job_id
+        report = await anyio.to_thread.run_sync(
+            compute_jobs.get_report_download, app_job_id
         )
-    except ValueError as e:
+    except ReportNotReadyError as e:
         raise HTTPException(
             status_code=status.HTTP_425_TOO_EARLY,
             detail="Report is not available",
         ) from e
+    except ReportMissingError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report was not found",
+        ) from e
+    except ReportTooLargeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="Report exceeds the download size limit",
+        ) from e
+    except ReportStorageError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Report storage is unavailable",
+        ) from e
+    except ReportInvariantError as e:
+        logger.exception("Report download invariant failed for job %s", app_job_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Report metadata is inconsistent",
+        ) from e
 
-    return RedirectResponse(report_url)
+    return StreamingResponse(
+        report.chunks,
+        media_type=report.content_type,
+        headers={
+            "Content-Disposition": 'attachment; filename="reporte.pdf"',
+            "Content-Length": str(report.size),
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

@@ -1,5 +1,7 @@
 import json
-from datetime import datetime, timedelta
+from collections.abc import Iterator
+from dataclasses import dataclass
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -15,7 +17,14 @@ from api.core.settings import (
     MINIO_SECURE,
 )
 
-__all__ = ["ArtifactStore", "artifact_store"]
+__all__ = ["ArtifactStore", "StoredObjectInfo", "artifact_store"]
+
+
+@dataclass(frozen=True)
+class StoredObjectInfo:
+    object_name: str
+    size: int
+    content_type: str | None
 
 
 class ArtifactStore:
@@ -78,12 +87,29 @@ class ArtifactStore:
 
         return self.bucket, report_key
 
-    def presigned_get_url(self, object_name: str, *, minutes: int = 10) -> str:
-        return self._client.presigned_get_object(
+    def stat_object(self, object_name: str) -> StoredObjectInfo:
+        result = self._client.stat_object(
             bucket_name=self.bucket,
             object_name=object_name,
-            expires=timedelta(minutes=minutes),
         )
+        return StoredObjectInfo(
+            object_name=object_name,
+            size=int(result.size or 0),
+            content_type=result.content_type,
+        )
+
+    def stream_object(
+        self, object_name: str, *, chunk_size: int = 1024 * 1024
+    ) -> Iterator[bytes]:
+        response = self._client.get_object(
+            bucket_name=self.bucket,
+            object_name=object_name,
+        )
+        try:
+            yield from response.stream(chunk_size)
+        finally:
+            response.close()
+            response.release_conn()
 
 
 def iso(value: datetime | None) -> str | None:
