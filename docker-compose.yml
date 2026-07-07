@@ -54,6 +54,8 @@ services:
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
+      args:
+        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:main}
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,6 +77,8 @@ services:
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
+      args:
+        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:main}
     restart: unless-stopped
     depends_on:
       compute-migrate:
@@ -96,6 +100,8 @@ services:
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
+      args:
+        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:main}
     restart: unless-stopped
     depends_on:
       compute-migrate:
