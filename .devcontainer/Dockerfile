@@ -1,4 +1,4 @@
-ARG TOOLCHAIN_IMAGE=ghcr.io/totallynotdavid/tsdhn-toolchain:main
+ARG TOOLCHAIN_IMAGE=ghcr.io/totallynotdavid/tsdhn-toolchain:master
 FROM ${TOOLCHAIN_IMAGE}
 
 USER root

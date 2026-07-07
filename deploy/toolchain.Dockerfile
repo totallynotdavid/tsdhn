@@ -1,7 +1,6 @@
 FROM ubuntu:24.04
 
 ARG TTT_SDK_REPO="https://gitlab.com/totallynotdavid/tttapi/"
-ARG TYPST_VERSION=0.15.0
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
@@ -70,18 +69,12 @@ RUN mkdir -p /tmp/ttt-sdk-build \
  && make -C /tmp/ttt-sdk-build/tttapi install clean \
  && rm -rf /tmp/ttt-sdk-build
 
-ADD https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz /tmp/typst.tar.xz
-RUN tar -xJf /tmp/typst.tar.xz -C /tmp \
- && install /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst \
- && rm -rf /tmp/typst.tar.xz /tmp/typst-x86_64-unknown-linux-musl
-
 # pygmt expects an unversioned libgmt.so on the dynamic linker path.
 RUN set -eux; \
     SO="$(ls /lib/*/libgmt.so.* /usr/lib/*/libgmt.so.* 2>/dev/null | head -n1)"; \
     if [ -n "$SO" ]; then ln -sf "$SO" "$(dirname "$SO")/libgmt.so"; fi; \
     command -v gmt; \
     command -v ttt_client; \
-    command -v typst; \
     command -v ifx
 
 WORKDIR /app
