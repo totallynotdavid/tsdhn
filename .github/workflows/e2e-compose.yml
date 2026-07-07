@@ -19,6 +19,7 @@ env:
   MINIO_ACCESS_KEY: minioadmin
   MINIO_SECRET_KEY: minioadmin
   MINIO_BUCKET: tsdhn-results
+  TOOLCHAIN_IMAGE: tsdhn-toolchain:e2e
 
 jobs:
   backend:
@@ -40,6 +41,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build toolchain image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/toolchain.Dockerfile
+          load: true
+          tags: ${{ env.TOOLCHAIN_IMAGE }}
+          cache-from: type=gha,scope=toolchain
+          cache-to: type=gha,mode=max,scope=toolchain
 
       - name: Validate compose config
         run: docker compose config --quiet
