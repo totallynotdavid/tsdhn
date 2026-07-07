@@ -2,15 +2,19 @@ from pathlib import Path
 
 import pytest
 
-from core.modules.maxola import load_stations
-from core.runtime import REQUIRED_MODEL_FILES, REQUIRED_TOOL_EXECUTABLES, RuntimePaths
-from core.schemas import ProcessingStep
-from core.utils.file_utils import (
+from tsdhn.render.maxola import load_stations
+from tsdhn.runtime import (
+    REQUIRED_MODEL_FILES,
+    REQUIRED_TOOL_EXECUTABLES,
+    RuntimeContext,
+)
+from tsdhn.steps import ProcessingStep
+from tsdhn.utils.file_utils import (
     WORKSPACE_DIRS,
     WORKSPACE_INPUTS,
     prepare_simulation_workspace,
 )
-from core.utils.processing import process_step
+from tsdhn.utils.processing import process_step
 
 
 def _create_model_dir(root: Path) -> Path:
@@ -35,21 +39,23 @@ def _create_tools_dir(root: Path) -> Path:
     return tools_dir
 
 
-def test_runtime_paths_require_explicit_environment(
+def test_runtime_context_reports_missing_managed_model(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("TSDHN_MODEL_DIR", raising=False)
     monkeypatch.delenv("TSDHN_TOOLS_DIR", raising=False)
+    monkeypatch.setenv("TSDHN_DATA_HOME", str(tmp_path / "missing"))
 
-    with pytest.raises(RuntimeError, match="TSDHN_MODEL_DIR"):
-        RuntimePaths.from_env()
+    with pytest.raises(RuntimeError, match="tsdhn assets install"):
+        RuntimeContext.resolve(require_tools=False)
 
 
 def test_runtime_paths_resolve_explicit_paths(tmp_path: Path) -> None:
     model_dir = _create_model_dir(tmp_path)
     tools_dir = _create_tools_dir(tmp_path)
 
-    runtime = RuntimePaths.resolve(model_dir=model_dir, tools_dir=tools_dir)
+    runtime = RuntimeContext.resolve(model_dir=model_dir, tools_dir=tools_dir)
 
     assert runtime.model_dir == model_dir.resolve()
     assert runtime.tools_dir == tools_dir.resolve()
@@ -61,7 +67,7 @@ def test_runtime_paths_can_resolve_model_only_when_no_tools_are_needed(
     model_dir = _create_model_dir(tmp_path)
     monkeypatch.delenv("TSDHN_TOOLS_DIR", raising=False)
 
-    runtime = RuntimePaths.resolve(model_dir=model_dir, require_tools=False)
+    runtime = RuntimeContext.resolve(model_dir=model_dir, require_tools=False)
 
     assert runtime.model_dir == model_dir.resolve()
     assert runtime.tools_dir is None
@@ -75,7 +81,7 @@ def test_runtime_paths_validate_only_required_tools(tmp_path: Path) -> None:
     executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     executable.chmod(0o755)
 
-    runtime = RuntimePaths.resolve(
+    runtime = RuntimeContext.resolve(
         model_dir=model_dir,
         tools_dir=tools_dir,
         required_tools=("fault_plane",),
@@ -95,7 +101,7 @@ def test_runtime_paths_validate_only_required_tools_from_environment(
     executable.chmod(0o755)
     monkeypatch.setenv("TSDHN_TOOLS_DIR", str(tools_dir))
 
-    runtime = RuntimePaths.resolve(
+    runtime = RuntimeContext.resolve(
         model_dir=model_dir,
         required_tools=("fault_plane",),
     )
@@ -153,6 +159,7 @@ def test_process_step_uses_prebuilt_executable(tmp_path: Path) -> None:
     process_step(
         ProcessingStep(
             name="hello",
+            outputs=("ran.txt",),
             command=["./hello"],
             file_checks=[("ran.txt", "prebuilt executable did not run")],
         ),

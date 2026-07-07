@@ -34,13 +34,12 @@ def generate_ttt_map(working_dir: Path) -> None:
     projection = "M16c"
     frame_parameters = ["WsNe", "xa20f10", "ya20f10"]
 
-    # GMT parameters
+    # GMT binary grid suffixes: cortado.i2 is signed short, ttt.b is binary float.
     grd_filename = "cortado.i2"
     grd_params = "=bs"
     tttb_filename = "ttt.b"
     tttb_params = "=bf"
 
-    # Path definitions
     grd_file = working_dir / grd_filename
     tttb_file = working_dir / tttb_filename
     meca_file = working_dir.parent / "meca.dat"
@@ -51,7 +50,6 @@ def generate_ttt_map(working_dir: Path) -> None:
             if not file.exists():
                 raise FileNotFoundError(f"Required file {file} not found.")
 
-        # Configure GMT settings
         pygmt.config(
             MAP_FRAME_TYPE="plain",
             FONT_ANNOT_PRIMARY="9p",
@@ -62,11 +60,9 @@ def generate_ttt_map(working_dir: Path) -> None:
 
         fig = pygmt.Figure()
 
-        # Create color palette
         color_cpt = working_dir / "color.cpt"
         pygmt.makecpt(cmap="globe", output=str(color_cpt), continuous=True)
 
-        # Plot grid image
         fig.grdimage(
             grid=f"{grd_file}{grd_params}",
             region=region,
@@ -74,7 +70,6 @@ def generate_ttt_map(working_dir: Path) -> None:
             cmap=str(color_cpt),
         )
 
-        # Add coastlines
         fig.coast(
             region=region,
             projection=projection,
@@ -84,7 +79,7 @@ def generate_ttt_map(working_dir: Path) -> None:
             shorelines="0.5,30",
         )
 
-        # Add contour lines
+        # Travel-time isolines are annotated in hours to match the legacy TTT map.
         fig.grdcontour(
             grid=f"{tttb_file}{tttb_params}",
             region=region,
@@ -97,7 +92,6 @@ def generate_ttt_map(working_dir: Path) -> None:
         spec = read_meca_spec(meca_file)
         logger.info("Parsed meca spec: %s", spec)
 
-        # Add focal mechanisms
         fig.meca(
             spec=spec,
             region=region,

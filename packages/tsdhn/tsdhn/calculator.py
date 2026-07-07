@@ -7,14 +7,14 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.io import loadmat
 
-from core.config import EARTH_RADIUS, GRAVITY
-from core.runtime import model_dir_from_env, validate_model_dir
-from core.schemas import (
+from tsdhn.domain import (
     CalculationResponse,
     EarthquakeInput,
     TsunamiTravelResponse,
 )
-from core.utils.geo import (
+from tsdhn.runtime import RuntimeContext, validate_model_dir
+from tsdhn.steps import EARTH_RADIUS, GRAVITY
+from tsdhn.utils.geo import (
     calculate_distance_to_coast,
     determine_epicenter_location,
     determine_tsunami_warning,
@@ -24,7 +24,7 @@ from core.utils.geo import (
 logger = logging.getLogger(__name__)
 
 # Legacy corner formulas use 60 nautical miles per degree.
-NM_CONVERSION = 60 * 1853  # Nautical miles to meters conversion
+NM_CONVERSION = 60 * 1853
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,7 @@ class TsunamiCalculator:
         self.model_dir = (
             validate_model_dir(model_dir.resolve())
             if model_dir is not None
-            else model_dir_from_env()
+            else RuntimeContext.resolve(require_tools=False).model_dir
         )
         self.xa: np.ndarray
         self.ya: np.ndarray

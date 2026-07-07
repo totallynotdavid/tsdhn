@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.schemas import ProcessingStep
+    from tsdhn.steps import ProcessingStep
 
-REQUIRED_EXECUTABLES: tuple[str, ...] = ("gmt", "ttt_client", "typst")
+REQUIRED_EXECUTABLES: tuple[str, ...] = ("gmt", "ttt_client")
 
 
 @cache

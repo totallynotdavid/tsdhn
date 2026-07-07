@@ -10,12 +10,11 @@ authors = [
 ]
 
 [tool.uv.workspace]
-members = ["packages/*"]
+members = ["packages/tsdhn", "packages/api"]
 
 [tool.uv.sources]
-tsdhn-core = { workspace = true }
+tsdhn = { workspace = true }
 tsdhn-api = { workspace = true }
-tsdhn-cli = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -52,16 +51,15 @@ extend-exclude = ["__pycache__", "dist", "build"]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "api", "cli"]
+known-first-party = ["tsdhn", "api"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*.py" = ["S101", "S105", "S106"]  # asserts and dummy tokens are fine in tests
 # S603 is suppressed: every subprocess call uses arguments from
 # validated floats, local Path objects, or frozen dataclass fields.
-"packages/core/core/utils/processing.py" = ["S603"]
-"packages/core/core/modules/maxola.py" = ["S603"]
-"packages/core/core/modules/reporte.py" = ["S603"]
-"packages/core/core/modules/ttt_inverso.py" = ["S603"]
+"packages/tsdhn/tsdhn/utils/processing.py" = ["S603"]
+"packages/tsdhn/tsdhn/render/maxola.py" = ["S603"]
+"packages/tsdhn/tsdhn/render/ttt_inverso.py" = ["S603"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -89,5 +87,5 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/core/tests", "packages/api/tests"]
+testpaths = ["packages/tsdhn/tests", "packages/api/tests"]
 addopts = "-ra"

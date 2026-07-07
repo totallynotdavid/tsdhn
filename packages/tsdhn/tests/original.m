@@ -10,10 +10,8 @@ lon0 = -156;    % Longitude
 hhmm = '0000';  % Time in HHMM format
 dia = 23;       % Day
 
-% Create log file for testing
 log_fid = fopen('tsunami_values.log', 'w');
 
-% Log input parameters
 fprintf(log_fid, 'INPUT_PARAMETERS\n');
 fprintf(log_fid, 'Mw=%f\n', Mw);
 fprintf(log_fid, 'h=%f\n', h);
@@ -22,13 +20,11 @@ fprintf(log_fid, 'lon0=%f\n', lon0);
 fprintf(log_fid, 'hhmm=%s\n', hhmm);
 fprintf(log_fid, 'dia=%d\n', dia);
 
-% Adjust longitude if needed
 if lon0 > 0
     lon0 = lon0 - 360;
 end
 fprintf(log_fid, 'adjusted_lon0=%f\n', lon0);
 
-% Load and log maper1.mat data
 fprintf(log_fid, '\nMAPER1_DATA\n');
 load maper1.mat
 lat = A(:,2);
@@ -38,7 +34,6 @@ for i = 1:min(5,size(A,1))
     fprintf(log_fid, '%f,%f\n', lon(i), lat(i));
 end
 
-% Load and log maper2.mat data
 fprintf(log_fid, '\nMAPER2_DATA\n');
 load maper2.mat
 lat2 = B(:,2);
@@ -48,7 +43,6 @@ for i = 1:min(5,size(B,1))
     fprintf(log_fid, '%f,%f\n', lon2(i), lat2(i));
 end
 
-% Load and log maper3.mat data
 fprintf(log_fid, '\nMAPER3_DATA\n');
 load maper3.mat
 lat3 = C(:,2);
@@ -58,7 +52,6 @@ for i = 1:min(5,size(C,1))
     fprintf(log_fid, '%f,%f\n', lon3(i), lat3(i));
 end
 
-% Load and log pacifico.mat data
 fprintf(log_fid, '\nPACIFICO_DATA\n');
 load pacifico.mat
 fprintf(log_fid, 'Dimensions: xa=%dx%d, ya=%dx%d, A=%dx%d\n', ...
@@ -70,10 +63,11 @@ for i = 1:min(5,size(xa,1))
     end
 end
 
-% Calculate earthquake parameters
 fprintf(log_fid, '\nEARTHQUAKE_PARAMETERS\n');
+% Papazachos et al. (2004) magnitude scaling relations.
 L = 10^(0.55*Mw-2.19);  % (km) Papazachos 2004
 W = 10^(0.31*Mw-0.63);  % (km)
+% Hanks and Kanamori moment magnitude relation.
 M0 = 10^(1.5*Mw+9.1);   % Momento sismico (N*m)
 u = 4.5e10;             % (N/m2) coeficiente de rigidez
 D = M0/(u*(L*1000)*(W*1000));
@@ -90,7 +84,6 @@ fprintf(log_fid, 'S=%f\n', S);
 fprintf(log_fid, 'a=%f\n', a);
 fprintf(log_fid, 'b=%f\n', b);
 
-% Load and calculate focal mechanism
 fprintf(log_fid, '\nMECFOC_DATA\n');
 A1 = load('mecfoc.dat');
 fprintf(log_fid, 'First 5 rows of mecfoc.dat:\n');
@@ -117,7 +110,6 @@ fprintf(log_fid, 'echado=%f\n', echado);
 fprintf(log_fid, 'minimo=%f\n', minimo);
 fprintf(log_fid, 'pos=%d\n', pos);
 
-% Calculate rectangle parameters
 fprintf(log_fid, '\nRECTANGLE_PARAMETERS\n');
 L1 = L*1000;
 W1 = 1000*W*cos(echado*pi/180);
@@ -139,7 +131,6 @@ fprintf(log_fid, 'b1=%f\n', b1);
 fprintf(log_fid, 'xo=%f\n', xo);
 fprintf(log_fid, 'yo=%f\n', yo);
 
-% Calculate rectangle corners
 dip = echado*pi/180;
 a1 = -(azimut-90)*pi/180;
 a2 = -(azimut)*pi/180;
@@ -153,7 +144,6 @@ for i = 1:length(sx)
     fprintf(log_fid, 'corner_%d=%f,%f\n', i, sx(i), sy(i));
 end
 
-% Calculate epicenter parameters
 m = length(lon);
 for k = 1:m
     dist(k) = sqrt((lon(k)-lon0)^2+(lat(k)-lat0)^2);
@@ -168,10 +158,8 @@ fprintf(log_fid, '\nEPICENTER_PARAMETERS\n');
 fprintf(log_fid, 'dist_min=%f\n', dist_min);
 fprintf(log_fid, 'h0=%f\n', h0);
 
-% Close log file
 fclose(log_fid);
 
-% Write parameters to hypo.dat
 fid2 = fopen('hypo.dat', 'w');
 fprintf(fid2, '%s\r\n', hhmm);
 fprintf(fid2, '%4.2f\r\n', lon0);
