@@ -3,7 +3,7 @@
 <!-- prettier-ignore-start -->
 <div align="center">
 
-[![CI](https://github.com/totallynotdavid/tsdhn/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/totallynotdavid/tsdhn/actions/workflows/ci.yml)
+[![CI](https://github.com/totallynotdavid/tsdhn/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/totallynotdavid/tsdhn/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/totallynotdavid/fb9b3bc6236ef7e8a1560403b5c58186/raw/e20fcb208809dbdea85b08d019923225699c2187/covbadge.json)](https://github.com/totallynotdavid/tsdhn/actions/workflows/ci.yml)
 [![Security](https://github.com/totallynotdavid/tsdhn/actions/workflows/security.yml/badge.svg)](https://github.com/totallynotdavid/tsdhn/actions/workflows/security.yml)
 [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/totallynotdavid/tsdhn?label=scorecard)](https://scorecard.dev/viewer/?uri=github.com/totallynotdavid/tsdhn)
@@ -12,17 +12,16 @@
 <!-- prettier-ignore-end -->
 
 TSDHN orchestrator runs tsunami simulation workflows from earthquake source
-parameters. The repository contains the shared numerical core, a FastAPI
-compute plane, a Procrastinate worker, a CLI for researchers, a SvelteKit web
-app, and the generated TypeScript API client used by the web server.
+parameters. The repository contains one shared `tsdhn` simulation engine and
+research CLI, a FastAPI compute adapter, a Procrastinate worker, a SvelteKit
+web app, and the generated TypeScript API client used by the web server.
 
 ## Documentation
 
 | Area | Docs | Covers |
 | --- | --- | --- |
-| Python core | [`packages/core`](./packages/core/readme.md) | Calculations, runtime paths, pipeline execution |
+| Python engine + CLI | [`packages/tsdhn`](./packages/tsdhn/readme.md) | Calculations, runtime paths, model assets, pipeline execution |
 | API service | [`packages/api`](./packages/api/readme.md) | FastAPI routes, service-token auth, worker entry point |
-| CLI | [`packages/cli`](./packages/cli/readme.md) | Local `tsdhn` commands for calculation previews and full simulations |
 | Web app | [`apps/web`](./apps/web/readme.md) | SvelteKit app, auth, database, and server-side backend configuration |
 | API client | [`libs/api-client`](./libs/api-client/readme.md) | OpenAPI schema and generated TypeScript types |
 
@@ -39,10 +38,10 @@ flowchart LR
     Web -->|server-side Bearer token| API[FastAPI /api/v1]
     API -->|create job + defer task| PG[(Compute Postgres)]
     Worker[Procrastinate worker] -->|claim task + update status| PG
-    Worker --> Core[tsdhn-core]
-    CLI[tsdhn CLI] --> Core
-    Core --> Model[model assets]
-    Core --> Tools[Fortran, GMT, TTT, Typst]
+    Worker --> Engine[tsdhn engine]
+    CLI[tsdhn CLI] --> Engine
+    Engine --> Model[versioned model assets]
+    Engine --> Tools[Fortran, GMT, TTT]
     Worker --> MinIO[(MinIO artifacts)]
     Worker --> Jobs[(temporary jobs directory)]
     Web --> DB[(SQLite/libSQL)]
@@ -50,14 +49,14 @@ flowchart LR
 
 The browser talks to the SvelteKit app. The SvelteKit server calls the FastAPI
 backend with `BACKEND_SERVICE_TOKEN`; that token is never sent to browser code.
-Long simulations run in the Procrastinate worker, which calls `tsdhn-core`,
-updates `compute_jobs` in Postgres, and writes completed reports and metadata to
-MinIO.
+Long simulations run in the Procrastinate worker, which calls the shared
+`tsdhn` engine, updates `compute_jobs` in Postgres, and writes artifact bundles
+and metadata to MinIO.
 
 ## Quick start
 
 The backend stack is self-hosted because the simulation runtime needs the
-Fortran/GMT/TTT/Typst toolchain. Docker Compose uses the images and Dockerfiles
+Fortran/GMT/TTT toolchain. Docker Compose uses the images and Dockerfiles
 under [`deploy/`](./deploy/).
 
 ```sh
@@ -113,8 +112,7 @@ picv-2025/
 ├── model/                    # TSDHN model assets and legacy Fortran sources
 ├── packages/
 │   ├── api/                  # FastAPI compute service and Procrastinate worker
-│   ├── cli/                  # Typer/Rich CLI for researchers
-│   └── core/                 # Shared numerical core and simulation pipeline
+│   └── tsdhn/                # Shared engine, runtime, assets, and CLI
 ├── scripts/
 │   ├── export_openapi.py     # FastAPI schema export
 │   └── gen-client.ts         # OpenAPI TypeScript generation
@@ -127,7 +125,7 @@ picv-2025/
 
 ## Runtime notes
 
-`tsdhn-core` validates model and tool paths before running simulations.
+`tsdhn` validates model and tool paths before running simulations.
 Non-container backend runs need:
 
 - `TSDHN_MODEL_DIR` pointing at the model asset directory.
@@ -149,7 +147,6 @@ Non-container runs must provide the same external tools:
 - [Generic Mapping Tools](https://docs.generic-mapping-tools.org/latest/)
 - [TTT SDK](https://www.geoware-online.com/tsunami.html), including
   `ttt_client`
-- [Typst](https://typst.app/docs/)
 - `ps2eps` and `csh`
 
 </details>

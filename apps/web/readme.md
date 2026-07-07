@@ -1,7 +1,7 @@
 # TSDHN web
 
 `apps/web` is the SvelteKit application for authenticated simulation requests,
-calculation previews, progress display, and report downloads.
+calculation previews, progress display, and artifact status.
 
 The app uses a server-side web backend pattern:
 
@@ -79,7 +79,6 @@ Current server-side backend calls include:
 - `POST /api/v1/jobs` from [`src/lib/server/dispatch.ts`](./src/lib/server/dispatch.ts)
 - `GET /api/v1/jobs/{id}` from app-owned simulation pages and dashboard status sync
 - `GET /api/v1/jobs/{id}/events` proxied by [`src/routes/(app)/simulations/[id]/events/+server.ts`](./src/routes/%28app%29/simulations/%5Bid%5D/events/+server.ts)
-- `GET /api/v1/jobs/{id}/report` proxied by [`src/routes/(app)/simulations/[id]/report/+server.ts`](./src/routes/%28app%29/simulations/%5Bid%5D/report/+server.ts)
 
 ## Docker
 
