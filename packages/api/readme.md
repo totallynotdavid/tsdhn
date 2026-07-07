@@ -40,6 +40,7 @@ http://localhost:8000/api-docs
 | `MINIO_SECRET_KEY` | worker, API report route | `minioadmin` | MinIO secret key |
 | `MINIO_BUCKET` | worker, API report route | `tsdhn-results` | Bucket for reports and metadata |
 | `MINIO_SECURE` | worker, API report route | `false` | Use HTTPS for MinIO client connections |
+| `REPORT_DOWNLOAD_MAX_BYTES` | API report route | `52428800` | Maximum generated PDF size the API will stream |
 | `TSDHN_API_LOG` | API | `tsunami_api.log` | API log file path |
 | `TSDHN_MODEL_DIR` | API, worker | none | Model asset directory loaded by `tsdhn-core` |
 | `TSDHN_TOOLS_DIR` | worker | none | Directory containing prebuilt model executables |
@@ -75,7 +76,14 @@ web app, not FastAPI directly.
 | `POST` | `/api/v1/jobs` | Yes | Enqueue a full simulation using the control-plane `app_job_id` idempotency key |
 | `GET` | `/api/v1/jobs/{app_job_id}` | Yes | Read queue status and completed metadata |
 | `GET` | `/api/v1/jobs/{app_job_id}/events` | Yes | Server-sent progress stream |
-| `GET` | `/api/v1/jobs/{app_job_id}/report` | Yes | Redirect to a short-lived MinIO URL for the generated PDF report |
+| `GET` | `/api/v1/jobs/{app_job_id}/report` | Yes | Download the generated PDF report through the API |
+
+Report downloads are proxied through the API. MinIO stays private, and the API
+authorizes the request before mapping `app_job_id` to the generated object key
+`simulations/{app_job_id}/reporte.pdf`. The route stats the object before
+streaming it, enforces `REPORT_DOWNLOAD_MAX_BYTES`, and sends the report with
+`Content-Disposition: attachment`, `Content-Type: application/pdf`,
+`X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store`.
 
 ## Request examples
 
