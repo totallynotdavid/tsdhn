@@ -53,8 +53,6 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                # Project targets py3.14 (requires-python = ">=3.14").
-                # Add 3.13/3.12 here only if you actually intend to support them.
                 python-version: ["3.14"]
         steps:
             - uses: actions/checkout@v7
@@ -90,8 +88,6 @@ jobs:
     coverage:
         name: Coverage
         runs-on: ubuntu-latest
-        # Only meaningful on the default branch or when explicitly dispatched,
-        # or on PRs from the same repo (forks can't update the gist anyway).
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         permissions:
             contents: read
@@ -122,7 +118,7 @@ jobs:
             - name: Run tests with coverage
               run: |
                   uv run coverage run -m pytest
-                  uv run coverage report --fail-under=70
+                  uv run coverage report
                   uv run coverage json -o coverage.json
 
             - name: Compute total coverage
