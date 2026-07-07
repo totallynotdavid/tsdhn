@@ -17,7 +17,12 @@ RUN bun install --frozen-lockfile
 COPY libs ./libs
 COPY apps/web ./apps/web
 ENV ADAPTER=node
-RUN bun --filter web build
+RUN DATABASE_URL=file:/tmp/tsdhn-build.db \
+    ORIGIN=http://localhost:3000 \
+    BETTER_AUTH_SECRET=build-time-placeholder-not-for-runtime \
+    BACKEND_URL=http://127.0.0.1:8000 \
+    BACKEND_SERVICE_TOKEN=build-time-placeholder \
+    bun --filter web build
 
 WORKDIR /app/apps/web
 ENV HOST=0.0.0.0 \

@@ -62,8 +62,8 @@ jobs:
         name: Publish to PyPI
         needs: build-sdist-wheels
 
-        # Only publish on real tag pushes, not on workflow_dispatch dry-runs.
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        # Only publish when PyPI trusted publishing is explicitly configured.
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && vars.PUBLISH_PYPI == 'true'
         runs-on: ubuntu-latest
 
         permissions:

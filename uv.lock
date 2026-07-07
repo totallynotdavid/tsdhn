@@ -726,7 +726,7 @@ wheels = [
 
 [[package]]
 name = "picv-2025"
-version = "0.1.0"
+version = "0.1.1"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -1298,7 +1298,7 @@ wheels = [
 
 [[package]]
 name = "tsdhn-api"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/api" }
 dependencies = [
     { name = "anyio" },
@@ -1325,7 +1325,7 @@ requires-dist = [
 
 [[package]]
 name = "tsdhn-cli"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/cli" }
 dependencies = [
     { name = "rich" },
@@ -1342,7 +1342,7 @@ requires-dist = [
 
 [[package]]
 name = "tsdhn-core"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "numpy" },
