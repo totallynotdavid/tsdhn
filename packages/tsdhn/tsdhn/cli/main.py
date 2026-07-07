@@ -17,7 +17,7 @@ from tsdhn.runtime import RuntimeContext, check_capabilities
 
 app = typer.Typer(
     add_completion=False,
-    help="TSDHN research tools for tsunami source calculations and simulations.",
+    help="TSDHN CLI for tsunami source calculations and simulations.",
 )
 assets_app = typer.Typer(add_completion=False, help="Manage versioned model datasets.")
 app.add_typer(assets_app, name="assets")

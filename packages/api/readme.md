@@ -1,9 +1,8 @@
 # tsdhn-api
 
-`tsdhn-api` exposes the TSDHN compute plane over FastAPI. It stores durable job
-state in Postgres, dispatches long-running simulations through Procrastinate,
-and writes completed artifact bundles to MinIO. The service is an adapter over
-the shared `tsdhn` engine.
+`tsdhn-api` serves the TSDHN simulation API. It stores job state in Postgres,
+runs long simulations through Procrastinate, writes completed artifacts to
+MinIO, and uses the shared `tsdhn` engine.
 
 ## Entry Points
 
@@ -33,12 +32,12 @@ http://localhost:8000/api-docs
 | `APP_PORT` | API | `8000` | Uvicorn bind port |
 | `ALLOWED_ORIGINS` | API | empty | Comma-separated browser origins for direct CORS access |
 | `BACKEND_SERVICE_TOKEN` | API | none | Required bearer token for simulation routes |
-| `COMPUTE_DATABASE_URL` | API, worker, migration | `postgresql://tsdhn:tsdhn@localhost:5432/tsdhn_compute` | Compute-plane Postgres connection |
+| `COMPUTE_DATABASE_URL` | API, worker, migration | `postgresql://tsdhn:tsdhn@localhost:5432/tsdhn_compute` | Worker Postgres connection |
 | `PROCRASTINATE_QUEUE` | API, worker | `simulations` | Procrastinate queue name |
 | `MINIO_ENDPOINT` | worker, API health | `localhost:9000` | MinIO or S3-compatible endpoint |
 | `MINIO_ACCESS_KEY` | worker, API health | `minioadmin` | MinIO access key |
 | `MINIO_SECRET_KEY` | worker, API health | `minioadmin` | MinIO secret key |
-| `MINIO_BUCKET` | worker, API health | `tsdhn-results` | Bucket for artifact bundles and metadata |
+| `MINIO_BUCKET` | worker, API health | `tsdhn-results` | Bucket for artifacts and metadata |
 | `MINIO_SECURE` | worker, API health | `false` | Use HTTPS for MinIO client connections |
 | `TSDHN_API_LOG` | API | `tsunami_api.log` | API log file path |
 | `TSDHN_MODEL_DIR` | API, worker | none | Model asset directory loaded by `tsdhn` |
@@ -72,7 +71,7 @@ web app, not FastAPI directly.
 | `GET` | `/api/v1/health` | No | API liveness, Postgres readiness, and MinIO readiness |
 | `GET` | `/api/v1/version` | No | Package name and version |
 | `POST` | `/api/v1/calculations` | Yes | Source-parameter and travel-time preview |
-| `POST` | `/api/v1/jobs` | Yes | Enqueue a full simulation using the control-plane `app_job_id` idempotency key |
+| `POST` | `/api/v1/jobs` | Yes | Enqueue a full simulation using the web app's `app_job_id` idempotency key |
 | `GET` | `/api/v1/jobs/{app_job_id}` | Yes | Read queue status and completed metadata |
 | `GET` | `/api/v1/jobs/{app_job_id}/events` | Yes | Server-sent progress stream |
 

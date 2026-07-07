@@ -1,7 +1,7 @@
 [project]
 name = "picv-2025"
 version = "0.1.1"
-description = "Tsunami simulation orchestrator workspace"
+description = "TSDHN tsunami simulation workspace"
 requires-python = ">=3.14"
 readme = "readme.md"
 license = { text = "MIT" }
