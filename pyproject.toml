@@ -32,7 +32,7 @@ dev = [
     "pip-audit==2.10.1",
 ]
 build = [
-    "uv_build==0.11.25",
+    "uv_build==0.11.27",
 ]
 
 [tool.ruff]
