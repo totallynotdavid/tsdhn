@@ -1,7 +1,7 @@
 [project]
 name = "tsdhn"
 version = "0.1.1"
-description = "TSDHN research CLI and simulation engine"
+description = "TSDHN CLI for researchers and simulation engine"
 requires-python = ">=3.14"
 readme = "readme.md"
 license = { text = "MIT" }

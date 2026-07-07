@@ -10,8 +10,8 @@ The app uses a server-side web backend pattern:
 - The service token stays in server-side code.
 - SQLite/libSQL stores data managed by the web app, such as users and submitted simulation
   records.
-- The FastAPI compute plane manages live simulation progress, worker state, and
-  MinIO artifact pointers.
+- FastAPI manages live simulation progress, worker state, and MinIO artifact
+  pointers.
 
 ## Commands
 

@@ -1,4 +1,4 @@
-# TSDHN orchestrator
+# TSDHN
 
 <!-- prettier-ignore-start -->
 <div align="center">
@@ -11,10 +11,10 @@
 </div>
 <!-- prettier-ignore-end -->
 
-TSDHN orchestrator runs tsunami simulation workflows from earthquake source
+TSDHN runs tsunami simulations from earthquake source
 parameters. The repository contains one shared `tsdhn` simulation engine and
-research CLI, a FastAPI compute adapter, a Procrastinate worker, a SvelteKit
-web app, and the generated TypeScript API client used by the web server.
+CLI for researchers, a FastAPI service, a Procrastinate worker, a SvelteKit web
+app, and the generated TypeScript API client used by the web server.
 
 ## Documentation
 
@@ -50,8 +50,8 @@ flowchart LR
 The browser talks to the SvelteKit app. The SvelteKit server calls the FastAPI
 backend with `BACKEND_SERVICE_TOKEN`; that token is never sent to browser code.
 Long simulations run in the Procrastinate worker, which calls the shared
-`tsdhn` engine, updates `compute_jobs` in Postgres, and writes artifact bundles
-and metadata to MinIO.
+`tsdhn` engine, updates `compute_jobs` in Postgres, and writes artifacts and
+metadata to MinIO.
 
 ## Quick start
 
