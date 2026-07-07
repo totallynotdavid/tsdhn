@@ -1,4 +1,4 @@
-FROM ubuntu:26.04
+FROM ubuntu:24.04
 
 ARG TTT_SDK_REPO="https://gitlab.com/totallynotdavid/tttapi/"
 ARG TYPST_VERSION=0.15.0
