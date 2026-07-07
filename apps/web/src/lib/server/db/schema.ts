@@ -17,9 +17,6 @@ export const simulation = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     params: text("params", { mode: "json" }).notNull(),
-    skipSteps: text("skip_steps", { mode: "json" })
-      .notNull()
-      .default(sql`'[]'`),
     status: text("status").notNull().default("pending_dispatch"),
     computeBackend: text("compute_backend"),
     computeJobId: text("compute_job_id"),
@@ -31,7 +28,9 @@ export const simulation = sqliteTable(
     totalSteps: integer("total_steps"),
     calculation: text("calculation", { mode: "json" }),
     travelTimes: text("travel_times", { mode: "json" }),
-    reportAvailable: integer("report_available", { mode: "boolean" }).notNull().default(false),
+    artifactsAvailable: integer("artifacts_available", { mode: "boolean" })
+      .notNull()
+      .default(false),
     error: text("error"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)

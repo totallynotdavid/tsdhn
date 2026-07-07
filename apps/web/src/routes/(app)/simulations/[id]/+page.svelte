@@ -30,7 +30,7 @@
         result_key: data.sim.resultKey,
         error: data.sim.error,
         finished_at: data.sim.finishedAt?.toISOString() ?? null,
-        report_available: data.sim.reportAvailable,
+        artifacts_available: data.sim.artifactsAvailable,
       }
     );
   }
@@ -155,10 +155,10 @@
       </div>
     {/if}
 
-    {#if live.status === "completed" && live.report_available}
-      <a href="/simulations/{data.sim.id}/report">
-        <Button class="w-full">Descargar reporte (PDF)</Button>
-      </a>
+    {#if live.status === "completed" && live.artifacts_available}
+      <Alert tone="success" title="Artefactos listos">
+        Los resultados estructurados y mapas fueron generados por el backend.
+      </Alert>
     {/if}
   </div>
 

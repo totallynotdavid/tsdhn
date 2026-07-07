@@ -24,9 +24,9 @@ export const load: PageServerLoad = async ({ params, locals, fetch }) => {
     params: { path: { app_job_id: sim.id } },
   });
   if (status) {
-    await syncStatus(sim.id, status.status, status.report_available, status);
+    await syncStatus(sim.id, status.status, status.artifacts_available, status);
     sim.status = status.status;
-    sim.reportAvailable = status.report_available;
+    sim.artifactsAvailable = status.artifacts_available;
     sim.details = status.details ?? null;
     sim.step = status.step ?? null;
     sim.stepIndex = status.step_index ?? null;

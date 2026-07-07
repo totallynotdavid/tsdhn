@@ -12,7 +12,7 @@ function errorMessage(error: unknown): string {
 }
 
 export async function dispatchSimulation(
-  sim: Pick<Simulation, "id" | "params" | "skipSteps">,
+  sim: Pick<Simulation, "id" | "params">,
   client: TsdhnClient,
   computeBackend = DEFAULT_COMPUTE_BACKEND,
 ): Promise<{ ok: true; computeJobId: string } | { ok: false; error: string }> {
@@ -21,7 +21,6 @@ export async function dispatchSimulation(
       body: {
         app_job_id: sim.id,
         input: sim.params as EarthquakeInput,
-        skip_steps: sim.skipSteps as string[],
       },
     });
 

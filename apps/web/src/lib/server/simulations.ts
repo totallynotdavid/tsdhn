@@ -19,7 +19,7 @@ export function markDispatchAccepted(
       computeBackend,
       computeJobId,
       error: null,
-      reportAvailable: false,
+      artifactsAvailable: false,
       dispatchedAt: new Date(),
       finishedAt: null,
     })
@@ -57,7 +57,7 @@ export async function getSimulation(userId: string, id: string): Promise<Simulat
 export function syncStatus(
   id: string,
   status: string,
-  reportAvailable: boolean,
+  artifactsAvailable: boolean,
   snapshot?: {
     details?: string | null;
     step?: string | null;
@@ -81,7 +81,7 @@ export function syncStatus(
     .update(simulation)
     .set({
       status,
-      reportAvailable,
+      artifactsAvailable,
       details: snapshot?.details ?? null,
       step: snapshot?.step ?? null,
       stepIndex: snapshot?.step_index ?? null,
