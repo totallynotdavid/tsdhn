@@ -1,4 +1,5 @@
 import logging
+import shutil
 import subprocess
 from dataclasses import dataclass
 from importlib.resources import files
@@ -75,7 +76,7 @@ def create_cpt_files(work_dir: Path) -> tuple[Path, Path]:
         # Create depth color palette
         with GMTTempFile() as temp_cpt:
             pygmt.makecpt(cmap="globe", output=temp_cpt.name)
-            Path(temp_cpt.name).rename(depth_cpt)
+            shutil.move(temp_cpt.name, depth_cpt)
 
         # Create height color palette
         with GMTTempFile() as temp_cpt:
@@ -85,7 +86,7 @@ def create_cpt_files(work_dir: Path) -> tuple[Path, Path]:
                 continuous=True,
                 output=temp_cpt.name,
             )
-            Path(temp_cpt.name).rename(hgt_cpt)
+            shutil.move(temp_cpt.name, hgt_cpt)
 
             # GMT uses B, F, and N rows for below-range, above-range, and NaN colors.
             with open(hgt_cpt, "a") as f:
