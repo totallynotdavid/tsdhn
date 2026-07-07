@@ -10,7 +10,7 @@ authors = [
 ]
 dependencies = [
     "tsdhn-core",
-    "typer==0.20.0",
+    "typer==0.26.8",
     "rich==15.0.0",
 ]
 
