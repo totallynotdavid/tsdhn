@@ -106,23 +106,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/jobs/{app_job_id}/report": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Job Report */
-        get: operations["get_job_report_api_v1_jobs__app_job_id__report_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -222,8 +205,6 @@ export interface components {
              */
             app_job_id: string;
             input: components["schemas"]["EarthquakeInput"];
-            /** Skip Steps */
-            skip_steps?: string[];
         };
         /** JobStatusResponse */
         JobStatusResponse: {
@@ -256,10 +237,10 @@ export interface components {
             /** Finished At */
             finished_at?: string | null;
             /**
-             * Report Available
+             * Artifacts Available
              * @default false
              */
-            report_available: boolean;
+            artifacts_available: boolean;
         };
         /** TsunamiTravelResponse */
         TsunamiTravelResponse: {
@@ -469,37 +450,6 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_job_report_api_v1_jobs__app_job_id__report_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                app_job_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            307: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

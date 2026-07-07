@@ -1,8 +1,8 @@
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from core.schemas import CalculationResponse, EarthquakeInput, TsunamiTravelResponse
+from tsdhn.domain import CalculationResponse, EarthquakeInput, TsunamiTravelResponse
 
 __all__ = [
     "CalculationPreview",
@@ -24,7 +24,6 @@ class CalculationPreview(BaseModel):
 class JobRequest(BaseModel):
     app_job_id: UUID
     input: EarthquakeInput
-    skip_steps: list[str] = Field(default_factory=list)
 
 
 class JobCreated(BaseModel):
@@ -51,7 +50,7 @@ class JobStatusResponse(BaseModel):
     created_at: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
-    report_available: bool = False
+    artifacts_available: bool = False
 
 
 class HealthStatus(BaseModel):

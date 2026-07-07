@@ -1,13 +1,10 @@
 import logging
 import shutil
 import uuid
-from collections.abc import Iterator
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
 
 import psycopg
-from minio.error import S3Error
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -15,25 +12,16 @@ from api.core.procrastinate_app import app
 from api.core.settings import (
     COMPUTE_DATABASE_URL,
     JOBS_DIR,
-    MINIO_BUCKET,
     PROCRASTINATE_QUEUE,
-    REPORT_DOWNLOAD_MAX_BYTES,
 )
 from api.core.storage import artifact_store, iso
-from core.config import MASTER_PIPELINE
-from core.schemas import EarthquakeInput, JobStatus
-from core.simulation import SimulationResult, run_simulation
-from core.utils.file_utils import sanitize_for_log
+from tsdhn.domain import EarthquakeInput, JobStatus
+from tsdhn.engine import SimulationResult, run_simulation
+from tsdhn.utils.file_utils import sanitize_for_log
 
 __all__ = [
     "ComputeJobs",
     "JobStatus",
-    "ReportDownload",
-    "ReportInvariantError",
-    "ReportMissingError",
-    "ReportNotReadyError",
-    "ReportStorageError",
-    "ReportTooLargeError",
     "compute_jobs",
     "install_compute_schema",
     "run_simulation_task",
@@ -43,34 +31,6 @@ logger = logging.getLogger(__name__)
 
 JobRow = dict[str, Any]
 DB_CONNECT_TIMEOUT_SECONDS = 2
-REPORT_CONTENT_TYPE = "application/pdf"
-
-
-@dataclass(frozen=True)
-class ReportDownload:
-    content_type: str
-    size: int
-    chunks: Iterator[bytes]
-
-
-class ReportNotReadyError(ValueError):
-    pass
-
-
-class ReportMissingError(ValueError):
-    pass
-
-
-class ReportInvariantError(RuntimeError):
-    pass
-
-
-class ReportStorageError(RuntimeError):
-    pass
-
-
-class ReportTooLargeError(RuntimeError):
-    pass
 
 
 COMPUTE_JOBS_SCHEMA = """
@@ -79,7 +39,6 @@ CREATE TABLE IF NOT EXISTS compute_jobs (
   external_id uuid UNIQUE NOT NULL,
   status text NOT NULL,
   input_params jsonb NOT NULL,
-  skip_steps jsonb NOT NULL DEFAULT '[]'::jsonb,
   details text,
   step text,
   step_index integer,
@@ -104,7 +63,7 @@ CREATE INDEX IF NOT EXISTS compute_jobs_created_at_idx
 
 
 SELECT_BY_EXTERNAL_ID = """
-SELECT id, external_id, status, input_params, skip_steps, details, step,
+SELECT id, external_id, status, input_params, details, step,
        step_index, total_steps, calculation, travel_times, result_bucket,
        result_key, error, created_at, updated_at, started_at, finished_at
 FROM compute_jobs
@@ -113,7 +72,7 @@ WHERE external_id = %s
 
 
 SELECT_BY_ID = """
-SELECT id, external_id, status, input_params, skip_steps, details, step,
+SELECT id, external_id, status, input_params, details, step,
        step_index, total_steps, calculation, travel_times, result_bucket,
        result_key, error, created_at, updated_at, started_at, finished_at
 FROM compute_jobs
@@ -123,11 +82,11 @@ WHERE id = %s
 
 INSERT_JOB_SQL = """
 INSERT INTO compute_jobs (
-  id, external_id, status, input_params, skip_steps, details
+  id, external_id, status, input_params, details
 )
-VALUES (%s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s)
 ON CONFLICT (external_id) DO NOTHING
-RETURNING id, external_id, status, input_params, skip_steps, details, step,
+RETURNING id, external_id, status, input_params, details, step,
           step_index, total_steps, calculation, travel_times, result_bucket,
           result_key, error, created_at, updated_at, started_at, finished_at
 """
@@ -139,13 +98,6 @@ def install_compute_schema() -> None:
     ) as conn:
         conn.execute(COMPUTE_JOBS_SCHEMA)
         conn.commit()
-
-
-def _validate_skip_steps(skip_steps: list[str]) -> None:
-    valid_steps = {step.name for step in MASTER_PIPELINE}
-    invalid = set(skip_steps) - valid_steps
-    if invalid:
-        raise ValueError(f"Invalid steps to skip: {', '.join(sorted(invalid))}")
 
 
 def _model_dump(data: EarthquakeInput) -> dict[str, Any]:
@@ -188,7 +140,7 @@ def _status_from_row(row: JobRow) -> dict[str, Any]:
         "created_at": iso(row["created_at"]),
         "started_at": iso(row["started_at"]),
         "finished_at": iso(row["finished_at"]),
-        "report_available": status == JobStatus.COMPLETED.value
+        "artifacts_available": status == JobStatus.COMPLETED.value
         and row["result_key"] is not None,
     }
 
@@ -233,12 +185,8 @@ class ComputeJobs:
         self,
         *,
         data: EarthquakeInput,
-        skip_steps: list[str] | None,
         external_id: str,
     ) -> dict[str, Any]:
-        skip_steps = skip_steps or []
-        _validate_skip_steps(skip_steps)
-
         app_job_id = _as_uuid(external_id)
         input_params = _model_dump(data)
 
@@ -258,7 +206,6 @@ class ComputeJobs:
                     app_job_id,
                     JobStatus.QUEUED.value,
                     Jsonb(input_params),
-                    Jsonb(skip_steps),
                     "Queued for simulation worker",
                 ],
             ).fetchone()
@@ -267,10 +214,7 @@ class ComputeJobs:
                 existing = _fetch_by_external_id(conn, app_job_id)
                 if existing is None:
                     raise RuntimeError("Compute job was not persisted")
-                if (
-                    existing["input_params"] != input_params
-                    or existing["skip_steps"] != skip_steps
-                ):
+                if existing["input_params"] != input_params:
                     raise ValueError("Job id already exists with different input")
                 return _status_from_row(existing)
 
@@ -302,39 +246,6 @@ class ComputeJobs:
         if row is None:
             raise ValueError("Invalid or unknown job ID")
         return _status_from_row(row)
-
-    def get_report_download(self, app_job_id: str) -> ReportDownload:
-        status = self.get_job_status(app_job_id)
-        if status["status"] != JobStatus.COMPLETED.value or not status["result_key"]:
-            raise ReportNotReadyError("Report is not available")
-
-        expected_key = f"simulations/{app_job_id}/reporte.pdf"
-        result_bucket = status["result_bucket"]
-        result_key = str(status["result_key"])
-        if result_bucket != MINIO_BUCKET or result_key != expected_key:
-            raise ReportInvariantError("Completed job points to an unexpected report")
-
-        try:
-            info = artifact_store.stat_object(result_key)
-        except S3Error as e:
-            if e.code in {"NoSuchBucket", "NoSuchKey", "NoSuchObject"}:
-                raise ReportMissingError("Report object was not found") from e
-            raise ReportStorageError("Report storage is unavailable") from e
-        except Exception as e:
-            raise ReportStorageError("Report storage is unavailable") from e
-
-        if info.size > REPORT_DOWNLOAD_MAX_BYTES:
-            raise ReportTooLargeError("Report object exceeds the download size limit")
-
-        content_type = (info.content_type or "").split(";", 1)[0].strip().lower()
-        if content_type != REPORT_CONTENT_TYPE:
-            raise ReportInvariantError("Report object has an unexpected content type")
-
-        return ReportDownload(
-            content_type=REPORT_CONTENT_TYPE,
-            size=info.size,
-            chunks=artifact_store.stream_object(result_key),
-        )
 
     def is_database_connected(self) -> bool:
         try:
@@ -370,7 +281,6 @@ def run_simulation_task(compute_job_id: str) -> None:
         app_job_id = str(row["external_id"])
         work_dir = JOBS_DIR / app_job_id
         data = EarthquakeInput(**row["input_params"])
-        skip_steps = cast(list[str], row["skip_steps"])
 
         conn.execute(
             """
@@ -395,7 +305,6 @@ def run_simulation_task(compute_job_id: str) -> None:
             result = run_simulation(
                 data,
                 work_dir,
-                skip_steps=skip_steps,
                 on_progress=on_progress,
             )
             _complete_job(conn, row, result)
@@ -443,12 +352,19 @@ def _complete_job(
         "finished_at": now.isoformat(),
         "calculation": calculation,
         "travel_times": travel_times,
-        "report_key": f"simulations/{app_job_id}/reporte.pdf",
+        "artifacts": [
+            {
+                "name": artifact.name,
+                "key": f"simulations/{app_job_id}/artifacts/{artifact.path.name}",
+                "content_type": artifact.content_type,
+            }
+            for artifact in result.bundle.artifacts
+        ],
     }
-    bucket, report_key = artifact_store.upload_simulation_result(
+    bucket, metadata_key = artifact_store.upload_simulation_result(
         app_job_id=app_job_id,
         compute_job_id=compute_job_id,
-        report_path=result.report_path,
+        bundle=result.bundle,
         metadata=metadata,
     )
 
@@ -472,7 +388,7 @@ def _complete_job(
             Jsonb(calculation),
             Jsonb(travel_times),
             bucket,
-            report_key,
+            metadata_key,
             now,
             row["id"],
         ],

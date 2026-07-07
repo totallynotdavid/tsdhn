@@ -278,57 +278,6 @@
           }
         }
       }
-    },
-    "/api/v1/jobs/{app_job_id}/report": {
-      "get": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Get Job Report",
-        "operationId": "get_job_report_api_v1_jobs__app_job_id__report_get",
-        "parameters": [
-          {
-            "name": "app_job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "App Job Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "307": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -569,13 +518,6 @@
           },
           "input": {
             "$ref": "#/components/schemas/EarthquakeInput"
-          },
-          "skip_steps": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Skip Steps"
           }
         },
         "type": "object",
@@ -729,9 +671,9 @@
             ],
             "title": "Finished At"
           },
-          "report_available": {
+          "artifacts_available": {
             "type": "boolean",
-            "title": "Report Available",
+            "title": "Artifacts Available",
             "default": false
           }
         },
