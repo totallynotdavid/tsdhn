@@ -1,9 +1,10 @@
 # Self-hosted backend stack for TSDHN.
 #
-#   docker compose up -d            # postgres + minio + libsql + api + worker
-#   docker compose --profile web up # also build & run the SvelteKit app (adapter-node)
+#   docker compose up -d                  # build/run postgres + minio + libsql + api + worker
+#   docker compose --profile web up       # also build/run the SvelteKit app (adapter-node)
+#   API_IMAGE=ghcr.io/org/tsdhn-api:tag docker compose up --no-build api worker
 #
-# The backend is self-hosted because it needs the Fortran/GMT/Typst toolchain.
+# The backend is self-hosted because it needs the Fortran/GMT/TTT toolchain.
 # Edge web deployments should point BACKEND_URL and DATABASE_URL at these services.
 
 services:
@@ -51,11 +52,12 @@ services:
       - libsql-data:/var/lib/sqld
 
   compute-migrate:
+    image: ${API_IMAGE:-tsdhn-api:local}
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
       args:
-        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:main}
+        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:master}
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,11 +76,12 @@ services:
     restart: "no"
 
   api:
+    image: ${API_IMAGE:-tsdhn-api:local}
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
       args:
-        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:main}
+        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:master}
     restart: unless-stopped
     depends_on:
       compute-migrate:
@@ -97,11 +100,12 @@ services:
       - "8000:8000"
 
   worker:
+    image: ${API_IMAGE:-tsdhn-api:local}
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
       args:
-        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:main}
+        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:master}
     restart: unless-stopped
     depends_on:
       compute-migrate:
@@ -122,6 +126,7 @@ services:
       - jobs-data:/app/jobs
 
   web:
+    image: ${WEB_IMAGE:-tsdhn-web:local}
     profiles: ["web"]
     build:
       context: .

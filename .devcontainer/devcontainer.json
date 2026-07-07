@@ -1,6 +1,6 @@
 {
     "name": "TSDHN",
-    "image": "ghcr.io/totallynotdavid/tsdhn-dev:main",
+    "image": "ghcr.io/totallynotdavid/tsdhn-dev:master",
     "workspaceFolder": "/app",
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
 

@@ -1,11 +1,11 @@
 # FastAPI and the Procrastinate worker run in this image for the self-hosted backend.
 #
 # Builds on the TSDHN toolchain base, which provides the scientific runtime:
-# GMT, Intel Fortran, Typst, and ttt_client. The base ships Python 3.12 for
+# GMT, Intel Fortran, and ttt_client. The base ships Python 3.12 for
 # system tooling; the app uses uv-managed Python 3.14.
 #
 # Build context is the repo root:  docker build -f deploy/api.Dockerfile .
-ARG TOOLCHAIN_IMAGE=ghcr.io/totallynotdavid/tsdhn-toolchain:main
+ARG TOOLCHAIN_IMAGE=ghcr.io/totallynotdavid/tsdhn-toolchain:master
 FROM ${TOOLCHAIN_IMAGE}
 
 USER root
@@ -32,7 +32,6 @@ RUN mkdir -p /app/tools \
  && ifx -parallel -qopenmp /app/model/tsunami1.for -o /app/tools/tsunami \
  && command -v gmt \
  && command -v ttt_client \
- && command -v typst \
  && test -x /app/tools/fault_plane \
  && test -x /app/tools/deform \
  && test -x /app/tools/tsunami
