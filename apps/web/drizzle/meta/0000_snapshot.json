@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8eac4462-e2cc-448b-9ab9-02b5a84a2b92",
+  "id": "eab180e2-5562-41ec-b5a9-53f6c6c2da69",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "simulation": {
@@ -34,10 +34,80 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'queued'"
+          "default": "'pending_dispatch'"
         },
-        "report_available": {
-          "name": "report_available",
+        "compute_backend": {
+          "name": "compute_backend",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "compute_job_id": {
+          "name": "compute_job_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "result_bucket": {
+          "name": "result_bucket",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "result_key": {
+          "name": "result_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "details": {
+          "name": "details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "step": {
+          "name": "step",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "step_index": {
+          "name": "step_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "total_steps": {
+          "name": "total_steps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "calculation": {
+          "name": "calculation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "travel_times": {
+          "name": "travel_times",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "artifacts_available": {
+          "name": "artifacts_available",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -67,6 +137,13 @@
           "autoincrement": false,
           "default": "(cast(unixepoch('subsecond') * 1000 as integer))"
         },
+        "dispatched_at": {
+          "name": "dispatched_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "finished_at": {
           "name": "finished_at",
           "type": "integer",
@@ -79,6 +156,21 @@
         "simulation_userId_idx": {
           "name": "simulation_userId_idx",
           "columns": ["user_id"],
+          "isUnique": false
+        },
+        "simulation_user_createdAt_idx": {
+          "name": "simulation_user_createdAt_idx",
+          "columns": ["user_id", "created_at"],
+          "isUnique": false
+        },
+        "simulation_status_idx": {
+          "name": "simulation_status_idx",
+          "columns": ["status"],
+          "isUnique": false
+        },
+        "simulation_compute_idx": {
+          "name": "simulation_compute_idx",
+          "columns": ["compute_backend", "compute_job_id"],
           "isUnique": false
         }
       },

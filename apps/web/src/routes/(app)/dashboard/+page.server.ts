@@ -20,9 +20,9 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
           params: { path: { app_job_id: s.id } },
         });
         if (data) {
-          await syncStatus(s.id, data.status, data.report_available, data);
+          await syncStatus(s.id, data.status, data.artifacts_available, data);
           s.status = data.status;
-          s.reportAvailable = data.report_available;
+          s.artifactsAvailable = data.artifacts_available;
           s.error = data.error ?? null;
         }
       }),

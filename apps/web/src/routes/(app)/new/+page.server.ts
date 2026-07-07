@@ -23,18 +23,16 @@ export const actions: Actions = {
 
     const input = toEarthquakeInput(form.data);
     const appJobId = crypto.randomUUID();
-    const skipSteps: string[] = [];
 
     await createSimulation({
       id: appJobId,
       userId: user.id,
       params: input,
-      skipSteps,
       status: "pending_dispatch",
     });
 
     const client = backend(fetch);
-    const dispatch = await dispatchSimulation({ id: appJobId, params: input, skipSteps }, client);
+    const dispatch = await dispatchSimulation({ id: appJobId, params: input }, client);
     if (!dispatch.ok) {
       return message(form, "No se pudo iniciar la simulación.", { status: 502 });
     }

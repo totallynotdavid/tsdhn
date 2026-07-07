@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1782746518035,
-      "tag": "0000_busy_sprite",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1783357573010,
-      "tag": "0001_fearless_frightful_four",
+      "when": 1783444160559,
+      "tag": "0000_blue_tana_nile",
       "breakpoints": true
     }
   ]
