@@ -4,11 +4,6 @@ on:
     push:
         tags: ["v*.*.*"]
     workflow_dispatch:
-        inputs:
-            dry_run:
-                description: "Dry run (build + test, no publish)"
-                type: boolean
-                default: false
 
 # Default: no permissions.
 # Each job opts into what it needs.
@@ -21,6 +16,9 @@ concurrency:
 env:
     UV_VERSION: "0.11.27"
     PYTHON_VERSION: "3.14"
+    IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+    CANDIDATE_TAG: candidate-${{ github.run_id }}-${{ github.run_attempt }}
+    RELEASE_BRANCH_TAG: master
 
 jobs:
     build-sdist-wheels:
@@ -44,68 +42,70 @@ jobs:
             - name: Sync with build group
               run: uv sync --all-packages --group dev --group build
 
+            - name: Build tsdhn
+              run: uv build --package tsdhn --out-dir dist/tsdhn
+
             - name: Build tsdhn-api
               run: uv build --package tsdhn-api --out-dir dist/api
-
-            - name: Build tsdhn-cli
-              run: uv build --package tsdhn-cli --out-dir dist/cli
 
             - name: Upload dist artifacts
               uses: actions/upload-artifact@v7
               with:
                   name: dist
                   path: |
+                      dist/tsdhn/*
                       dist/api/*
-                      dist/cli/*
 
-    publish-pypi:
-        name: Publish to PyPI
-        needs: build-sdist-wheels
-
-        # Only publish when PyPI trusted publishing is explicitly configured.
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && vars.PUBLISH_PYPI == 'true'
+    build-model-assets:
+        name: Build model asset bundle
         runs-on: ubuntu-latest
-
         permissions:
-            id-token: write
-            attestations: write
-
-        environment: pypi
-
+            contents: read
         steps:
-            - name: Download dist artifacts
-              uses: actions/download-artifact@v8
-              with:
-                  name: dist
-                  path: dist
+            - uses: actions/checkout@v7
 
-            - name: Attest PyPI artifacts (SLSA build provenance)
-              uses: actions/attest@v4.1.1
-              with:
-                  subject-path: dist/**/*.tar.gz,dist/**/*.whl
-                  show-summary: false
+            - name: Build model archive
+              run: |
+                  set -euo pipefail
+                  mkdir -p dist/model
+                  version="${GITHUB_REF_NAME#v}"
+                  archive="dist/model/tsdhn-model-v${version}.tar.gz"
+                  tar -czf "$archive" -C model .
+                  sha256sum "$archive" > "${archive}.sha256"
+                  python - <<'PY'
+                  import json
+                  import os
+                  from pathlib import Path
 
-            - name: Publish tsdhn-api
-              uses: pypa/gh-action-pypi-publish@release/v1
-              with:
-                  packages-dir: dist/api
+                  version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+                  files = sorted(str(path.relative_to("model")) for path in Path("model").rglob("*") if path.is_file())
+                  manifest = {
+                      "version": version,
+                      "model_schema": 1,
+                      "source_commit": os.environ["GITHUB_SHA"],
+                      "files": files,
+                  }
+                  Path(f"dist/model/tsdhn-model-manifest-v{version}.json").write_text(
+                      json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                      encoding="utf-8",
+                  )
+                  PY
 
-            - name: Publish tsdhn-cli
-              uses: pypa/gh-action-pypi-publish@release/v1
+            - name: Upload model assets
+              uses: actions/upload-artifact@v7
               with:
-                  packages-dir: dist/cli
+                  name: model-assets
+                  path: dist/model/*
 
-    publish-toolchain-image:
-        name: Build & push Docker (toolchain)
+    build-toolchain-image:
+        name: Build candidate Docker (toolchain)
         needs: build-sdist-wheels
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         runs-on: ubuntu-latest
         permissions:
             contents: read
             packages: write
             id-token: write
             attestations: write
-            artifact-metadata: write
         steps:
             - uses: actions/checkout@v7
 
@@ -123,13 +123,11 @@ jobs:
               id: meta
               uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
               with:
-                  images: ghcr.io/${{ github.repository_owner }}/tsdhn-toolchain
+                  images: ${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain
                   tags: |
-                      type=ref,event=tag
-                      type=raw,value=main
-                      type=sha,format=short
+                      type=raw,value=${{ env.CANDIDATE_TAG }}
 
-            - name: Build and push
+            - name: Build and push candidate
               id: build
               uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
               with:
@@ -144,38 +142,23 @@ jobs:
                   provenance: true
                   sbom: true
 
-            # Docs: https://github.com/actions/attest#container-image
-            - name: Attest image (SLSA build provenance, pushed to registry)
+            - name: Attest candidate image
               uses: actions/attest@v4.1.1
               with:
-                  # subject-name must be the fully-qualified image name, no tag.
-                  subject-name: ghcr.io/${{ github.repository_owner }}/tsdhn-toolchain
+                  subject-name: ${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain
                   subject-digest: ${{ steps.build.outputs.digest }}
                   push-to-registry: true
                   show-summary: false
 
-            - name: Install cosign
-              uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-              with:
-                  cosign-release: "v2.4.3"
-
-            - name: Sign published image
-              env:
-                  TAGS: ${{ steps.meta.outputs.tags }}
-                  DIGEST: ${{ steps.build.outputs.digest }}
-              run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
-
-    publish-app-images:
-        name: Build & push Docker (${{ matrix.target }})
-        needs: [build-sdist-wheels, publish-toolchain-image]
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    build-app-images:
+        name: Build candidate Docker (${{ matrix.target }})
+        needs: [build-sdist-wheels, build-toolchain-image]
         runs-on: ubuntu-latest
         permissions:
             contents: read
             packages: write
             id-token: write
             attestations: write
-            artifact-metadata: write
         strategy:
             fail-fast: false
             matrix:
@@ -209,13 +192,11 @@ jobs:
               id: meta
               uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
               with:
-                  images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+                  images: ${{ env.IMAGE_REGISTRY }}/${{ matrix.image }}
                   tags: |
-                      type=ref,event=tag
-                      type=raw,value=main
-                      type=sha,format=short
+                      type=raw,value=${{ env.CANDIDATE_TAG }}
 
-            - name: Build and push
+            - name: Build and push candidate
               id: build
               uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
               with:
@@ -225,37 +206,167 @@ jobs:
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
                   build-args: |
-                      TOOLCHAIN_IMAGE=ghcr.io/${{ github.repository_owner }}/tsdhn-toolchain:${{ github.ref_name }}
+                      TOOLCHAIN_IMAGE=${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain:${{ env.CANDIDATE_TAG }}
                   cache-from: type=gha,scope=${{ matrix.cache_scope }}
                   cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
                   platforms: linux/amd64
                   provenance: true
                   sbom: true
 
-            # Docs: https://github.com/actions/attest#container-image
-            - name: Attest image (SLSA build provenance, pushed to registry)
+            - name: Attest candidate image
               uses: actions/attest@v4.1.1
               with:
-                  # subject-name must be the fully-qualified image name, no tag.
-                  subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+                  subject-name: ${{ env.IMAGE_REGISTRY }}/${{ matrix.image }}
                   subject-digest: ${{ steps.build.outputs.digest }}
                   push-to-registry: true
                   show-summary: false
+
+    compose-smoke:
+        name: Compose smoke candidate images
+        needs: build-app-images
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        permissions:
+            contents: read
+            packages: read
+        env:
+            API_IMAGE: ${{ env.IMAGE_REGISTRY }}/tsdhn-api:${{ env.CANDIDATE_TAG }}
+            TOOLCHAIN_IMAGE: ${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain:${{ env.CANDIDATE_TAG }}
+            APP_JOB_ID: 4cfe522f-7e7d-46e0-96ca-7b98743fb9f5
+            BACKEND_SERVICE_TOKEN: compose-e2e-token
+            BETTER_AUTH_SECRET: compose-e2e-better-auth-secret
+            ORIGIN: http://localhost:3000
+            MINIO_ACCESS_KEY: minioadmin
+            MINIO_SECRET_KEY: minioadmin
+            MINIO_BUCKET: tsdhn-results
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Show Docker versions
+              run: |
+                  docker version
+                  docker compose version
+
+            - name: Log in to GitHub Container Registry
+              uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Pull candidate runtime image
+              run: docker pull "$API_IMAGE"
+
+            - name: Validate compose config
+              run: docker compose config --quiet
+
+            - name: Start backend stack from candidate images
+              run: docker compose up -d --no-build postgres minio compute-migrate api worker
+
+            - name: Run backend smoke test
+              run: bash scripts/e2e/backend_stack_smoke.sh
+
+            - name: Capture compose diagnostics
+              if: always()
+              run: |
+                  mkdir -p e2e-artifacts
+                  docker compose ps -a > e2e-artifacts/compose-ps.txt || true
+                  docker compose logs --no-color > e2e-artifacts/compose.log || true
+                  cp -f ./*.json ./*.jsonl ./*.txt e2e-artifacts/ 2>/dev/null || true
+
+            - name: Upload diagnostics
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: compose-smoke-diagnostics
+                  path: e2e-artifacts
+                  if-no-files-found: ignore
+
+            - name: Stop stack
+              if: always()
+              run: docker compose down -v --remove-orphans
+
+    promote-images:
+        name: Promote Docker images
+        needs: compose-smoke
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+            id-token: write
+        steps:
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+            - name: Log in to GitHub Container Registry
+              uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install cosign
               uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
               with:
                   cosign-release: "v2.4.3"
 
-            - name: Sign published image
-              env:
-                  TAGS: ${{ steps.meta.outputs.tags }}
-                  DIGEST: ${{ steps.build.outputs.digest }}
-              run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+            - name: Promote tested candidates
+              run: |
+                  set -euo pipefail
+                  short_sha="${GITHUB_SHA::7}"
+                  images=(tsdhn-toolchain tsdhn-api tsdhn-web tsdhn-dev)
+
+                  for image in "${images[@]}"; do
+                      source_ref="${IMAGE_REGISTRY}/${image}:${CANDIDATE_TAG}"
+                      release_ref="${IMAGE_REGISTRY}/${image}:${GITHUB_REF_NAME}"
+                      branch_ref="${IMAGE_REGISTRY}/${image}:${RELEASE_BRANCH_TAG}"
+                      sha_ref="${IMAGE_REGISTRY}/${image}:sha-${short_sha}"
+
+                      docker buildx imagetools create \
+                          -t "$release_ref" \
+                          -t "$branch_ref" \
+                          -t "$sha_ref" \
+                          "$source_ref"
+
+                      cosign sign --yes "$release_ref" "$branch_ref" "$sha_ref"
+                  done
+
+    publish-pypi:
+        name: Publish to PyPI
+        needs: [build-sdist-wheels, promote-images]
+
+        # Only publish when PyPI trusted publishing is explicitly configured.
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && vars.PUBLISH_PYPI == 'true'
+        runs-on: ubuntu-latest
+
+        permissions:
+            id-token: write
+            attestations: write
+
+        environment: pypi
+
+        steps:
+            - name: Download dist artifacts
+              uses: actions/download-artifact@v8
+              with:
+                  name: dist
+                  path: dist
+
+            - name: Attest PyPI artifacts (SLSA build provenance)
+              uses: actions/attest@v4.1.1
+              with:
+                  subject-path: dist/**/*.tar.gz,dist/**/*.whl
+                  show-summary: false
+
+            - name: Publish tsdhn
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  packages-dir: dist/tsdhn
 
     release-notes:
         name: Generate release notes
-        needs: build-sdist-wheels
+        needs: [build-model-assets, promote-images]
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         runs-on: ubuntu-latest
         permissions:
@@ -265,6 +376,13 @@ jobs:
               with:
                   fetch-depth: 0
 
+            - name: Download model assets
+              uses: actions/download-artifact@v8
+              with:
+                  name: model-assets
+                  path: dist/model
+
             - uses: softprops/action-gh-release@v3
               with:
                   generate_release_notes: true
+                  files: dist/model/*
