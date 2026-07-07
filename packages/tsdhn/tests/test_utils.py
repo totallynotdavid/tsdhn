@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from core.utils.geo import (
+from tsdhn.utils.geo import (
     calculate_distance_to_coast,
     determine_epicenter_location,
     determine_tsunami_warning,

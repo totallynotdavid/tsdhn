@@ -10,8 +10,8 @@ import pygmt
 import yaml
 from pygmt.helpers import GMTTempFile
 
-from core.executables import resolve
-from core.modules.point_ttt import read_meca_spec
+from tsdhn.external import resolve
+from tsdhn.render.point_ttt import read_meca_spec
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class TidalStation:
 
 
 def load_stations() -> list[TidalStation]:
-    stations_path = files("core.modules.data").joinpath("stations.yml")
+    stations_path = files("tsdhn.render.data").joinpath("stations.yml")
     logger.info("Loading stations configuration: %s", stations_path)
     try:
         with stations_path.open("r", encoding="utf-8") as f:
@@ -73,13 +73,13 @@ def create_cpt_files(work_dir: Path) -> tuple[Path, Path]:
     hgt_cpt = work_dir / "hgt.cpt"
 
     try:
-        # Create depth color palette
+        # GMT writes CPT files through a temporary path, then the pipeline owns them.
         with GMTTempFile() as temp_cpt:
             pygmt.makecpt(cmap="globe", output=temp_cpt.name)
             shutil.move(temp_cpt.name, depth_cpt)
 
-        # Create height color palette
         with GMTTempFile() as temp_cpt:
+            # The polar CPT preserves the legacy blue-to-red wave-height convention.
             pygmt.makecpt(
                 cmap="polar",
                 series="-0.5/0.5/0.01",
@@ -117,6 +117,7 @@ def process_grid(work_dir: Path, grid_config: GridConfig) -> Path:
                 f"Data size mismatch: Expected {expected_size}, got {data.size}"
             )
 
+        # The Fortran model writes column-major values. GMT expects north-up rows.
         arr = data.reshape((grid_config.ncols, grid_config.nrows), order="F")
         processed = np.flipud(arr.T)
 
@@ -280,22 +281,18 @@ def generate_maxola_plot(work_dir: Path) -> None:
         depth_cpt, hgt_cpt = create_cpt_files(work_dir)
         files_to_cleanup.extend([depth_cpt, hgt_cpt])
 
-        # Process grid data
         maximo_grid = process_grid(work_dir, grid_config)
         maxola_grid = work_dir / "maxola.grd"
         files_to_cleanup.extend([maximo_grid, maxola_grid])
 
-        # Convert grid format
         convert_grid_format(maximo_grid, maxola_grid)
 
-        # Create the figure
         fig = pygmt.Figure()
         fig.shift_origin(xshift="4.2c", yshift="10.0c")
 
-        # Add map of tsunami wave heights
+        # Azimuthal projection centered on the Pacific basin.
         fig.grdimage(grid=str(maxola_grid), cmap=hgt_cpt, projection="A210/-10/5.0i")
 
-        # Add map elements
         add_coastline(fig, style_config)
         add_tidal_stations(fig, stations, style_config)
         add_meca_data(fig, work_dir, style_config)

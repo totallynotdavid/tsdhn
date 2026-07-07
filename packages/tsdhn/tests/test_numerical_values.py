@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from core.calculator import TsunamiCalculator, parse_port_line
-from core.schemas import CalculationResponse, EarthquakeInput
+from tsdhn.calculator import TsunamiCalculator, parse_port_line
+from tsdhn.domain import CalculationResponse, EarthquakeInput
 
 
 @pytest.fixture(scope="module")

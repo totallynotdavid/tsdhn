@@ -2,7 +2,7 @@ import logging
 import subprocess
 from pathlib import Path
 
-from core.executables import resolve
+from tsdhn.external import resolve
 
 logger = logging.getLogger(__name__)
 

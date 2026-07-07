@@ -13,9 +13,8 @@ resolution-markers = [
 [manifest]
 members = [
     "picv-2025",
+    "tsdhn",
     "tsdhn-api",
-    "tsdhn-cli",
-    "tsdhn-core",
 ]
 
 [[package]]
@@ -1306,6 +1305,31 @@ wheels = [
 ]
 
 [[package]]
+name = "tsdhn"
+version = "0.1.1"
+source = { editable = "packages/tsdhn" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pydantic" },
+    { name = "pygmt" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "scipy" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = "==2.5.1" },
+    { name = "pydantic", specifier = "==2.13.4" },
+    { name = "pygmt", specifier = "==0.18.0" },
+    { name = "pyyaml", specifier = "==6.0.3" },
+    { name = "rich", specifier = "==15.0.0" },
+    { name = "scipy", specifier = "==1.18.0" },
+    { name = "typer", specifier = "==0.26.8" },
+]
+
+[[package]]
 name = "tsdhn-api"
 version = "0.1.1"
 source = { editable = "packages/api" }
@@ -1316,7 +1340,7 @@ dependencies = [
     { name = "procrastinate" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
-    { name = "tsdhn-core" },
+    { name = "tsdhn" },
     { name = "uvicorn" },
 ]
 
@@ -1328,46 +1352,8 @@ requires-dist = [
     { name = "procrastinate", specifier = ">=3.9.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "pydantic", specifier = "==2.13.4" },
-    { name = "tsdhn-core", editable = "packages/core" },
+    { name = "tsdhn", editable = "packages/tsdhn" },
     { name = "uvicorn", specifier = "==0.49.0" },
-]
-
-[[package]]
-name = "tsdhn-cli"
-version = "0.1.1"
-source = { editable = "packages/cli" }
-dependencies = [
-    { name = "rich" },
-    { name = "tsdhn-core" },
-    { name = "typer" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "rich", specifier = "==15.0.0" },
-    { name = "tsdhn-core", editable = "packages/core" },
-    { name = "typer", specifier = "==0.26.8" },
-]
-
-[[package]]
-name = "tsdhn-core"
-version = "0.1.1"
-source = { editable = "packages/core" }
-dependencies = [
-    { name = "numpy" },
-    { name = "pydantic" },
-    { name = "pygmt" },
-    { name = "pyyaml" },
-    { name = "scipy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "numpy", specifier = "==2.5.1" },
-    { name = "pydantic", specifier = "==2.13.4" },
-    { name = "pygmt", specifier = "==0.18.0" },
-    { name = "pyyaml", specifier = "==6.0.3" },
-    { name = "scipy", specifier = "==1.18.0" },
 ]
 
 [[package]]

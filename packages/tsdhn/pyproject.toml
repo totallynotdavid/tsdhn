@@ -1,7 +1,7 @@
 [project]
-name = "tsdhn-core"
+name = "tsdhn"
 version = "0.1.1"
-description = "TSDHN domain core: tsunami calculations and simulation pipeline orchestrator"
+description = "TSDHN research CLI and simulation engine"
 requires-python = ">=3.14"
 readme = "readme.md"
 license = { text = "MIT" }
@@ -14,12 +14,17 @@ dependencies = [
     "numpy==2.5.1",
     "pygmt==0.18.0",
     "pyyaml==6.0.3",
+    "typer==0.26.8",
+    "rich==15.0.0",
 ]
+
+[project.scripts]
+tsdhn = "tsdhn.cli.main:main"
 
 [build-system]
 requires = ["uv_build==0.11.27"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "core"
+module-name = "tsdhn"
 module-root = ""

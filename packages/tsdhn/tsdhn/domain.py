@@ -1,7 +1,4 @@
-from collections.abc import Callable
-from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 
 from pydantic import BaseModel, field_validator
 
@@ -54,19 +51,3 @@ class TsunamiTravelResponse(BaseModel):
     arrival_times: dict[str, str]
     distances: dict[str, float]
     epicenter_info: dict[str, str]
-
-
-@dataclass(frozen=True)
-class ProcessingStep:
-    name: str
-    command: list[str] | None = None
-    python_callable: Callable[[Path], Path | str | None] | None = None
-    system_executables: tuple[str, ...] = ()
-    file_checks: list[tuple[str, str]] = field(default_factory=list)
-    working_dir: str | None = None
-
-    def __post_init__(self) -> None:
-        if not (self.command is None) ^ (self.python_callable is None):
-            raise ValueError(
-                "ProcessingStep must have either command or python_callable"
-            )

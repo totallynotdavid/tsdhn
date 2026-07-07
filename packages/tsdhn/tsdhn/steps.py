@@ -1,11 +1,12 @@
 import shutil
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
 
-from core.modules.maxola import generate_maxola_plot
-from core.modules.point_ttt import generate_ttt_map
-from core.modules.reporte import generate_reports_wrapper
-from core.modules.ttt_inverso import ttt_inverso_python
-from core.modules.ttt_max import process_tsunami_data
-from core.schemas import ProcessingStep
+from tsdhn.render.maxola import generate_maxola_plot
+from tsdhn.render.point_ttt import generate_ttt_map
+from tsdhn.render.ttt_inverso import ttt_inverso_python
+from tsdhn.render.ttt_max import process_tsunami_data
 
 __all__ = [
     "EARTH_RADIUS",
@@ -21,19 +22,44 @@ __all__ = [
 GRAVITY: float = 9.81  # m/s2
 EARTH_RADIUS: float = 6370.8  # km
 
-PROCESSING_PIPELINE = [
+
+@dataclass(frozen=True)
+class ProcessingStep:
+    name: str
+    outputs: tuple[str, ...]
+    command: list[str] | None = None
+    python_callable: Callable[[Path], Path | str | None] | None = None
+    system_executables: tuple[str, ...] = ()
+    file_checks: list[tuple[str, str]] = field(default_factory=list)
+    working_dir: str | None = None
+
+    def __post_init__(self) -> None:
+        if not (self.command is None) ^ (self.python_callable is None):
+            raise ValueError(
+                "ProcessingStep must have either command or python_callable"
+            )
+
+
+def copy_ttt_pdf(working_dir: Path) -> None:
+    shutil.copy(working_dir / "ttt.pdf", working_dir.parent / "ttt.pdf")
+
+
+PROCESSING_PIPELINE = (
     ProcessingStep(
         name="fault_plane",
+        outputs=("pfalla.inp",),
         command=["./fault_plane"],
         file_checks=[("pfalla.inp", "Input file for deform not generated")],
     ),
     ProcessingStep(
         name="deform",
+        outputs=("deform",),
         command=["./deform"],
         file_checks=[("deform", "Deform executable missing")],
     ),
     ProcessingStep(
         name="tsunami",
+        outputs=("zfolder/green.dat", "zfolder/zmax_a.grd"),
         command=["./tsunami"],
         file_checks=[
             ("zfolder/green.dat", "Green data file missing"),
@@ -42,12 +68,14 @@ PROCESSING_PIPELINE = [
     ),
     ProcessingStep(
         name="maxola",
+        outputs=("maxola.pdf",),
         python_callable=generate_maxola_plot,
         system_executables=("gmt",),
         file_checks=[("maxola.pdf", "Maxola output missing")],
     ),
     ProcessingStep(
         name="ttt_max",
+        outputs=("zfolder/green_rev.dat", "ttt_max.dat", "mareograma.svg"),
         python_callable=process_tsunami_data,
         file_checks=[
             ("zfolder/green_rev.dat", "Scaled wave height data output missing"),
@@ -55,11 +83,12 @@ PROCESSING_PIPELINE = [
             ("mareograma.svg", "Mareogram plot missing"),
         ],
     ),
-]
+)
 
-TTT_MUNDO_STEPS = [
+TTT_MUNDO_STEPS = (
     ProcessingStep(
         name="ttt_inverso",
+        outputs=("ttt_mundo/ttt.b",),
         python_callable=ttt_inverso_python,
         system_executables=("gmt", "ttt_client"),
         working_dir="ttt_mundo",
@@ -67,6 +96,7 @@ TTT_MUNDO_STEPS = [
     ),
     ProcessingStep(
         name="point_ttt",
+        outputs=("ttt_mundo/ttt.pdf",),
         python_callable=generate_ttt_map,
         system_executables=("gmt",),
         working_dir="ttt_mundo",
@@ -74,19 +104,13 @@ TTT_MUNDO_STEPS = [
     ),
     ProcessingStep(
         name="copy_ttt_pdf",
-        python_callable=lambda wd: shutil.copy(wd / "ttt.pdf", wd.parent / "ttt.pdf"),
+        outputs=("ttt.pdf",),
+        python_callable=copy_ttt_pdf,
         working_dir="ttt_mundo",
         file_checks=[("../ttt.pdf", "ttt.pdf not copied to parent directory")],
     ),
-]
+)
 
-REPORT_STEPS = [
-    ProcessingStep(
-        name="generate_reports",
-        python_callable=generate_reports_wrapper,
-        system_executables=("typst",),
-        file_checks=[("reporte.pdf", "Final report PDF missing")],
-    ),
-]
+REPORT_STEPS: tuple[ProcessingStep, ...] = ()
 
-MASTER_PIPELINE = PROCESSING_PIPELINE + TTT_MUNDO_STEPS + REPORT_STEPS
+MASTER_PIPELINE = PROCESSING_PIPELINE + TTT_MUNDO_STEPS
