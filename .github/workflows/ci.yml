@@ -2,7 +2,7 @@ name: CI
 
 on:
     push:
-        branches: ["main"]
+        branches: ["master"]
     pull_request:
     merge_group:
     workflow_dispatch:
@@ -66,7 +66,7 @@ jobs:
                   enable-cache: true
                   cache-dependency-glob: "uv.lock"
 
-            # libgmt is needed by pygmt (a runtime dep of `tsdhn-api`).
+            # libgmt is needed by pygmt (a runtime dep of `tsdhn`).
             # Install the system lib and create the libgmt.so symlink that
             # pygmt expects. The symlink step is idempotent.
             - name: Install GMT (libgmt) for pygmt
@@ -184,7 +184,7 @@ jobs:
                   enable-cache: true
                   cache-dependency-glob: "uv.lock"
 
-            # api.main imports pygmt (via core), which needs libgmt at import time.
+            # api.main imports pygmt through tsdhn, which needs libgmt at import time.
             - name: Install GMT (libgmt) for pygmt
               run: |
                   sudo apt-get update
