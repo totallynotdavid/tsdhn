@@ -65,14 +65,14 @@ El cuadro 1 muestra los parámetros hipocentrales y mecanismo focal del terremot
 La figura 1 muestra el mapa de propagación de la máxima energía, la ubicación del epicentro está representado por la esfera focal y las estaciones mareográficas están representadas por los triángulos azules.
 
 #figure(
-  image("maxola.svg", width: 95%),
+  image("maxola.pdf", width: 95%),
   caption: [Mapa de máxima altura de propagación del tsunami. La esfera focal representa el epicentro. Los triángulos azules representan a las estaciones mareográficas.],
 )
 
 La figura 2 muestra las isócronas de los tiempos de arribo del tsunami para todo el Océano Pacífico. La esfera focal representa el epicentro.
 
 #figure(
-  image("ttt.svg", width: 100%),
+  image("ttt.pdf", width: 100%),
   caption: [Mapa de tiempo de arribo del tsunami],
 )
 

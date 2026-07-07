@@ -301,7 +301,7 @@ def generate_maxola_plot(work_dir: Path) -> None:
         add_meca_data(fig, work_dir, style_config)
         add_legend(fig, style_config)
 
-        fig.savefig(str(work_dir / "maxola.svg"))
+        fig.savefig(str(work_dir / "maxola.pdf"))
         logger.info(f"Tsunami visualization created: {work_dir / 'maxola'}")
 
     except Exception as e:
