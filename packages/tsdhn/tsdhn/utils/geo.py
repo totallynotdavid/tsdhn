@@ -27,23 +27,32 @@ def format_arrival_time(time: float, day: str) -> str:
     return f"{hour:02d}:{minute:02d} {day}{datetime.now().strftime('%b')}"
 
 
+LAND_NEAR_COAST_WARNING = "El epicentro esta en Tierra, pero podría generar Tsunami"
+LAND_NO_TSUNAMI_WARNING = "El epicentro esta en Tierra. NO genera Tsunami"
+SEA_NO_TSUNAMI_WARNING = "El epicentro esta en el Mar y NO genera Tsunami"
+NO_TSUNAMI_WARNING = "NO genera Tsunami"
+
+SEA_TSUNAMI_TIERS: tuple[tuple[float, str], ...] = (
+    (8.8, "Genera un Tsunami grande y destructivo"),
+    (8.3995, "Genera un Tsunami potencialmente destructivo"),
+    (7.9, "Genera un Tsunami pequeno"),
+    (7.0, "Probable Tsunami pequeno y local"),
+)
+
+
 def determine_tsunami_warning(Mw: float, h: float, h0: float, dist_min: float) -> str:
-    if h0 > 0 and dist_min < 50:
-        return "El epicentro esta en Tierra, pero podría generar Tsunami"
-    elif h0 > 0 and dist_min > 50:
-        return "El epicentro esta en Tierra. NO genera Tsunami"
+    if h0 > 0:
+        if dist_min < 50:
+            return LAND_NEAR_COAST_WARNING
+        if dist_min > 50:
+            return LAND_NO_TSUNAMI_WARNING
     elif h0 <= 0:
         if h > 60 or Mw < 7.0:
-            return "El epicentro esta en el Mar y NO genera Tsunami"
-        elif Mw >= 8.8:
-            return "Genera un Tsunami grande y destructivo"
-        elif Mw >= 8.3995:
-            return "Genera un Tsunami potencialmente destructivo"
-        elif Mw >= 7.9:
-            return "Genera un Tsunami pequeno"
-        elif Mw >= 7.0:
-            return "Probable Tsunami pequeno y local"
-    return "NO genera Tsunami"
+            return SEA_NO_TSUNAMI_WARNING
+        for threshold, message in SEA_TSUNAMI_TIERS:
+            if Mw >= threshold:
+                return message
+    return NO_TSUNAMI_WARNING
 
 
 def determine_epicenter_location(h0: float, dist_min: float) -> str:
