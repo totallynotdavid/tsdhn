@@ -4,7 +4,6 @@
 <div align="center">
 
 [![CI](https://github.com/totallynotdavid/tsdhn/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/totallynotdavid/tsdhn/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/totallynotdavid/fb9b3bc6236ef7e8a1560403b5c58186/raw/e20fcb208809dbdea85b08d019923225699c2187/covbadge.json)](https://github.com/totallynotdavid/tsdhn/actions/workflows/ci.yml)
 [![Security](https://github.com/totallynotdavid/tsdhn/actions/workflows/security.yml/badge.svg)](https://github.com/totallynotdavid/tsdhn/actions/workflows/security.yml)
 [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/totallynotdavid/tsdhn?label=scorecard)](https://scorecard.dev/viewer/?uri=github.com/totallynotdavid/tsdhn)
 
