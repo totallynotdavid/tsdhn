@@ -1,10 +1,12 @@
+import math
 from datetime import datetime
 from typing import Any
 
 import numpy as np
 
-EARTH_RADIUS = 6371.0  # in kilometers
-DEG_TO_KM = (EARTH_RADIUS * np.pi) / 180.0
+from tsdhn.constants import MEAN_EARTH_RADIUS_KM
+
+DEG_TO_KM = (MEAN_EARTH_RADIUS_KM * math.pi) / 180.0
 
 
 def calculate_distance_to_coast(
@@ -33,13 +35,13 @@ def determine_tsunami_warning(Mw: float, h: float, h0: float, dist_min: float) -
     elif h0 <= 0:
         if h > 60 or Mw < 7.0:
             return "El epicentro esta en el Mar y NO genera Tsunami"
-        elif Mw >= 8.8 and h <= 60:
+        elif Mw >= 8.8:
             return "Genera un Tsunami grande y destructivo"
-        elif Mw >= 8.3995 and h <= 60:
+        elif Mw >= 8.3995:
             return "Genera un Tsunami potencialmente destructivo"
-        elif Mw >= 7.9 and h <= 60:
+        elif Mw >= 7.9:
             return "Genera un Tsunami pequeno"
-        elif Mw >= 7.0 and h <= 60:
+        elif Mw >= 7.0:
             return "Probable Tsunami pequeno y local"
     return "NO genera Tsunami"
 

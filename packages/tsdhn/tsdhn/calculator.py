@@ -7,13 +7,13 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.io import loadmat
 
+from tsdhn.constants import STANDARD_GRAVITY_M_PER_S2, TSUNAMI_MODEL_EARTH_RADIUS_KM
 from tsdhn.domain import (
     CalculationResponse,
     EarthquakeInput,
     TsunamiTravelResponse,
 )
 from tsdhn.runtime import RuntimeContext, validate_model_dir
-from tsdhn.steps import EARTH_RADIUS, GRAVITY
 from tsdhn.utils.geo import (
     calculate_distance_to_coast,
     determine_epicenter_location,
@@ -303,12 +303,12 @@ class TsunamiCalculator:
         # Spherical law of cosines.
         cos_alpha = np.sin(t1) * np.sin(t2) * np.cos(f1 - f2) + np.cos(t1) * np.cos(t2)
         alpha = np.arccos(np.clip(cos_alpha, -1, 1))
-        distance = EARTH_RADIUS * alpha
+        distance = TSUNAMI_MODEL_EARTH_RADIUS_KM * alpha
 
         # Far-field and outside-Peru paths use empirical speed shortcuts.
         if distance >= 750:
             travel_time = distance / 790 + 0.2
-        elif not (-19 <= lat0 <= 0) and distance < 750:
+        elif not (-19 <= lat0 <= 0):
             travel_time = distance / 700
         else:
             n_points = 100
@@ -325,10 +325,10 @@ class TsunamiCalculator:
                 raise RuntimeError("Bathymetry interpolator not loaded")
 
             h = np.abs(self.bathy_interpolator(bath_points))
-            v = np.sqrt(GRAVITY * h) * 3.6  # Velocity in km/h
+            v = np.sqrt(STANDARD_GRAVITY_M_PER_S2 * h) * 3.6  # Velocity in km/h
 
             # Simpson's rule integration.
-            delta_dist = (alpha / n_points) * EARTH_RADIUS
+            delta_dist = (alpha / n_points) * TSUNAMI_MODEL_EARTH_RADIUS_KM
             y = 1 / v
             integral = (
                 delta_dist
