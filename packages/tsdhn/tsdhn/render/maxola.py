@@ -11,7 +11,7 @@ import yaml
 from pygmt.helpers import GMTTempFile
 
 from tsdhn.external import resolve
-from tsdhn.render.point_ttt import read_meca_spec
+from tsdhn.render.meca import read_meca_spec
 
 logger = logging.getLogger(__name__)
 

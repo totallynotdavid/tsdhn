@@ -183,13 +183,16 @@ def plot_mareograma(scale: float, tick_type: str) -> None:
     def y_to_px(value: float, top: float) -> float:
         return top + ((scale - value) / (2 * scale)) * panel_height
 
+    style = (
+        "<style>text{font-family:Helvetica,Arial,sans-serif;font-size:12px}"
+        ".axis{stroke:#111;stroke-width:1}.grid{stroke:#ddd;stroke-width:1}"
+        ".series{fill:none;stroke:#1d4ed8;stroke-width:1.5}</style>"
+    )
     elements = [
         '<svg xmlns="http://www.w3.org/2000/svg" '
         f'width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
         '<rect width="100%" height="100%" fill="white"/>',
-        "<style>text{font-family:Helvetica,Arial,sans-serif;font-size:12px}"
-        ".axis{stroke:#111;stroke-width:1}.grid{stroke:#ddd;stroke-width:1}"
-        ".series{fill:none;stroke:#1d4ed8;stroke-width:1.5}</style>",
+        style,
     ]
 
     for panel_index, (station, values) in enumerate(stations):
