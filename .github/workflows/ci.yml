@@ -100,8 +100,6 @@ jobs:
         if: always()
         permissions:
             contents: read
-        env:
-            UV_PYTHON: ${{ env.PYTHON_VERSION }}
         steps:
             - uses: actions/checkout@v7
 
