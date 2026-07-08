@@ -7,9 +7,9 @@ from typing import Any
 
 from tsdhn.calculator import TsunamiCalculator
 from tsdhn.domain import CalculationResponse, EarthquakeInput, TsunamiTravelResponse
-from tsdhn.external import ensure_all
+from tsdhn.external import ensure_executables
+from tsdhn.pipeline.types import ProcessingStep, ToolRunner
 from tsdhn.runtime import RuntimeContext
-from tsdhn.steps import MASTER_PIPELINE, ProcessingStep
 from tsdhn.utils.file_utils import prepare_simulation_workspace
 from tsdhn.utils.processing import process_step
 
@@ -64,7 +64,11 @@ class SimulationResult:
 
 
 class SimulationEngine:
-    def __init__(self, steps: tuple[ProcessingStep, ...] = MASTER_PIPELINE) -> None:
+    def __init__(self, steps: tuple[ProcessingStep, ...] | None = None) -> None:
+        if steps is None:
+            from tsdhn.pipeline.registry import DEFAULT_PIPELINE
+
+            steps = DEFAULT_PIPELINE
         self.steps = steps
 
     def run(
@@ -74,9 +78,9 @@ class SimulationEngine:
         on_progress: ProgressCallback = _noop,
     ) -> SimulationResult:
         required_tools = tuple(
-            Path(step.command[0]).name
+            step.runner.executable
             for step in self.steps
-            if step.command is not None
+            if isinstance(step.runner, ToolRunner)
         )
         runtime = RuntimeContext.resolve(
             model_dir=request.model_dir,
@@ -85,7 +89,6 @@ class SimulationEngine:
             require_tools=bool(required_tools),
             required_tools=required_tools,
         )
-
         calculator = TsunamiCalculator(runtime.model_dir)
         prepare_simulation_workspace(runtime.model_dir, request.work_dir)
 
@@ -106,7 +109,12 @@ class SimulationEngine:
             {"travel_times": travel_times.model_dump(mode="json")},
         )
 
-        ensure_all(self.steps)
+        system_executables = tuple(
+            executable
+            for step in self.steps
+            for executable in step.required_system_executables
+        )
+        ensure_executables(system_executables)
         total_steps = len(self.steps)
         for index, step in enumerate(self.steps, start=1):
             on_progress(

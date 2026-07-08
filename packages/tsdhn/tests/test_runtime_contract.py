@@ -2,13 +2,13 @@ from pathlib import Path
 
 import pytest
 
+from tsdhn.pipeline.types import ProcessingStep, ToolRunner
 from tsdhn.render.maxola import load_stations
 from tsdhn.runtime import (
     REQUIRED_MODEL_FILES,
     REQUIRED_TOOL_EXECUTABLES,
     RuntimeContext,
 )
-from tsdhn.steps import ProcessingStep
 from tsdhn.utils.file_utils import (
     WORKSPACE_DIRS,
     WORKSPACE_INPUTS,
@@ -160,8 +160,8 @@ def test_process_step_uses_prebuilt_executable(tmp_path: Path) -> None:
         ProcessingStep(
             name="hello",
             outputs=("ran.txt",),
-            command=["./hello"],
-            file_checks=[("ran.txt", "prebuilt executable did not run")],
+            runner=ToolRunner("hello"),
+            file_checks=(("ran.txt", "prebuilt executable did not run"),),
         ),
         work_dir,
         tools_dir,

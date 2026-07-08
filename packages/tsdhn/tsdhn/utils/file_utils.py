@@ -1,4 +1,5 @@
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 WORKSPACE_DIRS: tuple[str, ...] = ("bathy", "ttt_mundo", "zfolder")
@@ -16,7 +17,7 @@ def make_executable(file_path: Path) -> None:
     file_path.chmod(file_path.stat().st_mode | 0o111)
 
 
-def validate_files(cwd: Path, checks: list[tuple[str, str]]) -> None:
+def validate_files(cwd: Path, checks: Sequence[tuple[str, str]]) -> None:
     missing = []
     for filename, msg in checks:
         if not (cwd / filename).exists():
