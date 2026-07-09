@@ -1,6 +1,6 @@
 [project]
 name = "picv-2025"
-version = "0.1.1"
+version = "0.0.1"
 description = "TSDHN tsunami simulation workspace"
 requires-python = ">=3.14"
 readme = "readme.md"
