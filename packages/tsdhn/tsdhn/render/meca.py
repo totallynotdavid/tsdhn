@@ -1,14 +1,28 @@
 from pathlib import Path
+from typing import TypedDict
 
 
-def read_meca_spec(meca_file: Path) -> dict[str, object]:
+class MecaSpec(TypedDict):
+    longitude: float
+    latitude: float
+    depth: float
+    strike: float
+    dip: float
+    rake: float
+    magnitude: float
+    plot_longitude: float
+    plot_latitude: float
+    event_name: str
+
+
+def read_meca_spec(meca_file: Path) -> MecaSpec:
     with meca_file.open("r") as f:
         line = f.readline().strip()
     values = line.split()
     if len(values) != 10:
         raise ValueError(f"Meca file {meca_file} does not contain exactly 10 values.")
 
-    spec = {
+    spec: MecaSpec = {
         "longitude": float(values[0]),
         "latitude": float(values[1]),
         "depth": float(values[2]),

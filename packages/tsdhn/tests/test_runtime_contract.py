@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -5,6 +6,7 @@ import pytest
 from pygmt.enums import GridRegistration, GridType
 
 from tsdhn.pipeline.types import ProcessingStep, ToolRunner
+from tsdhn.render import ttt_inverso
 from tsdhn.render.maxola import GridConfig, load_stations, process_grid
 from tsdhn.runtime import (
     REQUIRED_MODEL_FILES,
@@ -178,6 +180,87 @@ def test_process_grid_returns_pixel_registered_dataarray(tmp_path: Path) -> None
             dtype=np.float32,
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("latitude", "expected_location"),
+    [
+        (-10.0, "210.25/-10.00"),
+        (-9.5, "210.25/-9.50"),
+        (9.5, "210.25/9.50"),
+        (10.0, "210.25/10.00"),
+    ],
+)
+def test_ttt_epicenter_format_matches_ttt_client_widths(
+    latitude: float, expected_location: str
+) -> None:
+    assert ttt_inverso.format_ttt_epicenter(210.25, latitude) == expected_location
+
+
+def test_ttt_inverso_uses_shared_meca_spec_for_epicenter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    working_dir = tmp_path / "ttt"
+    working_dir.mkdir()
+    (tmp_path / "meca.dat").write_text(
+        "210.25 -9.50 10 20 30 40 7.5 210 -9 event\n",
+        encoding="utf-8",
+    )
+    commands: list[tuple[list[str], Path]] = []
+
+    def fake_resolve(executable: str) -> Path:
+        return Path("/tools") / executable
+
+    def fake_run(
+        args: list[str],
+        *,
+        cwd: Path,
+        check: bool,
+        stdout: int,
+        stderr: int,
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append((args, cwd))
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(ttt_inverso, "resolve", fake_resolve)
+    monkeypatch.setattr("tsdhn.render.ttt_inverso.subprocess.run", fake_run)
+
+    ttt_inverso.ttt_inverso_python(working_dir)
+
+    assert commands == [
+        (
+            [
+                "/tools/ttt_client",
+                "cortado.i2",
+                "-E210.25/-9.50",
+                "-Tttt.b",
+                "-VL",
+            ],
+            working_dir,
+        ),
+        (
+            [
+                "/tools/gmt",
+                "grdmath",
+                "ttt.b=bf",
+                "1.0",
+                "MUL",
+                "=",
+                "ttt.b=bf",
+            ],
+            working_dir,
+        ),
+    ]
+
+
+def test_ttt_inverso_keeps_full_meca_dat_validation(tmp_path: Path) -> None:
+    working_dir = tmp_path / "ttt"
+    working_dir.mkdir()
+    (tmp_path / "meca.dat").write_text("210.25 -9.50\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="does not contain exactly 10 values"):
+        ttt_inverso.ttt_inverso_python(working_dir)
 
 
 def test_process_step_uses_prebuilt_executable(tmp_path: Path) -> None:

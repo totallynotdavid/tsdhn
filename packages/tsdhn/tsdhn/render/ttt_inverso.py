@@ -3,8 +3,23 @@ import subprocess
 from pathlib import Path
 
 from tsdhn.external import resolve
+from tsdhn.render.meca import read_meca_spec
 
 logger = logging.getLogger(__name__)
+
+
+def format_ttt_epicenter(longitude: float, latitude: float) -> str:
+    # ttt_client expects fixed-width latitude text with width based on sign/magnitude.
+    if latitude <= -10.0:
+        latitude_format = "{:6.2f}"
+    elif latitude < 0.0:
+        latitude_format = "{:5.2f}"
+    elif latitude < 10.0:
+        latitude_format = "{:4.2f}"
+    else:
+        latitude_format = "{:5.2f}"
+
+    return f"{longitude:6.2f}/{latitude_format.format(latitude)}"
 
 
 def ttt_inverso_python(working_dir: Path) -> None:
@@ -13,30 +28,9 @@ def ttt_inverso_python(working_dir: Path) -> None:
     if not meca_path.exists():
         raise FileNotFoundError(f"Required file {meca_path} not found.")
 
-    with open(meca_path) as f:
-        parts = f.readline().strip().split()
-        if len(parts) < 2:
-            raise ValueError(
-                f"Invalid meca.dat format: not enough values in {meca_path}"
-            )
-        try:
-            xep = float(parts[0])
-            yep = float(parts[1])
-        except ValueError as e:
-            raise ValueError(f"Invalid coordinate values in {meca_path}: {e}") from e
-
-    # ttt_client expects fixed-width latitude text with width based on sign/magnitude.
-    if yep <= -10.0:
-        x_fmt, y_fmt = "{:6.2f}", "{:6.2f}"
-    elif yep < 0.0:
-        x_fmt, y_fmt = "{:6.2f}", "{:5.2f}"
-    elif yep < 10.0:
-        x_fmt, y_fmt = "{:6.2f}", "{:4.2f}"
-    else:  # yep >= 10.0
-        x_fmt, y_fmt = "{:6.2f}", "{:5.2f}"
-
-    loc = f"{x_fmt.format(xep)}/{y_fmt.format(yep)}"
-    logger.info(f"Formatted location: {loc}")
+    meca_spec = read_meca_spec(meca_path)
+    loc = format_ttt_epicenter(meca_spec["longitude"], meca_spec["latitude"])
+    logger.info("Formatted location: %s", loc)
 
     try:
         # `loc` is a formatted float pair, not user input.
@@ -55,7 +49,7 @@ def ttt_inverso_python(working_dir: Path) -> None:
         )
         logger.info("ttt_client executed successfully.")
     except subprocess.CalledProcessError as e:
-        logger.exception(f"ttt_client execution failed: {e}")
+        logger.exception("ttt_client execution failed: %s", e)
         raise
 
     try:
@@ -68,5 +62,5 @@ def ttt_inverso_python(working_dir: Path) -> None:
         )
         logger.info("grdmath executed successfully.")
     except subprocess.CalledProcessError as e:
-        logger.exception(f"grdmath execution failed: {e}")
+        logger.exception("grdmath execution failed: %s", e)
         raise
