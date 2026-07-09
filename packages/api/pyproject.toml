@@ -25,7 +25,7 @@ tsdhn-worker = "api.worker:main"
 tsdhn-compute-migrate = "api.migrate:main"
 
 [build-system]
-requires = ["uv_build==0.11.27"]
+requires = ["uv_build==0.11.28"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
