@@ -316,8 +316,8 @@ fi
 
 mkdir -p "$(dirname "$ENV_FILE")"
 cat > "$ENV_FILE" <<EOF
-export TSDHN_MODEL_DIR="$ROOT_DIR/model"
-export TSDHN_TOOLS_DIR="$TOOLS_DIR"
+TSDHN_MODEL_DIR="$ROOT_DIR/model"
+TSDHN_TOOLS_DIR="$TOOLS_DIR"
 EOF
 
 log_info "Verifying runtime"

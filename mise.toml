@@ -65,3 +65,9 @@ doctor = [
     "gitleaks version",
     "cosign version",
 ]
+
+# mise silently skips `_.file` when the file is absent, so this works before
+# setup.sh has been run; `mise run api` will then fail at startup with the
+# usual "TSDHN model assets are not installed" error until the env file exists.
+[env]
+_.file = ".tsdhn/env"

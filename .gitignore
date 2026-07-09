@@ -17,3 +17,6 @@ htmlcov/
 hypo.dat
 *.npy
 *.log
+
+# Local scientific toolchain (written by scripts/setup.sh)
+.tsdhn/
