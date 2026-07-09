@@ -144,6 +144,8 @@ Non-container runs must provide the same external tools:
 - Intel Fortran compiler (`ifx`) from
   [Intel oneAPI Fortran Essentials](https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/latest/overview.html)
 - [Generic Mapping Tools](https://docs.generic-mapping-tools.org/latest/)
+- [Ghostscript](https://www.ghostscript.com/) (`gs`), required by PyGMT when
+  finalizing plots
 - [TTT SDK](https://www.geoware-online.com/tsunami.html), including
   `ttt_client`
 - `ps2eps` and `csh`

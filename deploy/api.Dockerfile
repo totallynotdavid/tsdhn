@@ -31,6 +31,7 @@ RUN mkdir -p /app/tools \
  && ifx -parallel /app/model/def_oka.f -o /app/tools/deform \
  && ifx -parallel -qopenmp /app/model/tsunami1.for -o /app/tools/tsunami \
  && command -v gmt \
+ && command -v gs \
  && command -v ttt_client \
  && test -x /app/tools/fault_plane \
  && test -x /app/tools/deform \

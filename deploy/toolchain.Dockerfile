@@ -74,6 +74,7 @@ RUN set -eux; \
     SO="$(ls /lib/*/libgmt.so.* /usr/lib/*/libgmt.so.* 2>/dev/null | head -n1)"; \
     if [ -n "$SO" ]; then ln -sf "$SO" "$(dirname "$SO")/libgmt.so"; fi; \
     command -v gmt; \
+    command -v gs; \
     command -v ttt_client; \
     command -v ifx
 
