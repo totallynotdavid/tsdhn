@@ -58,7 +58,6 @@ known-first-party = ["tsdhn", "api"]
 # S603 is suppressed: every subprocess call uses arguments from
 # validated floats, local Path objects, or frozen dataclass fields.
 "packages/tsdhn/tsdhn/pipeline/types.py" = ["S603"]
-"packages/tsdhn/tsdhn/render/maxola.py" = ["S603"]
 "packages/tsdhn/tsdhn/render/ttt_inverso.py" = ["S603"]
 
 [tool.ruff.format]

@@ -1316,6 +1316,7 @@ dependencies = [
     { name = "rich" },
     { name = "scipy" },
     { name = "typer" },
+    { name = "xarray" },
 ]
 
 [package.metadata]
@@ -1327,6 +1328,7 @@ requires-dist = [
     { name = "rich", specifier = "==15.0.0" },
     { name = "scipy", specifier = "==1.18.0" },
     { name = "typer", specifier = "==0.26.8" },
+    { name = "xarray", specifier = "==2026.4.0" },
 ]
 
 [[package]]

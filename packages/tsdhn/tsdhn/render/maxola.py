@@ -1,19 +1,22 @@
 import logging
 import shutil
-import subprocess
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
 import numpy as np
 import pygmt
+import xarray as xr
 import yaml
+from pygmt.enums import GridRegistration, GridType
 from pygmt.helpers import GMTTempFile
 
-from tsdhn.external import resolve
 from tsdhn.render.meca import read_meca_spec
 
 logger = logging.getLogger(__name__)
+
+MAX_WAVE_HEIGHT_METERS = 12.0
+LEGACY_GRID_DECIMALS = 2
 
 
 @dataclass(frozen=True)
@@ -99,80 +102,74 @@ def create_cpt_files(work_dir: Path) -> tuple[Path, Path]:
     return depth_cpt, hgt_cpt
 
 
-def process_grid(work_dir: Path, grid_config: GridConfig) -> Path:
-    """Normalize the legacy max-height grid into GMT ASCII grid format."""
+def process_grid(work_dir: Path, grid_config: GridConfig) -> xr.DataArray:
+    """Normalize the legacy max-height grid into a PyGMT-ready data array."""
     grid_path = work_dir / "zfolder" / "zmax_a.grd"
 
     if not grid_path.exists():
-        logger.error(f"Grid file missing: {grid_path}")
+        logger.error("Grid file missing: %s", grid_path)
         raise FileNotFoundError(f"Grid file not found: {grid_path}")
 
     try:
-        data = np.loadtxt(grid_path, dtype=np.float32)
-        expected_size = grid_config.ncols * grid_config.nrows
-
-        if data.size != expected_size:
-            logger.error(f"Grid size mismatch: {data.size} vs {expected_size}")
-            raise ValueError(
-                f"Data size mismatch: Expected {expected_size}, got {data.size}"
-            )
-
-        # The Fortran model writes column-major values. GMT expects north-up rows.
-        arr = data.reshape((grid_config.ncols, grid_config.nrows), order="F")
-        processed = np.flipud(arr.T)
-
-        max_val = np.nanmax(processed)
-        normalized = np.divide(
-            12.0 * processed,
-            max_val + np.finfo(float).eps,
-            out=np.zeros_like(processed),
-            where=(max_val != 0),
-        )
-
-        output_grid = work_dir / "maximo.grd"
-        write_grid_file(output_grid, normalized, grid_config)
-        return output_grid
+        values = np.loadtxt(grid_path, dtype=np.float32)
+        max_height_grid = reshape_model_grid(values, grid_config)
+        normalized_grid = normalize_max_height_grid(max_height_grid)
+        return create_grid_dataarray(normalized_grid, grid_config)
 
     except (ValueError, OSError) as e:
-        logger.error(f"Grid processing failed: {e!s}")
+        logger.error("Grid processing failed: %s", e)
         raise RuntimeError("Grid processing error") from e
 
 
-def write_grid_file(
-    output_path: Path, data: np.ndarray, grid_config: GridConfig
-) -> None:
-    header = (
-        f"ncols {grid_config.ncols}\n"
-        f"nrows {grid_config.nrows}\n"
-        f"xllcorner {grid_config.xllcorner:.8f}\n"
-        f"yllcorner {grid_config.yllcorner:.8f}\n"
-        f"cellsize {grid_config.cellsize:.8f}\n"
-        "nodata_value -9999\n"
+def reshape_model_grid(values: np.ndarray, grid_config: GridConfig) -> np.ndarray:
+    expected_size = grid_config.ncols * grid_config.nrows
+    if values.size != expected_size:
+        raise ValueError(
+            "Unexpected zmax_a.grd size: "
+            f"expected {expected_size} values from "
+            f"{grid_config.ncols}x{grid_config.nrows} grid, got {values.size}"
+        )
+
+    model_grid = values.reshape((grid_config.ncols, grid_config.nrows), order="F")
+    return np.flipud(model_grid.T)
+
+
+def normalize_max_height_grid(max_height_grid: np.ndarray) -> np.ndarray:
+    finite_values = max_height_grid[np.isfinite(max_height_grid)]
+    if finite_values.size == 0:
+        return np.zeros_like(max_height_grid, dtype=np.float32)
+
+    max_value = np.max(finite_values)
+    if max_value == 0:
+        return np.zeros_like(max_height_grid, dtype=np.float32)
+
+    normalized_grid = (MAX_WAVE_HEIGHT_METERS * max_height_grid) / max_value
+
+    return np.asarray(
+        np.round(normalized_grid, LEGACY_GRID_DECIMALS),
+        dtype=np.float32,
     )
 
-    try:
-        with open(output_path, "w") as f:
-            f.write(header)
-            np.savetxt(f, data, fmt="%8.2f", delimiter="", newline="\n")
-    except OSError as e:
-        logger.error(f"Grid write failed: {e!s}")
-        raise RuntimeError("Grid file I/O error") from e
+
+def create_grid_dataarray(data: np.ndarray, grid_config: GridConfig) -> xr.DataArray:
+    """Build a pixel-registered geographic grid for PyGMT."""
+    lon = cell_centers(grid_config.xllcorner, grid_config.ncols, grid_config.cellsize)
+    lat = cell_centers(grid_config.yllcorner, grid_config.nrows, grid_config.cellsize)
+
+    grid = xr.DataArray(
+        np.flipud(data),
+        dims=("lat", "lon"),
+        coords={"lat": lat, "lon": lon},
+        name="z",
+    )
+
+    grid.gmt.registration = GridRegistration.PIXEL
+    grid.gmt.gtype = GridType.GEOGRAPHIC
+    return grid
 
 
-def convert_grid_format(input_grid: Path, output_grid: Path) -> None:
-    try:
-        gmt = str(resolve("gmt"))
-        subprocess.run(
-            [gmt, "grdconvert", str(input_grid), "-G" + str(output_grid)],
-            check=True,
-            capture_output=True,
-        )
-    except subprocess.CalledProcessError as e:
-        logger.error(f"GMT command failed: {e.stderr.decode().strip()}")
-        raise RuntimeError("GMT grid conversion failed") from e
-    except FileNotFoundError:
-        logger.error("GMT command not found. Ensure GMT is installed and in PATH.")
-        raise RuntimeError("GMT executable not found") from None
+def cell_centers(origin: float, count: int, cellsize: float) -> np.ndarray:
+    return origin + (np.arange(count, dtype=np.float64) + 0.5) * cellsize
 
 
 def add_coastline(fig: pygmt.Figure, style_config: StyleConfig) -> None:
@@ -228,11 +225,11 @@ def add_meca_data(fig: pygmt.Figure, work_dir: Path, style_config: StyleConfig) 
             fig.meca(
                 spec=spec,
                 scale=style_config.meca_scale,
-                compressionfill="blue",
+                compression_fill="blue",
                 convention="mt",
             )
         except Exception as e:
-            logger.warning(f"Mechanism plot failed: {e!s}")
+            logger.warning("Mechanism plot failed: %s", e)
 
 
 def add_legend(fig: pygmt.Figure, style_config: StyleConfig) -> None:
@@ -277,21 +274,20 @@ def generate_maxola_plot(work_dir: Path) -> None:
     )
 
     try:
-        # Create color palettes
         depth_cpt, hgt_cpt = create_cpt_files(work_dir)
         files_to_cleanup.extend([depth_cpt, hgt_cpt])
 
-        maximo_grid = process_grid(work_dir, grid_config)
-        maxola_grid = work_dir / "maxola.grd"
-        files_to_cleanup.extend([maximo_grid, maxola_grid])
-
-        convert_grid_format(maximo_grid, maxola_grid)
+        max_height_grid = process_grid(work_dir, grid_config)
 
         fig = pygmt.Figure()
         fig.shift_origin(xshift="4.2c", yshift="10.0c")
 
         # Azimuthal projection centered on the Pacific basin.
-        fig.grdimage(grid=str(maxola_grid), cmap=hgt_cpt, projection="A210/-10/5.0i")
+        fig.grdimage(
+            grid=max_height_grid,
+            cmap=hgt_cpt,
+            projection="A210/-10/5.0i",
+        )
 
         add_coastline(fig, style_config)
         add_tidal_stations(fig, stations, style_config)
@@ -299,10 +295,10 @@ def generate_maxola_plot(work_dir: Path) -> None:
         add_legend(fig, style_config)
 
         fig.savefig(str(work_dir / "maxola.pdf"))
-        logger.info(f"Tsunami visualization created: {work_dir / 'maxola'}")
+        logger.info("Tsunami visualization created: %s", work_dir / "maxola")
 
     except Exception as e:
-        logger.error(f"Plot generation failed: {e!s}")
+        logger.error("Plot generation failed: %s", e)
         raise
     finally:
         cleanup_files(files_to_cleanup)
