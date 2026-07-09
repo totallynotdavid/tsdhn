@@ -55,20 +55,31 @@ metadata to MinIO.
 ## Quick start
 
 The backend stack is self-hosted because the simulation runtime needs the
-Fortran/GMT/TTT toolchain. Docker Compose uses the images and Dockerfiles
-under [`deploy/`](./deploy/).
+Fortran/GMT/TTT toolchain. Compose uses the images and Dockerfiles under
+[`deploy/`](./deploy/). [Podman](https://podman.io/) is the default local
+engine; `docker compose` works identically and is what CI uses.
+
+Install `podman` plus the `docker-compose-plugin` package, then enable the
+rootless socket once per machine:
+
+```sh
+systemctl --user enable --now podman.socket
+```
 
 ```sh
 cp .env.example .env
-docker compose up -d
+mise run dev-up
 ```
 
 Set `BACKEND_SERVICE_TOKEN` and `BETTER_AUTH_SECRET` in `.env` before running
 the web profile:
 
 ```sh
-docker compose --profile web up
+mise run dev-web
 ```
+
+Rootless containers stop when you log out. Run `loginctl enable-linger
+$(whoami)` once if you want the stack to survive logout or reboot.
 
 For local development, install the pinned tools with
 [mise](https://mise.jdx.dev/getting-started.html), then install the Python
@@ -96,8 +107,10 @@ scientific backend under WSL 2; Microsoft documents the setup in the
 | `mise run worker` | Start the Procrastinate worker with `tsdhn-worker` |
 | `mise run web-dev` | Start the SvelteKit dev server |
 | `mise run gen-client` | Export FastAPI OpenAPI JSON and regenerate TypeScript types |
-| `docker compose up -d` | Run Postgres, MinIO, libSQL, API, and worker |
-| `docker compose --profile web up` | Run the backend stack plus the SvelteKit web app |
+| `mise run dev-up` | Run Postgres, MinIO, libSQL, API, and worker (Podman) |
+| `mise run dev-web` | Run the backend stack plus the SvelteKit web app |
+| `mise run dev-down` | Stop the local stack |
+| `mise run dev-logs` | Follow logs for the local stack |
 
 ## Workspace
 
@@ -132,7 +145,7 @@ Non-container backend runs need:
   executables when command pipeline steps are active.
 - `TSDHN_JOBS_DIR` for temporary simulation workspaces when running the API worker.
 
-The Docker API image sets these paths to `/app/model`, `/app/tools`, and
+The API container image sets these paths to `/app/model`, `/app/tools`, and
 `/app/jobs`.
 
 <details>

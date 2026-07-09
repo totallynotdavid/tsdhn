@@ -54,6 +54,11 @@ gen-client = "bun run gen:client"
 # Self-hosted libSQL database (sqld). Data persists under ./data/libsql.
 db = "sqld --http-listen-addr 127.0.0.1:8080 --db-path ./data/libsql"
 
+dev-up = "podman compose up -d"
+dev-web = "podman compose --profile web up"
+dev-down = "podman compose down"
+dev-logs = "podman compose logs -f"
+
 lint-all = ["mise run lint", "mise run lint-js", "mise run fmt-check-js"]
 fix-all = ["mise run fix", "mise run fmt-js"]
 
