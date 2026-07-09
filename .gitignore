@@ -13,6 +13,7 @@ coverage.json
 htmlcov/
 
 # runtime outputs
+data
 /jobs/
 hypo.dat
 *.npy
