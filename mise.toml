@@ -9,33 +9,33 @@ gitleaks = "8.30.1"
 install = "uv sync --all-packages --group dev --group build"
 
 lint = [
-    "uv run ruff check --select E,F,W,I,B,UP,S,SIM,RUF .",
-    "uv run ruff format --check .",
-    "uv run mypy --strict packages",
+  "uv run ruff check --select E,F,W,I,B,UP,S,SIM,RUF .",
+  "uv run ruff format --check .",
+  "uv run mypy --strict packages",
 ]
 
-fix = [
-    "uv run ruff check --fix --unsafe-fixes .",
-    "uv run ruff format .",
-]
+fix = ["uv run ruff check --fix --unsafe-fixes .", "uv run ruff format ."]
 
 test = "uv run pytest -n auto"
 
 coverage = [
-    "uv run coverage run -m pytest",
-    "uv run coverage report --fail-under=70",
-    "uv run coverage json",
+  "uv run coverage run -m pytest",
+  "uv run coverage report --fail-under=70",
+  "uv run coverage json",
 ]
 
 security = [
-    "uv run bandit -r packages -lll --skip B101",
-    "uv run pip-audit --strict --skip-editable",
-    "gitleaks detect --source . --no-banner",
+  "uv run bandit -r packages -lll --skip B101",
+  # pip-audit --strict does not support editable workspace packages.
+  # Export only external dependencies and run pip-audit in an isolated env.
+  "uv export --locked --no-hashes --all-packages --no-emit-workspace --output-file=requirements.lock.txt",
+  "uvx pip-audit --strict --requirement requirements.lock.txt",
+  "gitleaks detect --source . --no-banner",
 ]
 
 build = [
-    "uv build --package tsdhn --out-dir dist/tsdhn",
-    "uv build --package tsdhn-api --out-dir dist/api",
+  "uv build --package tsdhn --out-dir dist/tsdhn",
+  "uv build --package tsdhn-api --out-dir dist/api",
 ]
 
 api = "uv run tsdhn-api"
@@ -62,15 +62,13 @@ lint-all = ["mise run lint", "mise run lint-js", "mise run fmt-check-js"]
 fix-all = ["mise run fix", "mise run fmt-js"]
 
 doctor = [
-    "uv run python --version",
-    "uv --version",
-    "uv run ruff --version",
-    "uv run mypy --version",
-    "gitleaks version",
+  "uv run python --version",
+  "uv --version",
+  "uv run ruff --version",
+  "uv run mypy --version",
+  "gitleaks version",
 ]
 
-# mise silently skips `_.file` when the file is absent, so this works before
-# setup.sh has been run; `mise run api` will then fail at startup with the
-# usual "TSDHN model assets are not installed" error until the env file exists.
+# mise ignores missing env files so setup.sh is optional until runtime.
 [env]
 _.file = ".tsdhn/env"
