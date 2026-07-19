@@ -1,9 +1,8 @@
 [tools]
 python = "3.14.6"
-uv = "0.11.27"
+uv = "0.11.29"
 bun = "1.3.14"
 gitleaks = "8.30.1"
-cosign = "3.1.1"
 "libsql-server" = { version = "0.24.32", version_prefix = "libsql-server-v" }
 
 [tasks]
@@ -68,7 +67,6 @@ doctor = [
     "uv run ruff --version",
     "uv run mypy --version",
     "gitleaks version",
-    "cosign version",
 ]
 
 # mise silently skips `_.file` when the file is absent, so this works before
