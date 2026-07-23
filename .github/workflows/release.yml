@@ -32,7 +32,7 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - uses: astral-sh/setup-uv@6a191366842ac1502ba6c07e9b5acd5c2d9d8db3 # 8.3.2
+            - uses: astral-sh/setup-uv@c6081965dd0577ae48820cb8c288e12509571f0c # 8.3.2
               with:
                   version: ${{ env.UV_VERSION }}
                   python-version: ${{ env.PYTHON_VERSION }}
@@ -143,7 +143,7 @@ jobs:
                   sbom: true
 
             - name: Attest candidate image
-              uses: actions/attest@v4.1.1
+              uses: actions/attest@v4.2.0
               with:
                   subject-name: ${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain
                   subject-digest: ${{ steps.build.outputs.digest }}
@@ -214,7 +214,7 @@ jobs:
                   sbom: true
 
             - name: Attest candidate image
-              uses: actions/attest@v4.1.1
+              uses: actions/attest@v4.2.0
               with:
                   subject-name: ${{ env.IMAGE_REGISTRY }}/${{ matrix.image }}
                   subject-digest: ${{ steps.build.outputs.digest }}
@@ -354,7 +354,7 @@ jobs:
                   path: dist
 
             - name: Attest PyPI artifacts (SLSA build provenance)
-              uses: actions/attest@v4.1.1
+              uses: actions/attest@v4.2.0
               with:
                   subject-path: dist/**/*.tar.gz,dist/**/*.whl
                   show-summary: false
