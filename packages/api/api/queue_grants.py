@@ -1,10 +1,10 @@
 """Provision the least-privilege roles the API and worker connect as.
 
-`tsdhn-compute-migrate` owns the compute schema and the web role;
-`rqueue ... migrate` owns the queue schema. This runs after both, for the same
-reason `tsdhn-web-grants` runs after the web migrations: a GRANT needs the
-tables to exist. Everything here is idempotent, and re-running it narrows a
-role that has been over-granted back to the table below.
+`tsdhn-compute-migrate` owns the compute schema and the web role, and
+`rqueue ... migrate` owns the queue schema. This runs after both, as
+`tsdhn-web-grants` runs after the web migrations, because a GRANT needs the
+tables to exist. Everything here is idempotent, and rerunning it narrows an
+over-granted role back to the table below.
 
 | role                | queue schema                          | compute schema |
 | ------------------- | ------------------------------------- | -------------- |
@@ -12,12 +12,11 @@ role that has been over-granted back to the table below.
 | COMPUTE_WORKER      | `Capability.CONSUME`                  | SELECT, UPDATE |
 | COMPUTE_PURGER      | `Capability.INSPECT` + DELETE on jobs | none           |
 
-`provision_role` grants no DDL to any of them, and this module repairs the
-older rqueue capability grant that gives CONSUME INSERT on `jobs`.
-Row-level security scopes `jobs` and `job_attempts` to the one queue this
-deployment runs;
-`concurrency_slots` and `runtime_heartbeats` have no per-queue RLS in rqueue
-today, which is fine for this single-queue deployment.
+`provision_role` grants no DDL to any of them. This module also revokes the
+INSERT on `jobs` that rqueue's CONSUME capability grants. Row-level security
+scopes `jobs` and `job_attempts` to the deployment's queue. `concurrency_slots`
+and `runtime_heartbeats` have no per-queue RLS in rqueue, which is acceptable
+for a single-queue deployment.
 """
 
 from __future__ import annotations
@@ -63,9 +62,9 @@ _DEFAULT_PRIVILEGE_OBJECT_TYPES = {
     "T": "TYPES",
 }
 
-# rqueue's role provisioner at the pinned dependency revision only resets ACLs.
-# These role attributes and memberships are authority above an ACL, so they
-# need their own repair before a runtime password is handed to a process.
+# rqueue's role provisioner at the pinned revision only resets ACLs. These role
+# attributes and memberships grant authority beyond an ACL, so they are
+# repaired separately before a runtime password is handed to a process.
 _ROLE_ATTRIBUTES = (
     ("rolsuper", "NOSUPERUSER"),
     ("rolcreatedb", "NOCREATEDB"),
@@ -85,7 +84,7 @@ class QueueRole:
     #: The environment variable the password comes from, for error messages.
     env_var: str
     capabilities: tuple[Capability, ...]
-    #: Privileges on `compute.jobs`; empty means the role never reaches it.
+    #: Privileges on `compute.jobs`. Empty means the role never reaches it.
     compute_privileges: str = ""
     #: Queue-table privileges no capability's grant set covers.
     extra_queue_privileges: tuple[tuple[str, str], ...] = field(default_factory=tuple)
@@ -98,10 +97,10 @@ def queue_roles() -> tuple[QueueRole, ...]:
             name=COMPUTE_PRODUCER_ROLE,
             password=COMPUTE_PRODUCER_PASSWORD,
             env_var="COMPUTE_PRODUCER_PASSWORD",
-            # The API only enqueues and reads back. It never touches schedules
-            # or queue pauses, which is all INSPECT would add over PRODUCE.
+            # The API only enqueues and reads back. INSPECT would add access to
+            # schedules and queue pauses, which the API never uses.
             capabilities=(Capability.PRODUCE,),
-            # `create_or_get_job` inserts and reads; no route updates a row.
+            # `create_or_get_job` inserts and reads. No route updates a row.
             compute_privileges="SELECT, INSERT",
         ),
         QueueRole(
@@ -109,21 +108,20 @@ def queue_roles() -> tuple[QueueRole, ...]:
             password=COMPUTE_WORKER_PASSWORD,
             env_var="COMPUTE_WORKER_PASSWORD",
             capabilities=(Capability.CONSUME,),
-            # The worker only ever advances rows the API created.
+            # The worker only advances rows the API created.
             compute_privileges="SELECT, UPDATE",
         ),
         QueueRole(
             name=COMPUTE_PURGER_ROLE,
             password=COMPUTE_PURGER_PASSWORD,
             env_var="COMPUTE_PURGER_PASSWORD",
-            # `Admin.purge` reads the terminal rows it is about to remove.
+            # `Admin.purge` reads the terminal rows it removes.
             capabilities=(Capability.INSPECT,),
-            # Retention is a queue-only concern: compute.jobs keeps its own
-            # history, and this task is not the one to start expiring it.
+            # Retention is queue-only. compute.jobs keeps its own history.
             compute_privileges="",
-            # No capability carries DELETE, on purpose -- a consumer that can
+            # No capability carries DELETE, on purpose. A consumer that can
             # delete a job can erase its own attempt history with it. Purge
-            # needs exactly this one grant and nothing else.
+            # needs this one grant and nothing else.
             extra_queue_privileges=(("jobs", "DELETE"),),
         ),
     )
@@ -132,9 +130,9 @@ def queue_roles() -> tuple[QueueRole, ...]:
 async def _ddl(connection: asyncpg.Connection, template: str, *args: str) -> None:
     """Run one DDL statement with PostgreSQL doing the identifier quoting.
 
-    The same trick `rqueue.roles` uses: role, schema and table names have no
-    bind-parameter form, so `format(..., %I)` is evaluated server-side and only
-    its already-quoted result is executed.
+    Role, schema, and table names have no bind-parameter form, so
+    `format(..., %I)` is evaluated server-side and only its quoted result is
+    executed. `rqueue.roles` does the same.
     """
     placeholders = ", ".join(f"${index + 2}::text" for index in range(len(args)))
     statement = await connection.fetchval(
@@ -148,8 +146,8 @@ async def _grant_compute_access(
 ) -> None:
     """Give one role its `compute.jobs` privileges, and only those.
 
-    The revoke comes first so re-running repairs a role that was widened by
-    hand, matching what `migrate.provision_web_role` does for the web role.
+    The revoke comes first so a rerun repairs a role widened by hand, as
+    `migrate.provision_web_role` does for the web role.
     """
     await _ddl(connection, "REVOKE ALL PRIVILEGES ON compute.jobs FROM %I", role.name)
     await _ddl(connection, "REVOKE CREATE ON SCHEMA compute FROM %I", role.name)
@@ -221,8 +219,8 @@ async def _reset_role_security(connection: asyncpg.Connection, role: str) -> Non
     """Remove PostgreSQL authority that table ACLs cannot narrow.
 
     The pinned rqueue provisioner repairs grants but leaves role attributes and
-    memberships untouched. A SUPERUSER, BYPASSRLS, CREATEROLE, inherited group
-    membership, or default ACL would therefore make the capability table
+    memberships untouched. A SUPERUSER, BYPASSRLS, or CREATEROLE attribute, an
+    inherited membership, or a default ACL would make the capability table
     misleading.
     """
     current = await connection.fetchrow(
@@ -284,10 +282,10 @@ async def _grant_purger_delete_policy(
 ) -> None:
     """Restrict direct purger deletes to rows safe for retention removal.
 
-    The purger has no grant on ``compute.jobs``. The security-definer helper is
-    owned by the schema-owner connection that runs provisioning, and is granted
-    only to this role, so its result can be part of the RLS policy without
-    widening the purger's direct visibility into the compute schema.
+    The purger has no grant on `compute.jobs`. The security-definer helper is
+    owned by the schema-owner connection that runs provisioning and is granted
+    only to this role. The RLS policy can therefore use its result without
+    giving the purger direct visibility into the compute schema.
     """
     status_literals = ", ".join(f"'{status}'" for status in _COMPUTE_TERMINAL_STATUSES)
     function_body = """
@@ -385,7 +383,7 @@ def _validate_role_names(roles: tuple[QueueRole, ...]) -> None:
 
 
 def _validate_compute_queue() -> None:
-    """Reject queue targets that the runtime ``Queue`` would reject."""
+    """Reject queue names that the runtime `Queue` would reject."""
     try:
         validate_name(
             COMPUTE_QUEUE,
@@ -401,12 +399,12 @@ async def _validate_existing_role_names(
 ) -> None:
     """Refuse to narrow an unmanaged role that is already security-sensitive.
 
-    A role with a row in rqueue's grant table was provisioned by this module in
-    an earlier run, so repairing its drift is intentional. An unrelated role
-    must not be passed to ``provision_role`` and then have its attributes or
-    memberships stripped merely because an environment variable was mistyped.
-    Even an otherwise ordinary pre-existing role must use a fresh configured
-    name; only the grant-table marker permits an existing role to be repaired.
+    A role with a row in rqueue's grant table was provisioned by this module
+    earlier, so repairing its drift is intended. Any other existing role must
+    not reach `provision_role`, or a mistyped environment variable would strip
+    an unrelated role's attributes and memberships. Even an ordinary existing
+    role needs a fresh configured name, because only the grant-table row
+    permits repairing an existing role.
     """
     names = [role.name for role in roles]
     existing = await connection.fetch(
@@ -503,8 +501,8 @@ async def _retire_role(
     if not exists:
         return
 
-    # The policy's role list is a dependency on the role. Remove it before
-    # DROP ROLE; the current purger provisioning recreates it for its new name.
+    # The policy's role list depends on the role, so drop the policy before
+    # DROP ROLE. Purger provisioning recreates it for the new name.
     if role_kind == "purger":
         await _ddl(
             connection,
@@ -565,15 +563,15 @@ async def provision_queue_roles(connection: asyncpg.Connection) -> None:
             role=role.name,
             capabilities=role.capabilities,
             schema=COMPUTE_QUEUE_SCHEMA,
-            # One queue, so the row-level-security scope is that queue rather
-            # than '*'. A second queue would need a row here, not a code change.
+            # The row-level-security scope is this deployment's one queue
+            # instead of '*'.
             queues=(COMPUTE_QUEUE,),
             password=role.password,
         )
         await _reset_role_security(connection, role.name)
         if role.name == COMPUTE_WORKER_ROLE:
-            # The pinned rqueue revision includes INSERT in CONSUME, although
-            # a consumer only claims and transitions producer-created jobs.
+            # The pinned rqueue revision includes INSERT in CONSUME, but the
+            # worker only claims and transitions jobs the producer created.
             await _ddl(
                 connection,
                 "REVOKE INSERT ON %I.%I FROM %I",

@@ -19,7 +19,7 @@ from api.core.settings import (
 from api.core.tasks import register_tasks
 from api.routes import get_calculator, ops_router, router
 
-# Send logs to stdout so container runtimes can collect them.
+# `basicConfig` logs to stderr, which container runtimes collect.
 logging.basicConfig(
     level=LOG_LEVEL,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     get_calculator()
     min_size, max_size = api_pool_size()
-    # A zero floor keeps this from waiting on Postgres to start.
+    # A zero `min_size`, the default, keeps startup from waiting on PostgreSQL.
     pool = await db.open_pool(
         min_size=min_size,
         max_size=max_size,

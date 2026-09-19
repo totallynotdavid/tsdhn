@@ -1,11 +1,9 @@
 """The rqueue handle for the simulation queue.
 
-Three modules import rqueue, and no others: this one for `Queue`, `tasks.py`
-for the task and retry types, and `worker.py` for `Worker`. `repository.py` in
-particular does not -- it reaches the queue through the `defer` callback
-`create_or_get_job` takes, and takes the queue's schema and name as plain
-arguments where reconciliation needs them, so the business code stays
-independent of which queue is behind it.
+`repository.py` does not import rqueue. It reaches the queue through the
+`defer` callback that `create_or_get_job` takes and receives the queue's schema
+and name as plain arguments, so job logic stays independent of the queue
+implementation.
 """
 
 import asyncpg
@@ -21,8 +19,8 @@ _queue: Queue | None = None
 def build_queue(pool: asyncpg.Pool) -> Queue:
     """Bind the process-wide queue to `pool` and return it.
 
-    Both processes call this: the worker to serve the queue, the API to
-    enqueue on the connection that also writes `compute.jobs`.
+    The worker calls this to serve the queue. The API calls it to enqueue on
+    the connection that also writes `compute.jobs`.
     """
     queue = Queue(pool, name=COMPUTE_QUEUE, schema=COMPUTE_QUEUE_SCHEMA)
     set_queue(queue)

@@ -53,14 +53,13 @@ def worker_id() -> str:
 
 @asynccontextmanager
 async def purge_pool() -> AsyncIterator[asyncpg.Pool]:
-    """Yield the pool used by retention, separately credentialed from consume.
+    """Yield the pool used by retention, credentialed separately from consume.
 
-    The purger password is required. Reusing the worker pool would use the
-    CONSUME role, which intentionally cannot delete queue jobs, while falling
-    back to the owner would bypass every runtime boundary.
+    The purger password is required. The worker pool uses the CONSUME role,
+    which cannot delete queue jobs, and falling back to the owner would bypass
+    every runtime boundary.
     """
-    # Retention is hourly, so one lazy connection is enough. It is always a
-    # separate pool from the worker's CONSUME credentials.
+    # Retention is hourly, so one lazy connection is enough.
     pool = await asyncpg.create_pool(
         db.runtime_dsn(COMPUTE_PURGER_ROLE, COMPUTE_PURGER_PASSWORD),
         min_size=0,
@@ -86,31 +85,25 @@ async def run() -> None:
             worker_id=worker_id(),
             concurrency=WORKER_CONCURRENCY,
             lease_duration=WORKER_LEASE_SECONDS,
-            # The simulation kernel runs on a thread, and Python cannot kill a
-            # thread. Under the default "wait", shutdown blocks on that thread
-            # for as long as the simulation takes -- tens of minutes -- so
-            # run() never returns and the `finally` below never closes the
-            # pool. "detach" stops waiting once the leases are back.
+            # The kernel runs on a thread that Python cannot kill. With the
+            # default "wait", shutdown blocks on that thread for the length of
+            # the simulation, so `run()` never returns and the `finally` below
+            # never closes the pool. "detach" stops waiting once the leases are
+            # back.
             executor_shutdown="detach",
         )
 
         loop = asyncio.get_running_loop()
         for received in (signal.SIGTERM, signal.SIGINT):
-            # stop() stops claiming and gives in-flight work a bounded grace
-            # period (rqueue's shutdown_timeout, 30s by default). A simulation
-            # runs for tens of minutes, so in practice it does not finish:
-            # rqueue cancels it and hands the lease straight back as `pending`
-            # rather than leaving it to expire, and the next worker picks it up
-            # and resumes from the checkpoints in its work directory.
+            # `stop()` stops claiming and gives in-flight work rqueue's
+            # `shutdown_timeout` (30 seconds by default). A simulation runs for
+            # tens of minutes, so rqueue cancels it and returns the lease as
+            # `pending`. The next worker resumes from the checkpoints in the
+            # work directory.
             #
-            # Detach mode (above) is what makes the rest of this shutdown
-            # reachable: run() returns once the leases are back, so the pool is
-            # closed properly instead of the process sitting on an open pool
-            # until it is killed. It does not stop the abandoned kernel thread
-            # -- nothing can -- it only stops waiting for it, which is why the
-            # process must not be reused afterwards. It is not: run() returns
-            # into main(), and the loop closes behind it. The thread then fails
-            # at its next progress write, whose loop is gone, and unwinds there.
+            # "detach" lets `run()` return once the leases are back, so the
+            # pool closes. It does not stop the abandoned kernel thread. That
+            # thread fails at its next progress write because its loop is gone.
             loop.add_signal_handler(received, worker.stop)
 
         stop_maintenance = asyncio.Event()
@@ -140,7 +133,7 @@ async def run() -> None:
 
 def main() -> None:  # pragma: no cover
     if NUMBA_THREADS is not None:
-        # Numba lacks type stubs; suppress type checking.
+        # Numba lacks type stubs, so suppress type checking.
         numba.set_num_threads(NUMBA_THREADS)  # type: ignore[no-untyped-call]
         logger.info(
             "numba parallel-region thread count capped to %d (TSDHN_NUMBA_THREADS)",
@@ -149,24 +142,19 @@ def main() -> None:  # pragma: no cover
 
     asyncio.run(run())
 
-    # run() returning means the leases are handed back and the pool is closed.
-    # It does not mean the process is idle: the worker runs with
-    # executor_shutdown="detach" (see run()), so an abandoned kernel thread can
-    # still be alive, and Python cannot kill it.
+    # `run()` returning means the leases are back and the pool is closed. An
+    # abandoned kernel thread can still be alive because the worker runs with
+    # `executor_shutdown="detach"`.
     #
-    # Those threads belong to a ThreadPoolExecutor, which makes them
-    # non-daemon, and CPython joins every non-daemon thread during interpreter
-    # shutdown. Falling off the end of main() therefore parks the process for
-    # the rest of the simulation -- measured at 3.20s for a 3s thread, against
-    # 0.16s with this call -- which is the very wait detach mode exists to
-    # avoid, moved from rqueue's executor teardown into Python's own atexit
-    # machinery. Detaching is only safe because the process is exiting rather
-    # than being reused, so the process has to actually exit.
+    # Executor threads are non-daemon, and CPython joins every non-daemon
+    # thread during interpreter shutdown. Returning from `main()` would park
+    # the process until the simulation ends, which is the wait "detach" exists
+    # to avoid. Detaching is safe only because the process exits instead of
+    # being reused.
     #
-    # Nothing durable is lost by leaving that way: the leases are back, the
-    # pool is closed, and the abandoned thread's writes are fenced and would be
-    # refused anyway. os._exit skips the buffers logging would otherwise flush
-    # on the way out, so flush them here.
+    # Nothing durable is lost. The leases are back, the pool is closed, and the
+    # abandoned thread's writes are fenced. `os._exit` skips the log flush, so
+    # flush first.
     logging.shutdown()
     os._exit(0)
 

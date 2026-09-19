@@ -24,11 +24,10 @@ CREATE TABLE IF NOT EXISTS compute.jobs (
   updated_at timestamptz NOT NULL DEFAULT now(),
   started_at timestamptz,
   finished_at timestamptz,
-  -- Which task-queue attempt currently owns this row. Every write an attempt
-  -- makes during its run carries its own number and matches on this column in
-  -- the same statement, so a write from an attempt that has been superseded
-  -- matches zero rows instead of racing the attempt that replaced it. NULL
-  -- until the first attempt claims the row.
+  -- The task-queue attempt that currently owns this row. Every write an
+  -- attempt makes carries its own number and matches on this column in the same
+  -- statement, so a superseded attempt matches zero rows. NULL until the first
+  -- attempt claims the row.
   owner_attempt integer
 );
 

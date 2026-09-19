@@ -1,7 +1,7 @@
 """Create the compute schema and provision the web database role.
 
-Run this before applying the queue and web schemas. The command uses
-the database owner for migrations; the web role is a runtime-only role.
+Run this before applying the queue and web schemas. The command connects as the
+database owner. The web role is a runtime-only role.
 """
 
 import logging
@@ -28,7 +28,7 @@ def transfer_web_ownership(
     web_role: str,
     migration_role: sql.Identifier,
 ) -> None:
-    """Move objects from the pre-runtime-role design to the owner role."""
+    """Transfer the web role's tables, sequences, and `drizzle` schema to the owner."""
     objects = conn.execute(
         """
         SELECT n.nspname, c.relname, c.relkind
@@ -98,8 +98,8 @@ def provision_web_role(conn: psycopg.Connection[tuple[str, ...]]) -> None:
     )
     transfer_web_ownership(conn, APP_DB_ROLE, migration_role)
 
-    # The web role is deliberately not a migration role. Re-running
-    # provisioning repairs these security boundaries if it was over-granted.
+    # The web role is deliberately not a migration role. Rerunning provisioning
+    # repairs these boundaries if the role was over-granted.
     for statement in (
         sql.SQL("REVOKE CREATE ON DATABASE {database} FROM {role}"),
         sql.SQL("REVOKE CREATE ON SCHEMA public FROM PUBLIC"),

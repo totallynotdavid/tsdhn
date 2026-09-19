@@ -53,9 +53,8 @@ JOBS_DIR: Path = Path(os.environ.get("TSDHN_JOBS_DIR", "jobs")).resolve()
 
 LOG_LEVEL = os.environ.get("TSDHN_LOG_LEVEL", "INFO").upper()
 
-# Zero keeps the pool lazy, so a process starts before PostgreSQL is
-# reachable and reports the outage through /health instead of refusing to
-# boot -- the behaviour the psycopg pool had with open(wait=False).
+# Zero keeps the pool lazy, so a process starts before PostgreSQL is reachable
+# and reports the outage through /health instead of refusing to boot.
 DB_POOL_MIN_SIZE = int(os.environ.get("DB_POOL_MIN_SIZE", "0"))
 DB_POOL_MAX_SIZE = int(os.environ.get("DB_POOL_MAX_SIZE", "10"))
 
@@ -63,7 +62,7 @@ DB_POOL_MAX_SIZE = int(os.environ.get("DB_POOL_MAX_SIZE", "10"))
 # time unless a deployment says otherwise.
 WORKER_CONCURRENCY = int(os.environ.get("TSDHN_WORKER_CONCURRENCY", "1"))
 
-# A lease this long tolerates a slow database round trip; rqueue heartbeats at
+# A lease this long tolerates a slow database round trip. rqueue heartbeats at
 # a third of it while the simulation runs off the event loop.
 WORKER_LEASE_SECONDS = float(os.environ.get("TSDHN_WORKER_LEASE_SECONDS", "60"))
 
@@ -78,12 +77,12 @@ def api_pool_size() -> tuple[int, int]:
 def worker_pool_size() -> tuple[int, int]:
     """Return the worker process's pool bounds.
 
-    This floor is load bearing, not cosmetic. `rqueue.Worker` holds one
-    connection for the whole run to LISTEN on its wake channel, borrows one per
-    poll to recover expired leases and claim, one per heartbeat, and one per
-    progress write from a running simulation. When the pool cannot spare a
-    connection for the listener, rqueue logs a warning and falls back to
-    polling only, which is a latency regression that is easy to misdiagnose.
+    The maximum must cover what `rqueue.Worker` borrows. It holds one
+    connection for the whole run to LISTEN on its wake channel, and it borrows
+    one per poll to recover expired leases and claim, one per heartbeat, and
+    one per progress write. If the pool cannot spare a connection for the
+    listener, rqueue logs a warning and falls back to polling only, which adds
+    latency and is easy to misdiagnose.
     """
     max_size = max(DB_POOL_MAX_SIZE, 2 * WORKER_CONCURRENCY + 4)
     return min(DB_POOL_MIN_SIZE, max_size), max_size
@@ -101,9 +100,9 @@ COMPUTE_PRODUCER_PASSWORD = os.environ.get("COMPUTE_PRODUCER_PASSWORD", "")
 COMPUTE_WORKER_ROLE = os.environ.get("COMPUTE_WORKER_ROLE", "tsdhn_worker")
 COMPUTE_WORKER_PASSWORD = os.environ.get("COMPUTE_WORKER_PASSWORD", "")
 
-# Retention deletes queue history, which no consuming role may do. Keeping it
-# on its own credential means a deployment can withhold it or move retention
-# to a maintenance container without changing the worker role.
+# Retention deletes queue history, which no consuming role may do. A separate
+# credential lets a deployment withhold it or move retention to a maintenance
+# container without changing the worker role.
 COMPUTE_PURGER_ROLE = os.environ.get("COMPUTE_PURGER_ROLE", "tsdhn_purger")
 COMPUTE_PURGER_PASSWORD = os.environ.get("COMPUTE_PURGER_PASSWORD", "")
 
@@ -126,16 +125,16 @@ def role_database_url(role: str, password: str) -> str:
     parts = urlsplit(COMPUTE_RUNTIME_DATABASE_URL or COMPUTE_DATABASE_URL)
     credentials = f"{quote(role, safe='')}:{quote(password, safe='')}"
     # Preserve the authority verbatim. asyncpg accepts socket URLs with no
-    # hostname and multi-host authorities; accessing ``parts.hostname`` or
-    # ``parts.port`` would reject those valid DSN forms before asyncpg sees
-    # them. Existing userinfo is replaced by taking everything after the last
-    # @, while the raw host list (if any) remains untouched.
+    # hostname and multi-host authorities, and `parts.hostname` or `parts.port`
+    # would reject those forms before asyncpg sees them. Existing userinfo is
+    # replaced by taking everything after the last `@`.
     authority = parts.netloc.rsplit("@", 1)[-1]
     return urlunsplit(parts._replace(netloc=f"{credentials}@{authority}"))
 
 
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "localhost:9000")
-# Public endpoint differs from API endpoint for browser downloads.
+# Browsers download from this endpoint, which can differ from the one the API
+# uploads to.
 MINIO_PUBLIC_ENDPOINT = os.environ.get("MINIO_PUBLIC_ENDPOINT", MINIO_ENDPOINT)
 MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "minioadmin")

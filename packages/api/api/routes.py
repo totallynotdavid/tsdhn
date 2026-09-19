@@ -77,7 +77,8 @@ async def create_calculation(data: EarthquakeInput) -> CalculationPreview:
     calculator = get_calculator()
 
     def compute() -> CalculationPreview:
-        # The preview writes hypo.dat, but previews must not mutate the workspace.
+        # The calculation writes hypo.dat. A temporary directory keeps a preview
+        # from touching any job workspace.
         with tempfile.TemporaryDirectory() as tmp:
             calculation = calculator.calculate_earthquake_parameters(data, Path(tmp))
         travel_times = calculator.calculate_tsunami_travel_times(data)
@@ -191,8 +192,8 @@ async def job_events(simulation_id: str) -> StreamingResponse:
         deadline = anyio.current_time() + SSE_MAX_DURATION
         # asyncpg delivers notifications to a callback, not to an async
         # generator, so a one-slot queue bridges the callback into this loop.
-        # It only ever carries "something changed"; the status is re-read from
-        # the row, which is what the client is actually shown.
+        # It only signals that something changed. The status is re-read from
+        # the row, which is what the client is shown.
         wakeups: asyncio.Queue[None] = asyncio.Queue(maxsize=1)
 
         def on_notify(
@@ -201,9 +202,9 @@ async def job_events(simulation_id: str) -> StreamingResponse:
             with contextlib.suppress(asyncio.QueueFull):
                 wakeups.put_nowait(None)
 
-        # Deliberately not a pooled connection: a stream can hold this for
-        # SSE_MAX_DURATION, and a handful of watchers would drain the pool
-        # every other route shares.
+        # Not a pooled connection. A stream can hold this for
+        # `SSE_MAX_DURATION`, and a few watchers would drain the pool that every
+        # other route shares.
         connection = await db.connect()
         try:
             await connection.add_listener(channel, on_notify)
