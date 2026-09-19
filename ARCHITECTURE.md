@@ -2,7 +2,7 @@
 
 This document explains what each component owns and how a simulation moves
 through the system. Component READMEs explain how to work on each component.
-[`DEPLOY.md`](./DEPLOY.md) explains how to run the services.
+`DEPLOY.md` explains how to run the services.
 
 ## System
 
@@ -66,7 +66,7 @@ PostgreSQL jobs, queues, or MinIO.
 The engine preserves several numerical and file-format rules from the original
 MATLAB and Fortran programs. Those rules are documented with the engine and
 beside the code that implements them. Legacy behavior is compatibility
-evidence; it is not treated as scientific validation without a source.
+evidence. It is not scientific validation without a source.
 
 ### Output storage
 
@@ -113,95 +113,144 @@ changes, and row-level security scopes each to the deployment's queue:
 | `COMPUTE_WORKER_ROLE` | worker | claim and transition (`CONSUME`) | `SELECT`, `UPDATE` |
 | `COMPUTE_PURGER_ROLE` | worker retention | inspect plus delete queue jobs | none |
 
-The producer cannot claim a job, the worker cannot delete one, and the purger
-cannot reach `compute.jobs`. Deleting a queue job cascades to its attempt
-history, so retention uses its own credential rather than the consumer role.
+The producer cannot claim a job. The worker cannot insert or delete a queue
+job. The purger cannot reach `compute.jobs`. Deleting a queue job cascades to
+its attempt history, so retention uses its own credential rather than the
+consumer role.
+
+The schema-owner connection is used only for migrations and provisioning. The
+API, worker, and purger each require their own configured password and never
+fall back to the owner URL.
+
+Provisioning is repeatable and only narrows. Each runtime role is
+`NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOBYPASSRLS`, `NOREPLICATION`,
+and `NOINHERIT`, with no inherited role membership. A manual grant or a
+template role must not widen a runtime capability.
 
 ## Cross-boundary invariants
 
-The queue, compute row, workspace, and retention records describe one
-simulation across different storage systems. The following is the invariant
-brief for changes to any of them: a transition is authorized only by the
-process or maintenance path named below, and a process must not infer safety
-from a state in another store unless the stated join or fence also holds.
-
-### Runtime identities and role membership
-
-- The schema-owner connection is authorized for migrations and provisioning
-  only. API, worker, and purger startup requires its own configured password
-  and must never fall back to the owner URL.
-- The API producer may create/read compute rows and enqueue/read queue rows.
-  It does not claim, transition, or delete queue work.
-- The worker may claim and transition queue rows and read/update
-  `compute.jobs`. It cannot insert or delete queue rows.
-- The purger may inspect and delete queue rows only through the retention
-  policy below. It has no `compute.jobs` privilege.
-- Provisioning is narrowing and repeatable: each runtime role is
-  `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOBYPASSRLS`,
-  `NOREPLICATION`, `NOINHERIT`, and has no inherited role membership. A
-  manual grant or a template role must not widen a runtime capability.
+The queue, the compute row, the workspace, and queue retention describe one
+simulation in different stores. A change to any of them must keep the rules
+below. A process must not infer safety from a state in another store unless the
+stated join or fence also holds.
 
 ### Queue state
 
 The producer creates one queue row for a compute job, with a dedupe key and a
 payload naming that job. The worker is the only runtime actor that claims a
-pending row, renews its lease, and advances it through execution; rqueue's
+pending row, renews its lease, and advances it through execution. rqueue's
 lease fence makes a superseded attempt's transition fail. Queue finalization
-may produce a terminal row without the handler updating `compute.jobs`, which
-is why reconciliation exists. The purger may only delete an already-terminal,
-old row that also passes the compute-side and payload checks; it never creates,
-claims, or updates queue work.
+can produce a terminal row without the handler updating `compute.jobs`, which
+is why reconciliation exists.
 
 ### Compute state
 
-`compute.jobs` is the application record and is never deleted by retention.
-The normal status transitions are `queued -> running -> completed` or
-`queued -> running -> failed`; an operator retry may re-enter `running` from
-`failed`. The worker's progress and failure writes are fenced by
-`owner_attempt` and refuse terminal rows. Completion writes carry both fences as
-well: a late result from an attempt that was reconciled or otherwise lost its
-row is not allowed to overwrite the terminal state. Reconciliation is the
-recovery transition for a queue-terminal row whose compute row is still
-unfinished: it changes that row to `failed` after the grace period. A completed
-row is never reopened by at-least-once queue delivery; only the current owning
-attempt may record a result, and only while the row is non-terminal.
+The queue owns delivery, leases, and retries. `compute.jobs` owns what a
+researcher sees. Different actors update them at different times, so the rules
+below keep them from disagreeing. The failures they prevent are silent ones,
+such as a job that reads `running` forever or a finished result that is
+overwritten.
+
+`compute.jobs` is the application record. Retention never deletes it.
+
+`compute.jobs.owner_attempt` links the two systems. It holds the queue's
+attempt counter for the delivery that currently owns the row. The counter only
+increases. Every claim increments it, and an operator retry raises the attempt
+ceiling instead of resetting the count. A larger number therefore always means
+a later delivery, and a guard can tell the newest attempt from a superseded one
+without locking across systems.
+
+| Transition | Who | Allowed when |
+| --- | --- | --- |
+| `queued` (row created, task enqueued) | API request | The job row and its queue entry commit together, so a job always has an entry. |
+| `queued`, `running`, or `failed` to `running` (claim) | The attempt that was just delivered | It is not superseded (`owner_attempt` is unset or not newer), the job is not `completed`, and, if the job is `failed`, this attempt is strictly newer than the one that owns it. |
+| Progress, `completed`, and `failed` (reported) | The running attempt | It still owns the row and the row is not finished. |
+| `failed` (reconciled) | The worker's periodic reconciliation | The queue has given up on the job, it has been terminal longer than the grace period, the row is not finished, and no newer attempt has taken the row since. |
+| Restart a finished job | An operator, through the queue's retry API | The job is terminal in the queue. It comes back as a strictly newer attempt and claims the row through the claim rule above. |
+
+A completed job is never reopened. `completed` is never reclaimed, because
+at-least-once delivery can redeliver a finished job and re-running it would
+flip the row back to `running` for everyone watching. `failed` can be
+reclaimed only by a strictly newer attempt. That is an operator retry and
+never a straggler waking up after its job was reconciled.
+
+Reconciliation never overrules a live attempt. It exists for the case where
+nothing is left running to report an outcome. It skips any row that a newer
+attempt has taken, and it records the attempt it failed so a straggler from
+that attempt cannot claim the row afterwards. If it races a retry, either
+order is safe. The retry's claim supersedes a reconciliation that landed first,
+and a reconciliation that would land second is skipped.
 
 ### Workspace and lock state
 
-`JOBS_DIR/{simulation_id}` and its sibling `.lock` are one workspace state,
-not independent scratch files. An attempt must claim the exclusive `flock`
-before reading checkpoints or writing the engine workspace. The claim remains
-held through result upload, using separate releases for the kernel thread and
-the completion path; a superseded attempt cannot write after the database
-fence rejects it. A process crash releases the kernel lock so a replacement
-attempt can resume. Only the owning completion path, or the abandoned-work
-sweep for an old terminal compute row, may remove the workspace, and removal
-must reacquire the lock before unlinking it.
+`TSDHN_JOBS_DIR/{simulation_id}` and its sibling `.lock` are one workspace
+state, not independent scratch files. The lock is an operating system `flock`,
+so it is released even when the holding process dies without warning.
+
+An attempt must claim the exclusive lock before reading checkpoints or writing
+the engine workspace. The claim stays held through the result upload. A
+superseded attempt cannot write to the database after the fence rejects it, and
+the lock keeps it from writing files a replacement is reading. A process crash
+releases the kernel lock so a replacement attempt can resume. Only the owning
+completion path, or the abandoned-work sweep for an old terminal compute row,
+may remove the workspace. Removal must take the lock before unlinking it.
+
+The claim has five states:
+
+- `unclaimed`: no attempt holds the lock.
+- `held-by-kernel-thread`: the claiming thread acquired the lock.
+- `held-by-coroutine-after-shield-returns`: the normal handoff reached the
+  coroutine.
+- `held-by-drain-task-after-cancellation`: cancellation won before that
+  handoff, and a detached drain task owns the returned claim.
+- `released`: every share has been given back and the descriptor is closed.
+
+The claiming thread alone moves `unclaimed` to `held-by-kernel-thread`. On the
+normal path the coroutine then moves the claim to
+`held-by-coroutine-after-shield-returns`. The kernel thread gives back its
+share when the simulation stops, and the coroutine gives back its share after
+the result upload. If cancellation wins after the handoff but before the kernel
+thread starts, the coroutine also gives back the kernel share because no kernel
+`finally` will run. After the kernel starts, only that thread gives back its
+share. If cancellation wins before the coroutine receives the claim, the drain
+task moves it to `held-by-drain-task-after-cancellation` and gives back both
+shares. Only the last release moves the claim to `released`.
+
+The sweep may remove a workspace only while it is `unclaimed`. A busy lock
+leaves the state unchanged, and a workspace the sweep locks is removed and left
+`released`.
+
+A redelivered attempt can enter its own held state only after the previous
+claim is released. The drain gives back both shares before the lock becomes
+available, and `claim_workspace` and the sweep back off while the lock is held.
+No replacement can write into a workspace that a drain task is still
+releasing.
+
+`flock` protects a single host only. Workers on different hosts that share one
+network volume are not covered.
 
 ### Purge state
 
-Queue retention is authorized only when all of these facts hold in the same
-database policy: the row belongs to this queue, its queue state is terminal,
-its `finished_at` is more than seven days old, its payload names a canonical
-compute job UUID, and the matching `compute.jobs.status` is `completed` or
-`failed`. The database security-definer predicate enforces the cross-schema
-status check while keeping `compute.jobs` hidden from the purger. The worker
-also preselects candidates through its compute-readable pool, but that
-application check is advisory to the database policy, not a privilege
-boundary. Missing, malformed, recent, or still-running counterparts remain
-available for reconciliation and inspection; `compute.jobs` itself is never
-purged.
+Queue retention deletes a `task_queue.jobs` row only when all of these hold in
+the same database policy:
 
-## Queue retention
+- the row belongs to this queue;
+- its queue state is terminal;
+- its `finished_at` is more than seven days old;
+- its payload names a canonical compute job UUID;
+- the matching `compute.jobs.status` is `completed` or `failed`.
 
-Terminal `task_queue.jobs` rows whose matching `compute.jobs` row is also
-terminal are deleted after seven days by an hourly pass in the worker process.
-Rows whose compute counterpart is still running, missing, or malformed remain
-available for reconciliation. The queue row has no application value once the
-handler records the outcome; the week preserves attempt history for operational
-inspection over a working week and weekend. Attempt and occurrence rows follow
-through `ON DELETE CASCADE`. `compute.jobs` is not purged because it holds the
-simulation result record.
+An hourly pass in the worker process runs retention. The database
+security-definer predicate enforces the cross-schema status check while keeping
+`compute.jobs` hidden from the purger. The worker also preselects candidates
+through its compute-readable pool, but that check is advisory. The database
+policy is the boundary.
+
+Rows whose compute counterpart is missing, malformed, recent, or still running
+remain available for reconciliation and inspection. Deleting a queue row
+cascades to its attempt and occurrence rows. The queue row has no application
+value once the handler records the outcome, and the week keeps attempt history
+available for operational inspection.
 
 ## Identifiers
 
@@ -300,98 +349,17 @@ resumes from the checkpoints in the job's work directory.
 A worker that dies mid-run loses its lease, and the queue reclaims the job
 without asking the dead worker anything. When that happens on the job's last
 attempt the queue records the failure by itself, so no running code is left to
-update `compute.jobs`. The worker process therefore reconciles: it periodically
-finds jobs the queue has finished that `compute.jobs` still shows as running,
-and marks them failed with an error saying the status was reconciled rather
-than reported by the run. A job that reported its own outcome is never
-overwritten.
+update `compute.jobs`. The worker process therefore reconciles. It periodically
+finds jobs the queue has given up on that `compute.jobs` still shows as
+unfinished, and marks them failed with an error saying the status was
+reconciled rather than reported by the run. A job that reported its own outcome
+is never overwritten.
 
-Because the simulation runs on a thread that the service cannot stop on demand,
-a job records which attempt currently owns it, and every write an attempt makes
-is accepted only if that attempt still owns the job and the job is not already
-finished. A late write from an attempt that has been replaced, or from one whose
-job has already been reconciled, is refused rather than applied.
-
-The same reasoning covers the job's working directory, which holds the
-checkpoints a retry resumes from. An attempt holds an exclusive claim on that
-directory for as long as its simulation is actually running, so a replacement
-never reads checkpoints another attempt is still writing. If the worker process
-dies the claim is released with it, and the replacement resumes normally; if the
-previous attempt is still running, the replacement waits and retries instead.
-
-### Who may change what
-
-Two systems hold state for one simulation, and they are updated by different
-actors at different times: the task queue owns delivery, leases and retries,
-and `compute.jobs` owns what a researcher sees. Neither can read the other's
-mind, so the rules below are what keep them from disagreeing. They are worth
-stating exactly, because the failures they prevent are silent ones -- a job
-that reads `running` forever, or a finished result quietly overwritten.
-
-The link between the two is `compute.jobs.owner_attempt`: the queue's own
-attempt counter for the delivery that currently owns the row. That counter only
-ever counts up. Every claim increments it, and an operator retry raises the
-attempt ceiling rather than resetting the count, so a larger number always means
-a later delivery -- which is what lets a guard tell "the newest attempt" from
-"an attempt that has been superseded" without any cross-system locking.
-
-| Transition | Who | Allowed when |
-| --- | --- | --- |
-| `queued` (row created, task enqueued) | API request | The job row and its queue entry commit together, so a job always has an entry. |
-| `queued`/`running`/`failed` -> `running` (claim) | The attempt that was just delivered | It is not superseded (`owner_attempt` is unset or not newer), the job is not `completed`, and -- if the job is `failed` -- this attempt is **strictly newer** than the one that owns it. |
-| progress updates | The running attempt | It still owns the row *and* the row is not already finished. |
-| -> `completed` | The running attempt | It still owns the row and the row is not already finished. |
-| -> `failed` (reported) | The running attempt | It still owns the row and the row is not already finished. |
-| -> `failed` (reconciled) | The worker's periodic reconciliation | The queue has given up on the job, it has been terminal longer than the grace period, the row is not already finished, and no **newer** attempt has taken the row since. |
-| restart a finished job | An operator, through the queue's retry API | The job is terminal in the queue. It comes back as a strictly newer attempt and claims the row through the ordinary rule above. |
-
-Two consequences are worth spelling out, because they are the ones that are
-easy to get wrong.
-
-**A finished job is never reopened by accident.** `completed` is never
-reclaimed at all -- at-least-once delivery means a finished job can be
-delivered again, and re-running it would flip a finished row back to `running`
-for everyone watching. `failed` may be reclaimed, but only by a strictly newer
-attempt, which is exactly an operator retry and never a straggler waking up
-after its job was reconciled.
-
-**Reconciliation never overrules a live attempt.** It exists for the case where
-nothing is left running to report an outcome, so it skips any row a newer
-attempt has since taken, and it records the attempt it failed so a straggler
-from that same attempt cannot claim the row afterwards. If it and a retry race,
-either order is safe: the retry's claim supersedes a reconciliation that landed
-first, and a reconciliation that would land second is skipped.
-
-The working directory follows the same ownership idea with a separate
-mechanism, because files are not rows: the claim described above is a lock held
-by the operating system, so it is released even when the process holding it dies
-without warning.
-
-### Who may change what: workspace claims
-
-The claim has five practical states: `unclaimed`, with no attempt holding the
-lock; `held-by-kernel-thread`, after the claiming thread has acquired it;
-`held-by-coroutine-after-shield-returns`, after the normal handoff has reached
-the coroutine; `held-by-drain-task-after-cancellation`, when cancellation won
-before that handoff and the detached drain owns the returned claim; and
-`released`, after all claim shares are given back and the descriptor is closed.
-
-The claiming thread alone moves `unclaimed` to `held-by-kernel-thread`. On the
-normal path the coroutine moves that state to
-`held-by-coroutine-after-shield-returns`; the kernel thread then gives back its
-share when simulation stops, and the coroutine gives back its share after the
-result upload. If cancellation wins after that handoff but before the kernel
-thread starts, the coroutine also gives back the kernel share because no kernel
-`finally` will run; after the kernel starts, only that thread gives back its
-share. If cancellation wins before the coroutine receives the claim, the drain
-task moves it to `held-by-drain-task-after-cancellation` and gives back both
-shares. Only the last of those releases moves the claim to `released`.
-The sweep may remove a workspace only while it is `unclaimed`: a busy lock
-leaves the state unchanged, and a successfully locked workspace is cleaned up
-and left `released`.
-
-The invariant is that a redelivered attempt can enter its own held state only
-after the previous claim is released. The drain therefore gives back both
-shares before its lock can become available, and `claim_workspace` or the
-sweep backs off while that lock is held; no replacement can write into a
-workspace that a drain task is still releasing.
+The simulation runs on a thread that the service cannot stop on demand, so a
+replaced attempt can keep running for a while. The `owner_attempt` fence
+rejects its database writes. The workspace lock keeps a replacement from
+reading checkpoints that the old thread is still writing. If the worker process
+dies, the kernel releases the lock and the replacement resumes. If the previous
+attempt is still running, the replacement fails with a transient error and
+retries after a backoff. See [Cross-boundary invariants](#cross-boundary-invariants)
+for the rules.
