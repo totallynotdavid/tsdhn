@@ -16,7 +16,7 @@ SvelteKit web app
   |
   v
 FastAPI compute service
-  |-- compute.jobs and the Procrastinate queue
+  |-- compute.jobs and the rqueue task_queue schema
   |-- worker -> tsdhn engine -> MinIO
 ```
 
@@ -48,7 +48,7 @@ job ID, a compute-service selector, or output storage keys.
 The compute service owns:
 
 - the API used by the web server;
-- `compute.jobs` and the Procrastinate queue tables;
+- `compute.jobs` and the `task_queue` schema rqueue owns;
 - the internal compute job ID;
 - job progress, retry state, and worker heartbeats;
 - simulation work directories and checkpoints;
@@ -93,8 +93,8 @@ submission_error
 created_at
 ```
 
-The compute service creates and writes `compute.jobs` and the Procrastinate
-queue tables. `compute.jobs.simulation_id` links a compute job to the web
+The compute service creates and writes `compute.jobs` and the `task_queue`
+schema rqueue owns. `compute.jobs.simulation_id` links a compute job to the web
 simulation. The value is unique because repeating a submission must return the
 same compute job.
 
@@ -191,3 +191,78 @@ The engine records enough state to continue valid completed work after a
 retry. The compute service keeps the job in `compute.jobs` and reports the
 final failure when retries are exhausted. Deployment settings determine retry
 limits, worker recovery, storage, and cleanup.
+
+A worker asked to stop gracefully stops taking new work and gives what it is
+already running a short grace period. A simulation runs far longer than that, so
+it is cancelled and its claim is handed straight back for another worker, which
+resumes from the checkpoints in the job's work directory.
+
+A worker that dies mid-run loses its lease, and the queue reclaims the job
+without asking the dead worker anything. When that happens on the job's last
+attempt the queue records the failure by itself, so no running code is left to
+update `compute.jobs`. The worker process therefore reconciles: it periodically
+finds jobs the queue has finished that `compute.jobs` still shows as running,
+and marks them failed with an error saying the status was reconciled rather
+than reported by the run. A job that reported its own outcome is never
+overwritten.
+
+Because the simulation runs on a thread that the service cannot stop on demand,
+a job records which attempt currently owns it, and every write an attempt makes
+is accepted only if that attempt still owns the job and the job is not already
+finished. A late write from an attempt that has been replaced, or from one whose
+job has already been reconciled, is refused rather than applied.
+
+The same reasoning covers the job's working directory, which holds the
+checkpoints a retry resumes from. An attempt holds an exclusive claim on that
+directory for as long as its simulation is actually running, so a replacement
+never reads checkpoints another attempt is still writing. If the worker process
+dies the claim is released with it, and the replacement resumes normally; if the
+previous attempt is still running, the replacement waits and retries instead.
+
+### Who may change what
+
+Two systems hold state for one simulation, and they are updated by different
+actors at different times: the task queue owns delivery, leases and retries,
+and `compute.jobs` owns what a researcher sees. Neither can read the other's
+mind, so the rules below are what keep them from disagreeing. They are worth
+stating exactly, because the failures they prevent are silent ones -- a job
+that reads `running` forever, or a finished result quietly overwritten.
+
+The link between the two is `compute.jobs.owner_attempt`: the queue's own
+attempt counter for the delivery that currently owns the row. That counter only
+ever counts up. Every claim increments it, and an operator retry raises the
+attempt ceiling rather than resetting the count, so a larger number always means
+a later delivery -- which is what lets a guard tell "the newest attempt" from
+"an attempt that has been superseded" without any cross-system locking.
+
+| Transition | Who | Allowed when |
+| --- | --- | --- |
+| `queued` (row created, task enqueued) | API request | The job row and its queue entry commit together, so a job always has an entry. |
+| `queued`/`running`/`failed` -> `running` (claim) | The attempt that was just delivered | It is not superseded (`owner_attempt` is unset or not newer), the job is not `completed`, and -- if the job is `failed` -- this attempt is **strictly newer** than the one that owns it. |
+| progress updates | The running attempt | It still owns the row *and* the row is not already finished. |
+| -> `completed` | The running attempt | It still owns the row and the row is not already finished. |
+| -> `failed` (reported) | The running attempt | It still owns the row and the row is not already finished. |
+| -> `failed` (reconciled) | The worker's periodic reconciliation | The queue has given up on the job, it has been terminal longer than the grace period, the row is not already finished, and no **newer** attempt has taken the row since. |
+| restart a finished job | An operator, through the queue's retry API | The job is terminal in the queue. It comes back as a strictly newer attempt and claims the row through the ordinary rule above. |
+
+Two consequences are worth spelling out, because they are the ones that are
+easy to get wrong.
+
+**A finished job is never reopened by accident.** `completed` is never
+reclaimed at all -- at-least-once delivery means a finished job can be
+delivered again, and re-running it would flip a finished row back to `running`
+for everyone watching. `failed` may be reclaimed, but only by a strictly newer
+attempt, which is exactly an operator retry and never a straggler waking up
+after its job was reconciled.
+
+**Reconciliation never overrules a live attempt.** It exists for the case where
+nothing is left running to report an outcome, so it skips any row a newer
+attempt has since taken, and it records the attempt it failed so a straggler
+from that same attempt cannot claim the row afterwards. If it and a retry race,
+either order is safe: the retry's claim supersedes a reconciliation that landed
+first, and a reconciliation that would land second is skipped.
+
+The working directory follows the same ownership idea with a separate
+mechanism, because files are not rows: the claim described above is a lock held
+by the operating system, so it is released even when the process holding it dies
+without warning.
