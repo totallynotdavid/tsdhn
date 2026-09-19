@@ -8,6 +8,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+import api.main as main_module
 from api import routes
 from api.core import db, repository
 from api.core.storage import output_store
@@ -37,6 +38,8 @@ def _service_token(monkeypatch: pytest.MonkeyPatch) -> None:
 def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     # The lifespan opens the process pool; these tests stub the repository
     # instead, so it is replaced with one that never reaches PostgreSQL.
+    monkeypatch.setattr(main_module, "COMPUTE_PRODUCER_PASSWORD", "test-password")
+
     async def open_pool(**_kwargs: Any) -> object:
         return object()
 

@@ -52,7 +52,7 @@ async def queue(
     runner. Neither is ever created implicitly at import or worker startup.
     """
     monkeypatch.setattr(db, "COMPUTE_DATABASE_URL", isolated_database)
-    pool = await db.open_pool(min_size=1, max_size=6)
+    pool = await db.open_pool(min_size=1, max_size=6, dsn=db.COMPUTE_DATABASE_URL)
     async with pool.acquire() as connection:
         await migrations.migrate(connection, schema=COMPUTE_QUEUE_SCHEMA)
     try:

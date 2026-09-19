@@ -55,6 +55,7 @@ async def test_connect_classifies_a_database_outage_as_transient(
         raise OSError("database unavailable")
 
     monkeypatch.setattr(db_module.asyncpg, "connect", fail)
+    monkeypatch.setattr(db_module, "_dsn", "postgresql://role:pw@host/db")
 
     with pytest.raises(TransientInfraError, match="database unavailable"):
         await db.connect()
@@ -69,6 +70,7 @@ async def test_a_postgres_connection_error_is_transient(
         raise asyncpg.PostgresConnectionError("server closed the connection")
 
     monkeypatch.setattr(db_module.asyncpg, "connect", fail)
+    monkeypatch.setattr(db_module, "_dsn", "postgresql://role:pw@host/db")
 
     with pytest.raises(TransientInfraError):
         await db.connect()
@@ -115,6 +117,110 @@ def test_notify_channel_is_a_bare_identifier_per_job() -> None:
     # No hyphens or quoting needed: it goes straight into LISTEN/NOTIFY.
     assert channel.replace("_", "").isalnum()
     assert db.notify_channel(uuid.uuid4()) != channel
+
+
+def test_role_database_url_swaps_only_the_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "COMPUTE_DATABASE_URL",
+        "postgresql://owner:secret@db.internal:5432/tsdhn",
+    )
+
+    url = settings.role_database_url("tsdhn_producer", "p@ss word")
+
+    assert url == "postgresql://tsdhn_producer:p%40ss%20word@db.internal:5432/tsdhn"
+
+
+def test_role_database_url_can_use_a_runtime_endpoint_without_owner_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "COMPUTE_DATABASE_URL",
+        "postgresql://owner:secret@owner.internal:5432/tsdhn",
+    )
+    monkeypatch.setattr(
+        settings,
+        "COMPUTE_RUNTIME_DATABASE_URL",
+        "postgresql://postgres:5432/tsdhn",
+    )
+
+    assert settings.role_database_url("tsdhn_worker", "secret") == (
+        "postgresql://tsdhn_worker:secret@postgres:5432/tsdhn"
+    )
+
+
+@pytest.mark.parametrize(
+    ("database_url", "expected"),
+    [
+        (
+            "postgresql:///tsdhn?host=/var/run/postgresql",
+            "postgresql://tsdhn_worker:secret@/tsdhn?host=/var/run/postgresql",
+        ),
+        (
+            "postgresql://owner:old@db1:5432,db2:5432/tsdhn",
+            "postgresql://tsdhn_worker:secret@db1:5432,db2:5432/tsdhn",
+        ),
+    ],
+)
+def test_role_database_url_preserves_asyncpg_dsn_authorities(
+    monkeypatch: pytest.MonkeyPatch, database_url: str, expected: str
+) -> None:
+    monkeypatch.setattr(settings, "COMPUTE_DATABASE_URL", database_url)
+
+    assert settings.role_database_url("tsdhn_worker", "secret") == expected
+
+
+def test_an_unprovisioned_role_is_rejected_before_a_connection_is_opened() -> None:
+    with pytest.raises(ValueError, match="refusing to use the schema-owner"):
+        settings.role_database_url("tsdhn_producer", "")
+    with pytest.raises(ValueError, match="runtime database role"):
+        settings.role_database_url("", "secret")
+
+
+def test_runtime_dsn_refuses_to_fall_back_to_the_owner() -> None:
+    with pytest.raises(RuntimeError, match="refusing to use the schema-owner"):
+        db.runtime_dsn("tsdhn_producer", "")
+
+
+@pytest.mark.asyncio
+async def test_connect_reuses_the_dsn_the_pool_was_opened_with(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[str] = []
+
+    async def create_pool(dsn: str, **_kwargs: Any) -> object:
+        return object()
+
+    async def connect(dsn: str, **_kwargs: Any) -> object:
+        seen.append(dsn)
+        return object()
+
+    monkeypatch.setattr(db_module.asyncpg, "create_pool", create_pool)
+    monkeypatch.setattr(db_module.asyncpg, "connect", connect)
+    monkeypatch.setattr(db_module, "_pool", None)
+    monkeypatch.setattr(db_module, "_dsn", None)
+
+    await db.open_pool(min_size=0, max_size=1, dsn="postgresql://role:pw@host/db")
+    await db.connect()
+
+    assert seen == ["postgresql://role:pw@host/db"]
+
+
+@pytest.mark.asyncio
+async def test_connect_rejects_an_unopened_pool_instead_of_using_the_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def connect(*_args: Any, **_kwargs: Any) -> object:
+        pytest.fail("connect must not open an owner-credentialed connection")
+
+    monkeypatch.setattr(db_module.asyncpg, "connect", connect)
+    monkeypatch.setattr(db_module, "_dsn", None)
+
+    with pytest.raises(RuntimeError, match="runtime-role DSN"):
+        await db.connect()
 
 
 class _Connection:

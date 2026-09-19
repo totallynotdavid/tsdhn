@@ -53,6 +53,7 @@ async def test_the_worker_detaches_from_its_blocking_threads_on_shutdown(
     monkeypatch.setattr(worker_any, "register_tasks", lambda queue: queue)
     monkeypatch.setattr(db, "open_pool", open_pool)
     monkeypatch.setattr(db, "close_pool", close_pool)
+    monkeypatch.setattr(db, "runtime_dsn", lambda *_args: "postgresql://test")
 
     await asyncio.wait_for(worker_module.run(), timeout=10)
 
@@ -126,6 +127,7 @@ def test_the_shutdown_story_holds_together(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(worker_any, "register_tasks", lambda queue: queue)
     monkeypatch.setattr(db, "open_pool", open_pool)
     monkeypatch.setattr(db, "close_pool", close_pool)
+    monkeypatch.setattr(db, "runtime_dsn", lambda *_args: "postgresql://test")
     monkeypatch.setattr(os, "_exit", exits.append)
 
     worker_module.main()

@@ -179,13 +179,21 @@ scenario_ttl_sweep() {
 import asyncio
 
 from api.core import db
-from api.core.settings import worker_pool_size
+from api.core.settings import (
+    COMPUTE_WORKER_PASSWORD,
+    COMPUTE_WORKER_ROLE,
+    worker_pool_size,
+)
 from api.core.tasks import sweep_abandoned_work_dirs
 
 
 async def main():
     minimum, maximum = worker_pool_size()
-    await db.open_pool(min_size=minimum, max_size=maximum)
+    await db.open_pool(
+        min_size=minimum,
+        max_size=maximum,
+        dsn=db.runtime_dsn(COMPUTE_WORKER_ROLE, COMPUTE_WORKER_PASSWORD),
+    )
     try:
         await sweep_abandoned_work_dirs()
     finally:

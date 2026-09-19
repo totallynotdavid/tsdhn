@@ -36,7 +36,6 @@ RUN mkdir -p /var/tmp/jobs \
 
 ENV APP_HOST=0.0.0.0 \
     APP_PORT=8000 \
-    COMPUTE_DATABASE_URL=postgresql://tsdhn:tsdhn@postgres:5432/tsdhn \
     MINIO_ENDPOINT=minio:9000 \
     MINIO_ACCESS_KEY=minioadmin \
     MINIO_SECRET_KEY=minioadmin \
