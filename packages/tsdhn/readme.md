@@ -105,6 +105,6 @@ science guide before using them for quantitative analysis.
 - `tsdhn/assets.py`: versioned model installation.
 - `tsdhn/cli/`: researcher commands.
 
-Service deployment is documented in [`DEPLOY.md`](../../DEPLOY.md). System
+Service deployment is documented in `DEPLOY.md`. System
 responsibilities and request flow are documented in
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md).

@@ -6,7 +6,7 @@ and stores output files in MinIO.
 
 The browser does not call this service. The web app calls it with
 `COMPUTE_API_TOKEN`. See [`ARCHITECTURE.md`](../../ARCHITECTURE.md) for service
-responsibilities and [`DEPLOY.md`](../../DEPLOY.md) for configuration,
+responsibilities and `DEPLOY.md` for configuration,
 migrations, storage, and worker resources.
 
 ## Commands
@@ -51,7 +51,7 @@ flag, before the subcommand. They live in `COMPUTE_QUEUE_SCHEMA` (default
 `task_queue`), never in `compute`.
 
 For a complete deployment, including web migrations and grants, follow
-[`DEPLOY.md`](../../DEPLOY.md). For local PostgreSQL, `mise run db-migrate`
+`DEPLOY.md`. For local PostgreSQL, `mise run db-migrate`
 applies every database change. `mise run test-integration` creates disposable
 databases and runs the database-backed tests.
 

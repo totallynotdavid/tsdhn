@@ -52,7 +52,7 @@ bun --filter web db:migrate
 ```
 
 The running app uses the restricted role created by the compute migration. See
-[`DEPLOY.md`](../../DEPLOY.md) for the complete startup order and environment.
+`DEPLOY.md` for the complete startup order and environment.
 
 ## Server modules
 

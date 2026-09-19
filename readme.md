@@ -45,7 +45,7 @@ The web app is at <http://localhost:3000>. The API is at
 | `mise run install` | Install Python dependencies |
 | `mise run web-install` | Install the Bun workspace |
 | `mise run dev-up` | Start the API, worker, Postgres, and MinIO |
-| `mise run dev-web` | Start the web profile and web app |
+| `mise run dev-web` | Run web migrations and start the web app |
 | `mise run db-migrate` | Apply local database migrations |
 | `mise run test` | Run the fast Python test suite |
 | `mise run test-integration` | Run disposable PostgreSQL tests |
@@ -64,7 +64,7 @@ database-backed tests, and removes those databases when it exits.
 | Document | Use it for |
 | --- | --- |
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Responsibilities, database ownership, identifiers, displayed state, and request flows |
-| [`DEPLOY.md`](./DEPLOY.md) | Compose deployment, configuration, and operations |
+| `DEPLOY.md` | Compose deployment, configuration, and operations |
 | [`packages/tsdhn`](./packages/tsdhn/readme.md) | Engine, CLI, model files, and simulation outputs |
 | [`packages/api`](./packages/api/readme.md) | Compute API and worker development |
 | [`apps/web`](./apps/web/readme.md) | SvelteKit development and server modules |
