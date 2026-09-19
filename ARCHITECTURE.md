@@ -103,6 +103,106 @@ The web runtime role can read and write the web tables and read
 changes. The table definition in `apps/web/src/lib/server/db/compute.ts` is
 used only for reads and is excluded from web migrations.
 
+The compute service has three restricted runtime roles, provisioned after the
+compute and queue migrations by `tsdhn-queue-grants`. None can run schema
+changes, and row-level security scopes each to the deployment's queue:
+
+| Role | Process | Queue capability | `compute.jobs` |
+| --- | --- | --- | --- |
+| `COMPUTE_PRODUCER_ROLE` | API | enqueue and read (`PRODUCE`) | `SELECT`, `INSERT` |
+| `COMPUTE_WORKER_ROLE` | worker | claim and transition (`CONSUME`) | `SELECT`, `UPDATE` |
+| `COMPUTE_PURGER_ROLE` | worker retention | inspect plus delete queue jobs | none |
+
+The producer cannot claim a job, the worker cannot delete one, and the purger
+cannot reach `compute.jobs`. Deleting a queue job cascades to its attempt
+history, so retention uses its own credential rather than the consumer role.
+
+## Cross-boundary invariants
+
+The queue, compute row, workspace, and retention records describe one
+simulation across different storage systems. The following is the invariant
+brief for changes to any of them: a transition is authorized only by the
+process or maintenance path named below, and a process must not infer safety
+from a state in another store unless the stated join or fence also holds.
+
+### Runtime identities and role membership
+
+- The schema-owner connection is authorized for migrations and provisioning
+  only. API, worker, and purger startup requires its own configured password
+  and must never fall back to the owner URL.
+- The API producer may create/read compute rows and enqueue/read queue rows.
+  It does not claim, transition, or delete queue work.
+- The worker may claim and transition queue rows and read/update
+  `compute.jobs`. It cannot insert or delete queue rows.
+- The purger may inspect and delete queue rows only through the retention
+  policy below. It has no `compute.jobs` privilege.
+- Provisioning is narrowing and repeatable: each runtime role is
+  `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOBYPASSRLS`,
+  `NOREPLICATION`, `NOINHERIT`, and has no inherited role membership. A
+  manual grant or a template role must not widen a runtime capability.
+
+### Queue state
+
+The producer creates one queue row for a compute job, with a dedupe key and a
+payload naming that job. The worker is the only runtime actor that claims a
+pending row, renews its lease, and advances it through execution; rqueue's
+lease fence makes a superseded attempt's transition fail. Queue finalization
+may produce a terminal row without the handler updating `compute.jobs`, which
+is why reconciliation exists. The purger may only delete an already-terminal,
+old row that also passes the compute-side and payload checks; it never creates,
+claims, or updates queue work.
+
+### Compute state
+
+`compute.jobs` is the application record and is never deleted by retention.
+The normal status transitions are `queued -> running -> completed` or
+`queued -> running -> failed`; an operator retry may re-enter `running` from
+`failed`. The worker's progress and failure writes are fenced by
+`owner_attempt` and refuse terminal rows. Completion writes carry both fences as
+well: a late result from an attempt that was reconciled or otherwise lost its
+row is not allowed to overwrite the terminal state. Reconciliation is the
+recovery transition for a queue-terminal row whose compute row is still
+unfinished: it changes that row to `failed` after the grace period. A completed
+row is never reopened by at-least-once queue delivery; only the current owning
+attempt may record a result, and only while the row is non-terminal.
+
+### Workspace and lock state
+
+`JOBS_DIR/{simulation_id}` and its sibling `.lock` are one workspace state,
+not independent scratch files. An attempt must claim the exclusive `flock`
+before reading checkpoints or writing the engine workspace. The claim remains
+held through result upload, using separate releases for the kernel thread and
+the completion path; a superseded attempt cannot write after the database
+fence rejects it. A process crash releases the kernel lock so a replacement
+attempt can resume. Only the owning completion path, or the abandoned-work
+sweep for an old terminal compute row, may remove the workspace, and removal
+must reacquire the lock before unlinking it.
+
+### Purge state
+
+Queue retention is authorized only when all of these facts hold in the same
+database policy: the row belongs to this queue, its queue state is terminal,
+its `finished_at` is more than seven days old, its payload names a canonical
+compute job UUID, and the matching `compute.jobs.status` is `completed` or
+`failed`. The database security-definer predicate enforces the cross-schema
+status check while keeping `compute.jobs` hidden from the purger. The worker
+also preselects candidates through its compute-readable pool, but that
+application check is advisory to the database policy, not a privilege
+boundary. Missing, malformed, recent, or still-running counterparts remain
+available for reconciliation and inspection; `compute.jobs` itself is never
+purged.
+
+## Queue retention
+
+Terminal `task_queue.jobs` rows whose matching `compute.jobs` row is also
+terminal are deleted after seven days by an hourly pass in the worker process.
+Rows whose compute counterpart is still running, missing, or malformed remain
+available for reconciliation. The queue row has no application value once the
+handler records the outcome; the week preserves attempt history for operational
+inspection over a working week and weekend. Attempt and occurrence rows follow
+through `ON DELETE CASCADE`. `compute.jobs` is not purged because it holds the
+simulation result record.
+
 ## Identifiers
 
 | Name | Owner | Purpose |

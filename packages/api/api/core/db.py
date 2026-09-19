@@ -7,6 +7,7 @@ simulation run: the only long-lived borrow in the system is the one
 `settings.worker_pool_size()` sizes the worker's pool the way it does.
 """
 
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -15,9 +16,10 @@ from typing import Any
 import asyncpg
 
 from api.core.errors import TransientInfraError
-from api.core.settings import COMPUTE_DATABASE_URL
+from api.core.settings import COMPUTE_DATABASE_URL, role_database_url
 
 __all__ = [
+    "COMPUTE_DATABASE_URL",
     "CONNECT_TIMEOUT",
     "JobRow",
     "acquire",
@@ -27,13 +29,20 @@ __all__ = [
     "is_transient",
     "notify_channel",
     "open_pool",
+    "runtime_dsn",
     "transient_connection_errors",
 ]
+
+logger = logging.getLogger(__name__)
 
 JobRow = dict[str, Any]
 CONNECT_TIMEOUT = 2
 
 _pool: asyncpg.Pool | None = None
+
+# The DSN the open pool used, so `connect()` reaches the same role rather than
+# quietly falling back to the owner behind the pool's back.
+_dsn: str | None = None
 
 # Client-side failures: the server was never reached, or the socket died.
 _CLIENT_ERRORS = (ConnectionError, OSError, TimeoutError)
@@ -71,12 +80,25 @@ def is_transient(exc: BaseException) -> bool:
     return isinstance(sqlstate, str) and sqlstate[:2] in _TRANSIENT_SQLSTATE_CLASSES
 
 
-async def open_pool(*, min_size: int, max_size: int) -> asyncpg.Pool:
-    """Create the process-wide pool. Idempotent within one process."""
-    global _pool
+def runtime_dsn(role: str, password: str) -> str:
+    """Resolve a runtime role's DSN, failing before an owner fallback."""
+    try:
+        return role_database_url(role, password)
+    except ValueError as error:
+        raise RuntimeError(str(error)) from error
+
+
+async def open_pool(*, min_size: int, max_size: int, dsn: str) -> asyncpg.Pool:
+    """Create the process-wide pool. Idempotent within one process.
+
+    The DSN is required so a runtime caller cannot accidentally become the
+    schema owner by omitting role credentials.
+    """
+    global _pool, _dsn
     if _pool is None:
+        _dsn = dsn
         _pool = await asyncpg.create_pool(
-            COMPUTE_DATABASE_URL,
+            _dsn,
             min_size=min_size,
             max_size=max_size,
             timeout=CONNECT_TIMEOUT,
@@ -85,10 +107,11 @@ async def open_pool(*, min_size: int, max_size: int) -> asyncpg.Pool:
 
 
 async def close_pool() -> None:
-    global _pool
+    global _pool, _dsn
     if _pool is not None:
         await _pool.close()
         _pool = None
+    _dsn = None
 
 
 def get_pool() -> asyncpg.Pool:
@@ -177,8 +200,16 @@ async def connect() -> asyncpg.Connection:
     be half an hour. Taking that from the request pool would let a handful of
     watching browsers starve every other route.
     """
+    if _dsn is None:
+        raise RuntimeError(
+            "database connection DSN is not configured; "
+            "call db.open_pool() with a runtime-role DSN first"
+        )
     try:
-        return await asyncpg.connect(COMPUTE_DATABASE_URL, timeout=CONNECT_TIMEOUT)
+        return await asyncpg.connect(
+            _dsn,
+            timeout=CONNECT_TIMEOUT,
+        )
     except Exception as e:
         if not is_transient(e):
             raise
