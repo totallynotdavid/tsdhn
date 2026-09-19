@@ -1,10 +1,9 @@
 """Read and write the compute service's job state.
 
-Every JSON column is written as `$n::text::jsonb` and read back with an
-explicit `::text` cast, decoded here with `json.loads`. asyncpg has no `Jsonb`
-wrapper, and whether a given connection carries a jsonb codec depends on who
-configured it; casting on both sides makes the behaviour identical either way.
-This is the same convention rqueue's own storage layer uses.
+JSON columns are written as `$n::text::jsonb` and read back with an explicit
+`::text` cast, then decoded with `json.loads`. asyncpg has no `Jsonb` wrapper,
+and whether a connection carries a jsonb codec depends on who configured it.
+Casting on both sides behaves the same either way.
 """
 
 import json
@@ -46,26 +45,25 @@ StoredOutput = dict[str, str]
 FAILED_JOB_DETAILS = "Pipeline failed - check error logs"
 RECONCILED_JOB_DETAILS = "Failed - reconciled from the task queue"
 
-# The queue's error_type is an exception class name ("LeaseExpired",
-# "RuntimeError"), the same shape _public_error already exposes, so it is safe
-# to show. The message says plainly that no run reported this outcome.
+# The queue's `error_type` is an exception class name, the same shape
+# `_public_error` exposes, so it is safe to show. The message states that no
+# run reported this outcome.
 RECONCILED_ERROR = (
     "Simulation stopped without reporting a result; "
     "status reconciled from the task queue (%s)"
 )
 
-# Queue states that mean the queue gave up on the job. 'succeeded' is excluded
-# deliberately: the queue only records it after run_simulation_task returned,
-# which it cannot do before complete_job has committed compute.jobs, so a
-# succeeded job that still looks unfinished here is not a state we can reach.
+# Queue states in which the queue gave up on the job. `succeeded` is excluded.
+# The queue records it only after `run_simulation_task` returned, which happens
+# only after `complete_job` committed compute.jobs.
 QUEUE_GAVE_UP = ("failed", "cancelled")
 
 # A job that reported its own outcome is never overwritten, by anyone.
 TERMINAL_STATUSES = [JobStatus.COMPLETED.value, JobStatus.FAILED.value]
 
 # The canonical form `str(uuid.UUID(...))` produces, and the only form
-# `enqueue_simulation` ever writes. Anything else is skipped by reconciliation
-# rather than casting -- see `_reconcile_sql`.
+# `enqueue_simulation` writes. Reconciliation skips any other form instead of
+# casting it. See `_reconcile_sql`.
 CANONICAL_UUID_RE = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
 # The jsonb columns come back as text and are decoded below.
@@ -122,7 +120,7 @@ def _decode(record: asyncpg.Record | None) -> JobRow | None:
 
 
 async def _notify(conn: asyncpg.Connection, simulation_id: uuid.UUID) -> None:
-    """PostgreSQL delivers the notification when the update commits."""
+    """Notify listeners of `simulation_id`. Delivery waits for the commit."""
     await conn.execute(f"NOTIFY {notify_channel(simulation_id)}")
 
 
@@ -165,12 +163,12 @@ async def fetch_by_id(conn: asyncpg.Connection, job_id: uuid.UUID) -> JobRow | N
 async def create_or_get_job(
     *, data: EarthquakeInput, simulation_id: str, defer: Any
 ) -> dict[str, Any]:
-    """Insert a job and enqueue it, atomically.
+    """Insert a job and enqueue it in one transaction.
 
-    `defer` is awaited with the open connection and the new compute job id.
-    Keeping it as an argument leaves this module independent of the queue
-    implementation. The insert and the enqueue commit together, so a job row
-    always has a queue entry.
+    `defer` is awaited with the open connection and the new compute job id,
+    which keeps this module independent of the queue implementation. Raises
+    `ValueError` when the simulation id exists with different input. Returns
+    the existing job's status when the input matches.
     """
     simulation_uuid = as_uuid(simulation_id)
     input_params = _model_dump(data)
@@ -231,10 +229,9 @@ async def get_outputs(simulation_id: str) -> list[StoredOutput]:
         raise ValueError("Invalid or unknown job ID")
     if row["status"] != JobStatus.COMPLETED.value:
         return []
-    # `outputs` is NOT NULL DEFAULT '[]' today, so this cannot be NULL. The
-    # check is here because this query bypasses _decode and reads the column
-    # as text: if the constraint were ever relaxed, json.loads(None) would
-    # raise rather than fall through to the `or []` that used to cover it.
+    # `outputs` is NOT NULL today. This query bypasses `_decode` and reads the
+    # column as text, so a relaxed constraint would make `json.loads(None)`
+    # raise.
     encoded = row["outputs"]
     if encoded is None:
         return []
@@ -267,57 +264,39 @@ async def list_abandoned_work_dirs(cutoff: datetime) -> list[str]:
 def _reconcile_sql(queue_schema: str) -> str:
     """Build the reconciliation statement for one queue schema.
 
-    `queue_schema` is interpolated rather than bound because PostgreSQL has no
-    bind parameter for an identifier. The only value ever passed is
-    `rqueue.Queue.schema`, which rqueue validated against
-    `[a-z_][a-z0-9_]*` when the queue was constructed, so the interpolated
-    name is byte-identical to the schema rqueue itself created.
-
-    The `MATERIALIZED` CTE is load bearing, not stylistic. Casting
-    `payload->>'compute_job_id'` to uuid *aborts the whole statement* on one
-    malformed value -- `SELECT ('{{"compute_job_id":"x"}}'::jsonb->>
-    'compute_job_id')::uuid` raises `invalid input syntax for type uuid` --
-    so a single bad row would silently un-reconcile every other stuck job in
-    the pass. Filtering with a regex in the same `WHERE` as the cast does not
-    fix that: PostgreSQL is free to evaluate the qualifiers in either order.
-    Putting the cast in a materialized CTE's select list, behind the regex in
-    that CTE's `WHERE`, does: the projection is computed only for rows that
-    passed the filter, and `MATERIALIZED` stops the planner from folding the
-    two levels back together. A payload this codebase did not write is skipped
-    rather than fatal.
-
-    That snapshot is also the one hazard the CTE creates, and the
-    `j.owner_attempt <= q.attempt` predicate is what answers it. `gave_up` is
-    read once, at statement start; nothing re-reads the queue afterwards. The
-    `UPDATE` that follows can then block for as long as a concurrent
-    `mark_started` holds the compute row's lock -- and in that window an
-    operator retry can put the queue row back to `pending`, a worker can claim
-    it, and that live attempt can take ownership of the compute row. The
-    snapshot still says `failed` at the older attempt, so without this
-    predicate the pass would mark a *running, rightfully owned* job failed,
-    and the live attempt's own `complete_job` would then be refused by the
-    terminal-status guard: a job killed by the pass meant to repair jobs.
-
-    Re-reading the queue row is one way to close that. Comparing
-    `owner_attempt` is better, and cheaper: it takes no lock on rqueue's own
-    table, and it tests the thing that actually decides the question -- who
-    owns the compute row *now*. PostgreSQL re-evaluates an `UPDATE`'s
-    qualifiers against the latest committed row version when it unblocks
-    (`READ COMMITTED` / EvalPlanQual), so `j.owner_attempt` here is the value
-    the concurrent `mark_started` just committed, not the one from the
-    snapshot. A newer owner means a newer attempt, and the row is skipped.
-
-    The reverse order needs no help from this predicate: if the pass wins the
-    lock first, it marks the row failed at the older attempt, and the live
-    attempt's `mark_started` then reclaims it under the strictly-newer rule.
-    Either way the live attempt survives, which is why no lock is needed.
-
-    Nothing gets stranded by this, because `owner_attempt` can never outrun the
-    queue: it is only ever written from `context.attempt`, which *is* the queue's
-    counter for that delivery, or by this pass from `q.attempt`. Once a queue
-    row settles terminal at its final attempt, the compute row's owner is at
-    most that number, so a later pass always matches.
+    `queue_schema` is interpolated because PostgreSQL has no bind parameter for
+    an identifier. Its only source is `rqueue.Queue.schema`, which rqueue
+    validated when the queue was built.
     """
+    # Casting `payload->>'compute_job_id'` to uuid aborts the whole statement on
+    # one malformed value, which would leave every other stuck job unreconciled.
+    # The regex and the cast cannot share a WHERE clause because PostgreSQL may
+    # evaluate the qualifiers in either order. The cast is in the select list of
+    # a MATERIALIZED CTE, behind the regex in that CTE's WHERE, so it runs only
+    # for rows that passed the filter. A payload this codebase did not write is
+    # skipped.
+    #
+    # `gave_up` is read once at statement start. The UPDATE can then block on a
+    # concurrent `mark_started`, and in that window an operator retry can requeue
+    # the job and a new attempt can take ownership of the compute row.
+    # `j.owner_attempt <= q.attempt` skips that row. PostgreSQL re-evaluates an
+    # UPDATE's qualifiers against the latest committed row version when it
+    # unblocks (READ COMMITTED), so `j.owner_attempt` is the value the
+    # concurrent claim committed. Without the predicate the pass would fail a
+    # running job that a live attempt rightfully owns, and that attempt's
+    # `complete_job` would then be refused by the terminal-status guard.
+    #
+    # If the pass takes the row lock first, it marks the row failed at the older
+    # attempt and the live attempt's `mark_started` reclaims it as strictly
+    # newer. Neither order needs a lock on rqueue's tables.
+    #
+    # `owner_attempt` never exceeds the queue's attempt counter. It is written
+    # only from `context.attempt` or by this pass from `q.attempt`, so once a
+    # queue row settles at its final attempt a later pass always matches.
+    #
+    # `GREATEST(COALESCE(...))` keeps the stamp from moving backwards. The two
+    # counters can disagree: a job cancelled before its first lease has queue
+    # attempt 0 and a NULL `owner_attempt`.
     return f"""
         WITH gave_up AS MATERIALIZED (
             SELECT (payload->>'compute_job_id')::uuid AS compute_job_id,
@@ -347,39 +326,24 @@ def _reconcile_sql(queue_schema: str) -> str:
 async def reconcile_terminal_jobs(
     *, queue_schema: str, queue_name: str, task: str, cutoff: datetime
 ) -> list[uuid.UUID]:
-    """Fail compute jobs the queue gave up on without the run saying so.
+    """Fail compute jobs the queue gave up on, and return their ids.
 
-    A simulation normally writes its own outcome: `record_failure` on the last
-    attempt, `complete_job` on success. Several paths end a job without that
-    write ever happening -- a worker whose lease expired with its attempt
-    budget spent, which rqueue fails by a pure SQL update that never calls the
-    handler; a failure inside `complete_job` after the kernel finished; a
-    second outage that defeats `record_failure` itself. In every one of them
-    the queue row is terminal while compute.jobs is still `running`, and
-    without this pass nothing would ever correct it.
+    A run normally writes its own outcome with `record_failure` or
+    `complete_job`. Some paths end a job without that write: rqueue failing a
+    job whose lease expired on its last attempt without calling the handler, a
+    failure inside `complete_job` after the kernel finished, and an outage that
+    also defeats `record_failure`. In each the queue row is terminal while
+    compute.jobs is still unfinished.
 
-    Only rows the queue gave up on and that compute.jobs has not already
-    finished are touched, so running this twice, or from two workers at once,
-    changes nothing the first pass did not: the guard is evaluated under the
+    Only rows the queue gave up on and compute.jobs has not finished are
+    touched. Repeating the pass, or running it on two workers at once, changes
+    nothing the first pass did not, because the guard is evaluated under the
     row lock the UPDATE takes.
 
-    The pass also stamps `owner_attempt` with the queue's own attempt counter,
-    and that is what makes the repair stick. Without it, the attempt this pass
-    just failed *on the queue's behalf* is still free to come back: a worker
-    wedged past its lease can reach `mark_started` afterwards and reopen the
-    row (`owner_attempt IS NULL` when it never got that far, or equal to its
-    own number when it did), leaving compute.jobs `running` under a queue row
-    that says `failed`. Recording which attempt the queue gave up on turns
-    "has this job been reconciled?" into a comparison `mark_started` can make:
-    only a strictly newer attempt may reclaim a failed row, and rqueue's
-    attempt counter only ever counts up (`storage.lease_jobs` does
-    `attempt = attempt + 1` on every claim, and `Admin.retry_job` deliberately
-    does not reset it -- it raises `max_attempts` instead), so an operator
-    retry always is strictly newer and a stale attempt never is.
-
-    `GREATEST(COALESCE(...), ...)` because the two counters can legitimately
-    disagree: a job cancelled before it was ever leased has queue attempt 0
-    and `owner_attempt` NULL, and nothing should ever walk the stamp backwards.
+    The pass stamps `owner_attempt` with the queue's attempt. `mark_started`
+    lets only a strictly newer attempt reclaim a failed row, so a wedged
+    attempt that wakes up later cannot reopen the row while an operator retry
+    can.
     """
     async with acquire() as conn, conn.transaction():
         rows = await conn.fetch(
@@ -394,8 +358,8 @@ async def reconcile_terminal_jobs(
             TERMINAL_STATUSES,
             CANONICAL_UUID_RE,
         )
-        # Same transaction as the update, so a watching SSE stream is only
-        # woken for a state that has committed.
+        # Same transaction as the update, so a watching SSE stream wakes only
+        # for a state that has committed.
         for row in rows:
             await _notify(conn, row["simulation_id"])
     return [row["id"] for row in rows]
@@ -416,47 +380,37 @@ async def mark_started(
     simulation_id: uuid.UUID,
     attempt: int,
 ) -> bool:
-    """Claim this row for `attempt`, and say whether the claim was won.
+    """Claim this row for `attempt` and return whether the claim was won.
 
-    Three things happen in one statement, and all three have to: taking
-    ownership, refusing to reopen a finished job, and marking the job running.
-    A claim is lost when a *newer* attempt already owns the row, or when the
-    job is already `completed` -- at-least-once delivery means a completed job
-    can come back, and re-running it would flip a finished row to `running` for
-    everyone watching.
+    One statement takes ownership, refuses to reopen a finished job, and marks
+    the job running. The claim is lost when a newer attempt owns the row or the
+    job is `completed`. Delivery is at least once, so a completed job can come
+    back, and re-running it would flip a finished row to `running` for every
+    watcher.
 
-    `completed` is refused outright. `failed` is refused only for an attempt
-    that is not strictly newer than the one that owns the row, because the two
-    ways a job gets there need opposite answers:
+    A `failed` row is refused only to an attempt that is not strictly newer
+    than the row's owner, because two paths lead there and need opposite
+    answers:
 
-    - `rqueue.Admin.retry_job` is the documented way an operator restarts a
-      terminally failed job, and it works by putting the same row back to
-      `pending` for an ordinary claim. If a `failed` compute row could not be
-      reclaimed at all, that retry would run a whole simulation whose every
-      write was rejected.
-    - `reconcile_terminal_jobs` marks a row failed on behalf of a queue that
-      gave up on it, and stamps `owner_attempt` with the attempt it failed.
-      The attempt behind that -- a worker wedged past its own lease -- can wake
-      up afterwards and reach here, and reopening the row would flip
-      compute.jobs to `running` under a queue row that says `failed`, undoing
-      the repair and leaving the two systems disagreeing with nothing left to
-      correct them.
+    - An operator restarts a failed job with `rqueue.Admin.retry_job`, which
+      requeues the same row. The retry must be able to reclaim the failed
+      compute row, or the whole simulation would run with every write rejected.
+    - `reconcile_terminal_jobs` fails a row for a queue that gave up and stamps
+      the attempt it failed. That attempt, a worker wedged past its lease, may
+      wake up and reach here. Reopening the row would leave compute.jobs
+      `running` under a queue row that says `failed`.
 
-    Strict inequality separates them exactly, because rqueue's attempt counter
-    only ever counts up: `storage.lease_jobs` does `attempt = attempt + 1` on
-    every claim, and `retry_terminal` deliberately does not reset it (attempt
-    records are immutable and keyed by `(job_id, attempt)`; a fresh budget
-    comes from raising `max_attempts`). So an operator retry is always strictly
-    newer than the reconciled attempt, and the wedged attempt never is.
+    Strict inequality separates them because rqueue's attempt counter only
+    increases. `storage.lease_jobs` increments it on every claim, and
+    `Admin.retry_job` raises `max_attempts` instead of resetting it.
 
-    A reclaimed row also has its previous attempt's `error` and `finished_at`
-    cleared. That is not cosmetic: `status_from_row` hands both to the status
-    endpoint and to SSE beside the new `running`, so leaving them makes a live
-    run indistinguishable from a stale failure to every client.
+    A reclaimed row has the previous attempt's `error` and `finished_at`
+    cleared, because `status_from_row` returns both to clients beside the new
+    `running`.
     """
-    # asyncpg commits each statement on its own, so the NOTIFY and the UPDATE
-    # it describes are wrapped together: a client must never be woken to read a
-    # state that has not committed yet.
+    # asyncpg commits each statement on its own. The transaction keeps the
+    # NOTIFY with its UPDATE, so no client is woken to read an uncommitted
+    # state.
     async with transient_connection_errors(conn), conn.transaction():
         claimed = await conn.fetchval(
             """
@@ -491,23 +445,18 @@ async def record_progress(
     details: dict[str, Any],
     attempt: int,
 ) -> bool:
-    """Write one progress update, fenced on owning the attempt.
+    """Write one progress update fenced on owning the attempt.
 
-    This is the only write reachable from the kernel *thread*, which outlives
-    the coroutine that started it (see `api.core.tasks`). Two predicates make
-    that safe, and both are part of the same statement as the write:
+    Returns whether the write landed. The kernel thread makes this write, and
+    it can outlive its coroutine (see `api.core.tasks`). Two predicates in the
+    same statement make that safe:
 
-    - `owner_attempt = $9` refuses a write from an attempt that has been
-      superseded, so a thread abandoned by attempt 1 cannot scribble over what
-      attempt 2 is doing;
-    - `status <> ALL(TERMINAL_STATUSES)` refuses a write to a job that is
-      already finished, which is the case that matters most: reconciliation
-      marks an abandoned job `failed`, and a stale write that flipped it back
-      to `running` would silently undo exactly the repair reconciliation
-      exists to make. The abandoned attempt is still the *owner* there, so the
-      attempt fence alone would not catch it.
+    - `owner_attempt = $9` refuses a superseded attempt.
+    - `status <> ALL(TERMINAL_STATUSES)` refuses a finished job. An attempt
+      that reconciliation failed is still the owner, so the attempt fence alone
+      would let its stale write flip `failed` back to `running`.
 
-    Returns whether the write landed. A refused write is normal, not an error.
+    A refused write is normal, not an error.
     """
     calculation = details.get("calculation")
     travel_times = details.get("travel_times")
@@ -557,17 +506,13 @@ async def record_failure(
 ) -> None:
     """Record a failed run.
 
-    When the exception is about to be retried this only updates `details`
-    and leaves the status RUNNING, so an in-flight retry does not look
-    terminal to anyone watching.
+    When the exception will be retried this only updates `details` and leaves
+    the status `running`, so an in-flight retry does not look terminal.
 
-    Both statements refuse to touch a row that already reached a terminal
-    state. That is not defensive padding: `complete_job` can fail *after* its
-    UPDATE committed (a connection lost at commit is ambiguous by definition),
-    and the caller then reports a failure for a job that is, in fact, finished.
-    The guard is the same one `_fail_exhausted` carried on `bump`, and it is
-    paired with the same `owner_attempt` fence every other write in an
-    attempt's lifetime carries.
+    Both statements carry the `owner_attempt` fence and skip a terminal row.
+    The terminal guard matters because `complete_job` can fail after its UPDATE
+    committed, since a connection lost at commit is ambiguous. The caller then
+    reports a failure for a job that is finished.
     """
     logger.exception("Simulation failed for compute job %s", job_uuid)
     async with transient_connection_errors(conn), conn.transaction():
@@ -605,26 +550,18 @@ async def complete_job(
 ) -> bool:
     """Upload the result and commit its manifest with the terminal state.
 
-    Fenced on `owner_attempt` *and* on the row not already being terminal,
-    like every other write an attempt makes. The attempt fence alone is not
-    enough here, for the same reason it is not enough in `record_progress`:
-    the attempt that gets reconciled is still the row's owner afterwards. A
-    worker wedged past its lease, whose attempt budget the queue then spent,
-    has its job failed by `reconcile_terminal_jobs` while its kernel thread is
-    still running; when that kernel finally returns, `owner_attempt` still
-    matches, and without the status guard this would flip the row to
-    `completed` under a queue row that says `failed` -- the one divergence
-    reconciliation exists to prevent, reintroduced at the last step.
+    Returns whether the manifest landed. The upload has happened by the time
+    the UPDATE runs, so a refused write leaves objects in MinIO that
+    compute.jobs does not point at. The refusal is logged with the object
+    location, and the caller must be able to tell.
 
-    Standing down costs a real result, which is why the refusal is loud (see
-    below) rather than silent: the objects are in MinIO and the log says where.
-    Recording it instead would be worse, because the two systems would then
-    disagree permanently with nothing left to reconcile them.
+    The UPDATE is fenced on `owner_attempt` and on the row not being terminal,
+    as in `record_progress`. An attempt that reconciliation failed is still the
+    owner, so without the status guard its late completion would flip the row
+    to `completed` under a queue row that says `failed`.
 
-    Returns whether the manifest landed. It matters here more than anywhere
-    else that the caller can tell: the upload has already happened by the time
-    the UPDATE runs, so a silently skipped write leaves objects in MinIO with
-    nothing in `compute.jobs` pointing at them, and no trace of why.
+    Refusing discards a real result. Recording it would leave the two systems
+    permanently disagreeing with nothing left to reconcile them.
     """
     now = datetime.now().astimezone()
     simulation_id = str(row["simulation_id"])
@@ -653,7 +590,7 @@ async def complete_job(
         "travel_times": travel_times,
         "outputs": outputs,
     }
-    # MinIO's client is blocking; uploading on the event loop would stall every
+    # MinIO's client is blocking. Uploading on the event loop would stall every
     # other coroutine in the worker, heartbeats included.
     bucket, metadata_key = await anyio.to_thread.run_sync(
         lambda: output_store.upload_simulation_result(
