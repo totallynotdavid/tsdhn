@@ -3,6 +3,7 @@
 import asyncio
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -769,6 +770,76 @@ async def test_a_cancelled_claim_does_not_strand_the_workspace(
             break
     else:
         pytest.fail("the cancelled claim left the workspace locked")
+
+
+@pytest.mark.asyncio
+async def test_cancelled_queued_kernel_releases_its_claim_share(
+    worker_job: tuple[uuid.UUID, uuid.UUID, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job_id, _simulation_id, work_dir = worker_job
+    loop = asyncio.get_running_loop()
+    executor = ThreadPoolExecutor(max_workers=1)
+    loop.set_default_executor(executor)
+    blocker_started = threading.Event()
+    unblock = threading.Event()
+    kernel_started = threading.Event()
+    claim_returned = asyncio.Event()
+    blocker_task: asyncio.Task[None] | None = None
+
+    async def claimed(*_args: Any, **_kwargs: Any) -> bool:
+        return True
+
+    monkeypatch.setattr(tasks_module.repository, "mark_started", claimed)
+
+    def run_simulation(*_args: Any, **_kwargs: Any) -> object:
+        kernel_started.set()
+        return object()
+
+    monkeypatch.setattr(tasks_module, "run_simulation", run_simulation)
+    original_claim = tasks._claim_workspace_safely
+
+    async def claim_then_queue(
+        current_work_dir: Path, attempt: int
+    ) -> tuple[tasks.WorkspaceClaim, bool]:
+        nonlocal blocker_task
+        result = await original_claim(current_work_dir, attempt)
+
+        def block_executor() -> None:
+            blocker_started.set()
+            unblock.wait(5)
+
+        blocker_task = asyncio.create_task(asyncio.to_thread(block_executor))
+        for _ in range(500):
+            if blocker_started.is_set():
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("executor blocker did not start")
+        claim_returned.set()
+        return result
+
+    monkeypatch.setattr(tasks_module, "_claim_workspace_safely", claim_then_queue)
+    task = asyncio.create_task(tasks.run_simulation_task(job_id, _context(attempt=1)))
+
+    try:
+        await asyncio.wait_for(claim_returned.wait(), 5)
+        # The sole executor worker is occupied, so run_kernel is queued when
+        # cancellation reaches the coroutine.
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not kernel_started.is_set()
+    finally:
+        unblock.set()
+        if blocker_task is not None:
+            await blocker_task
+        executor.shutdown(wait=True)
+
+    next_claim, _resume = tasks.claim_workspace(work_dir, 2)
+    next_claim.release()
+    next_claim.release()
 
 
 def test_a_fresh_workspace_reports_that_there_is_nothing_to_resume(

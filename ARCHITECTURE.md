@@ -266,3 +266,32 @@ The working directory follows the same ownership idea with a separate
 mechanism, because files are not rows: the claim described above is a lock held
 by the operating system, so it is released even when the process holding it dies
 without warning.
+
+### Who may change what: workspace claims
+
+The claim has five practical states: `unclaimed`, with no attempt holding the
+lock; `held-by-kernel-thread`, after the claiming thread has acquired it;
+`held-by-coroutine-after-shield-returns`, after the normal handoff has reached
+the coroutine; `held-by-drain-task-after-cancellation`, when cancellation won
+before that handoff and the detached drain owns the returned claim; and
+`released`, after all claim shares are given back and the descriptor is closed.
+
+The claiming thread alone moves `unclaimed` to `held-by-kernel-thread`. On the
+normal path the coroutine moves that state to
+`held-by-coroutine-after-shield-returns`; the kernel thread then gives back its
+share when simulation stops, and the coroutine gives back its share after the
+result upload. If cancellation wins after that handoff but before the kernel
+thread starts, the coroutine also gives back the kernel share because no kernel
+`finally` will run; after the kernel starts, only that thread gives back its
+share. If cancellation wins before the coroutine receives the claim, the drain
+task moves it to `held-by-drain-task-after-cancellation` and gives back both
+shares. Only the last of those releases moves the claim to `released`.
+The sweep may remove a workspace only while it is `unclaimed`: a busy lock
+leaves the state unchanged, and a successfully locked workspace is cleaned up
+and left `released`.
+
+The invariant is that a redelivered attempt can enter its own held state only
+after the previous claim is released. The drain therefore gives back both
+shares before its lock can become available, and `claim_workspace` or the
+sweep backs off while that lock is held; no replacement can write into a
+workspace that a drain task is still releasing.

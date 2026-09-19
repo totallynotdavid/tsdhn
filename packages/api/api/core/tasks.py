@@ -307,6 +307,8 @@ async def _release_unreceived_claim(
         claim, _resume = await claim_future
     except BaseException:
         return
+    # Cancellation won before the coroutine received the claim, so its normal
+    # path will never release its share; the drain owns both shares.
     claim.release()
     claim.release()
 
@@ -443,6 +445,21 @@ async def run_simulation_task(compute_job_id: uuid.UUID, context: TaskContext) -
             # stops writing -- which is not when the coroutine stops waiting.
             claim.release()
 
+    kernel_state_guard = threading.Lock()
+    kernel_started = False
+    kernel_cancelled = False
+
+    def run_kernel_if_not_cancelled(held: WorkspaceClaim, should_resume: bool) -> Any:
+        """Start the kernel only if cancellation has not claimed its share."""
+        nonlocal kernel_started
+        with kernel_state_guard:
+            if kernel_cancelled:
+                # The coroutine released both shares: its own in finally and
+                # the kernel's because this work item never entered run_kernel.
+                return None
+            kernel_started = True
+        return run_kernel(held, should_resume)
+
     claim: WorkspaceClaim | None = None
     try:
         # rqueue installs a ThreadPoolExecutor sized from the worker's
@@ -450,7 +467,7 @@ async def run_simulation_task(compute_job_id: uuid.UUID, context: TaskContext) -
         # bounded without building an executor here.
         held, resume = await _claim_workspace_safely(work_dir, context.attempt)
         claim = held
-        result = await asyncio.to_thread(run_kernel, held, resume)
+        result = await asyncio.to_thread(run_kernel_if_not_cancelled, held, resume)
         async with db.acquire() as conn:
             # Still under this attempt's claim: complete_job reads the result
             # files back out of the workspace to upload them, and a lease lost
@@ -463,6 +480,13 @@ async def run_simulation_task(compute_job_id: uuid.UUID, context: TaskContext) -
         # The coroutine ends here; the OS thread underneath it does not, because
         # Python cannot kill a thread. Tell it to stop.
         abandoned.set()
+        with kernel_state_guard:
+            kernel_cancelled = True
+            kernel_was_started = kernel_started
+        if claim is not None and not kernel_was_started:
+            # The executor may cancel a queued work item before run_kernel gets
+            # to its finally block, so release its share here in that case.
+            claim.release()
         raise
     except AbandonedAttempt as e:
         # A refused write, not a broken run. This is the one path where the
