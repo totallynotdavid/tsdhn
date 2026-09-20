@@ -1,4 +1,3 @@
-# pragma: no cover - This is configuration data, not executable logic.
 from tsdhn.deform import run_deform
 from tsdhn.fault_plane import run_fault_plane
 from tsdhn.pipeline.types import ProcessingStep

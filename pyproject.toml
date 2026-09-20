@@ -83,7 +83,11 @@ branch = true
 # the harness itself is well-tested is a different question from whether
 # the product is, so it is not measured here.
 source = ["packages/tsdhn/tsdhn", "packages/api/api"]
-omit = ["**/tests/*", "**/__init__.py"]
+omit = [
+    "**/tests/*",
+    "**/__init__.py",
+    "packages/tsdhn/tsdhn/pipeline/registry.py",
+]
 
 [tool.coverage.report]
 exclude_lines = [
