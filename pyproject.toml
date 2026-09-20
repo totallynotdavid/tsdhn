@@ -19,21 +19,21 @@ tsdhn-parity = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "ruff==0.15.20",
-    "mypy==2.2.0",
+    "ruff==0.16.8",
+    "mypy==2.3.1",
     "types-PyYAML==6.0.12.20260518",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "pytest-xdist==3.8.0",
     "pytest-cov==7.1.0",
     "httpx2==2.12.0",
-    "coverage==7.15.0",
+    "coverage==7.15.2",
     "diff-cover==10.5.1",
     "bandit==1.9.4",
     "pip-audit==2.10.1",
 ]
 build = [
-    "uv_build==0.11.28",
+    "uv_build==0.11.31",
 ]
 
 [tool.ruff]
