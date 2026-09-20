@@ -6,7 +6,6 @@ one long-lived borrow is the LISTEN connection `rqueue.Worker` holds, which is
 why `settings.worker_pool_size()` sizes the worker's pool as it does.
 """
 
-import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -31,8 +30,6 @@ __all__ = [
     "runtime_dsn",
     "transient_connection_errors",
 ]
-
-logger = logging.getLogger(__name__)
 
 JobRow = dict[str, Any]
 CONNECT_TIMEOUT = 2
