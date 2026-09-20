@@ -5,27 +5,13 @@ import numpy as np
 import pytest
 
 import tsdhn.tsunami as tsunami_module
-from tsdhn.tsunami import (
-    _bout,
-    _hmn,
-    _mass,
-    _mmnt,
-    _prelim,
-    _read_deform_a,
-    _read_grid_a,
-    _read_tidal_dat,
-    _read_xyo_dat,
-    _write_green_dat,
-    _write_zmax_a,
-    run_tsunami,
-)
 
 MODEL_DIR = Path(__file__).resolve().parents[3] / "model"
 
 
 def test_hmn_staggered_averages_and_edges() -> None:
     h = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=np.float32)
-    hm, hn = _hmn(h)
+    hm, hn = tsunami_module._hmn(h)
     np.testing.assert_array_equal(
         hm, np.array([[2.0, 3.0], [4.0, 5.0], [5.0, 6.0]], dtype=np.float32)
     )
@@ -37,7 +23,7 @@ def test_hmn_staggered_averages_and_edges() -> None:
 def test_prelim_factors_match_formulas() -> None:
     hm = np.full((3, 4), 1000.0, dtype=np.float32)
     hn = np.full((3, 4), 2000.0, dtype=np.float32)
-    rx, cj, xx, yy = _prelim(hm, hn)
+    rx, cj, xx, yy = tsunami_module._prelim(hm, hn)
 
     delta = 240.0 / 3600.0
     da = math.pi * delta / 180.0
@@ -65,7 +51,7 @@ def test_mass_step_hand_computed() -> None:
     m1[1, 1] = 1.0
     m1[2, 1] = 2.0
     z2 = np.full((3, 3), 9.0, dtype=np.float32)
-    _mass(z1, z2, m1, n1, h, rx, cj)
+    tsunami_module._mass(z1, z2, m1, n1, h, rx, cj)
 
     assert z2[1, 1] == np.float32(-0.5)
     assert z2[2, 1] == np.float32(-0.5)
@@ -85,7 +71,7 @@ def test_mass_flushes_small_values_to_zero() -> None:
     n1 = np.zeros((3, 3), dtype=np.float32)
     m1[1, 1] = np.float32(1.6e-5)
     z2 = np.empty((3, 3), dtype=np.float32)
-    _mass(z1, z2, m1, n1, h, rx, cj)
+    tsunami_module._mass(z1, z2, m1, n1, h, rx, cj)
     assert z2[1, 1] == np.float32(0.0)
 
 
@@ -101,7 +87,7 @@ def test_mmnt_wet_pair_condition_and_flush() -> None:
     n1 = np.zeros((3, 3), dtype=np.float32)
     m2 = np.full((3, 3), 9.0, dtype=np.float32)
     n2 = np.full((3, 3), 9.0, dtype=np.float32)
-    _mmnt(z2, m1, m2, n1, n2, h, xx, yy)
+    tsunami_module._mmnt(z2, m1, m2, n1, n2, h, xx, yy)
 
     assert m2[1, 1] == np.float32(-0.5)
     assert m2[1, 2] == np.float32(0.0)
@@ -122,7 +108,7 @@ def test_bout_radiation_sign_and_corner_order() -> None:
     n_prev[1, 1] = 7.0
     n_prev[2, 1] = -7.0
     z2 = np.zeros((ia, ja), dtype=np.float32)
-    _bout(z2, m_prev, n_prev, h)
+    tsunami_module._bout(z2, m_prev, n_prev, h)
 
     cc = math.sqrt(9.8 * 100.0)
     assert z2[2, 1] == pytest.approx(7.0 / cc, rel=1e-6)
@@ -138,13 +124,13 @@ def test_bout_skips_dry_cells() -> None:
     m_prev = np.zeros((ia, ja), dtype=np.float32)
     n_prev = np.zeros((ia, ja), dtype=np.float32)
     z2 = np.full((ia, ja), 0.25, dtype=np.float32)
-    _bout(z2, m_prev, n_prev, h)
+    tsunami_module._bout(z2, m_prev, n_prev, h)
     assert z2[2, 1] == np.float32(0.25)
     assert z2[1, 2] == np.float32(0.25)
 
 
 def test_read_tidal_dat_real_file() -> None:
-    ip, jp = _read_tidal_dat(MODEL_DIR / "tidal.dat")
+    ip, jp = tsunami_module._read_tidal_dat(MODEL_DIR / "tidal.dat")
     assert ip.shape == (17,)
     assert (ip[0], jp[0]) == (2272, 1088)
     assert (ip[-1], jp[-1]) == (2425, 864)
@@ -152,11 +138,18 @@ def test_read_tidal_dat_real_file() -> None:
 
 def test_read_xyo_dat_real_file() -> None:
     # The captured file includes grid dimensions after the four consumed fields.
-    assert _read_xyo_dat(MODEL_DIR / "xyo.dat") == (1021, 1246, 1861, 2056)
+    assert tsunami_module._read_xyo_dat(MODEL_DIR / "xyo.dat") == (
+        1021,
+        1246,
+        1861,
+        2056,
+    )
 
 
 def test_read_deform_a_real_file() -> None:
-    grid = _read_deform_a(MODEL_DIR / "deform_a.grd", 1021, 1246, 1861, 2056)
+    grid = tsunami_module._read_deform_a(
+        MODEL_DIR / "deform_a.grd", 1021, 1246, 1861, 2056
+    )
     assert grid.shape == (226, 196)
     assert grid.dtype == np.float32
     assert np.all(np.isfinite(grid))
@@ -164,7 +157,7 @@ def test_read_deform_a_real_file() -> None:
 
 def test_write_green_dat_fixed_width_format(tmp_path: Path) -> None:
     path = tmp_path / "green.dat"
-    _write_green_dat(
+    tsunami_module._write_green_dat(
         path,
         [
             (0.0, np.array([0.123, -0.5], dtype=np.float32)),
@@ -178,7 +171,9 @@ def test_write_green_dat_fixed_width_format(tmp_path: Path) -> None:
 
 def test_write_zmax_a_fixed_width_format(tmp_path: Path) -> None:
     path = tmp_path / "zmax_a.grd"
-    _write_zmax_a(path, np.array([[0.0, 14.441], [-0.5, 1.0]], dtype=np.float32))
+    tsunami_module._write_zmax_a(
+        path, np.array([[0.0, 14.441], [-0.5, 1.0]], dtype=np.float32)
+    )
     lines = path.read_text().splitlines()
     assert lines[0] == "   0.000  14.441"
     assert lines[1] == "  -0.500   1.000"
@@ -192,7 +187,7 @@ def test_read_grid_a_applies_shallow_water_floor(
     path = tmp_path / "grid_a.grd"
     path.write_text("5.0 -3.0\n0.0 20.0\n")
     np.testing.assert_array_equal(
-        _read_grid_a(path),
+        tsunami_module._read_grid_a(path),
         np.array([[10.0, -3.0], [0.0, 20.0]], dtype=np.float32),
     )
 
@@ -215,7 +210,7 @@ def test_run_tsunami_mini_end_to_end(
     (tmp_path / "xyo.dat").write_text("2 3 2 3\n")
     (tmp_path / "deform_a.grd").write_text("1.0 1.0\n1.0 1.0\n")
 
-    run_tsunami(tmp_path)
+    tsunami_module.run_tsunami(tmp_path)
 
     green = (tmp_path / "zfolder" / "green.dat").read_text().splitlines()
     assert green == [
@@ -265,7 +260,7 @@ def test_run_tsunami_resumes_from_checkpoint_after_interruption(
     reference_dir = tmp_path / "reference"
     reference_dir.mkdir()
     _write_toy_grid_inputs(reference_dir)
-    run_tsunami(reference_dir)
+    tsunami_module.run_tsunami(reference_dir)
     reference_green = (reference_dir / "zfolder" / "green.dat").read_text()
     reference_zmax = np.loadtxt(
         reference_dir / "zfolder" / "zmax_a.grd", dtype=np.float32
@@ -296,13 +291,13 @@ def test_run_tsunami_resumes_from_checkpoint_after_interruption(
 
     monkeypatch.setattr(tsunami_module, "_mmnt", flaky_mmnt)
     with pytest.raises(RuntimeError, match="simulated worker crash"):
-        run_tsunami(resumed_dir)
+        tsunami_module.run_tsunami(resumed_dir)
 
     checkpoint_path = resumed_dir / "zfolder" / "_checkpoint.npz"
     assert checkpoint_path.is_file()
 
     monkeypatch.setattr(tsunami_module, "_mmnt", real_mmnt)
-    run_tsunami(resumed_dir)
+    tsunami_module.run_tsunami(resumed_dir)
 
     assert not checkpoint_path.exists()
     resumed_green = (resumed_dir / "zfolder" / "green.dat").read_text()
@@ -338,7 +333,7 @@ def test_read_grid_a_rejects_the_wrong_shape(
     path.write_text("5.0 -3.0 1.0\n")
 
     with pytest.raises(ValueError, match=r"Unexpected grid_a\.grd shape"):
-        _read_grid_a(path)
+        tsunami_module._read_grid_a(path)
 
 
 def test_read_deform_a_rejects_a_window_size_mismatch(tmp_path: Path) -> None:
@@ -346,7 +341,7 @@ def test_read_deform_a_rejects_a_window_size_mismatch(tmp_path: Path) -> None:
     path.write_text("1.0 1.0 1.0\n")
 
     with pytest.raises(ValueError, match=r"Unexpected deform_a\.grd size"):
-        _read_deform_a(path, ids=1, ide=2, jds=1, jde=2)
+        tsunami_module._read_deform_a(path, ids=1, ide=2, jds=1, jde=2)
 
 
 def test_read_checkpoint_rejects_an_array_shape_mismatch(tmp_path: Path) -> None:

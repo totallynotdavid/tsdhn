@@ -4,20 +4,13 @@ import numpy as np
 import pytest
 
 import tsdhn.deform as deform_module
-from tsdhn.deform import (
-    _udip_gz,
-    _ustrike_fz,
-    clip_anomalous_values,
-    compute_deform_grid,
-    write_deform_grid,
-)
 
 
 def test_clip_anomalous_values_uses_greater_equal_threshold() -> None:
     # Values at or beyond 20 m are outliers, not values subject to a small
     # value floor. Keep the examples away from the float32 boundary.
     grid = np.array([19.9, 20.1, -19.9, -20.1, 0.5], dtype=np.float32)
-    result = clip_anomalous_values(grid)
+    result = deform_module.clip_anomalous_values(grid)
     np.testing.assert_allclose(result, [19.9, 0.0, -19.9, 0.0, 0.5], atol=1e-4)
 
 
@@ -30,8 +23,8 @@ def test_ustrike_fz_and_udip_gz_finite_away_from_fault() -> None:
     eps = np.float32(1.0e-8)
     rmu = np.float32(0.5)
 
-    fz = _ustrike_fz(eps, rmu, q, cs, sn, xi, et)
-    gz = _udip_gz(eps, rmu, q, cs, sn, xi, et)
+    fz = deform_module._ustrike_fz(eps, rmu, q, cs, sn, xi, et)
+    gz = deform_module._udip_gz(eps, rmu, q, cs, sn, xi, et)
     assert np.all(np.isfinite(fz))
     assert np.all(np.isfinite(gz))
 
@@ -45,7 +38,7 @@ def test_udip_gz_handles_q_near_zero() -> None:
     eps = np.float32(1.0e-8)
     rmu = np.float32(0.5)
 
-    gz = _udip_gz(eps, rmu, q, cs, sn, xi, et)
+    gz = deform_module._udip_gz(eps, rmu, q, cs, sn, xi, et)
     assert np.all(np.isfinite(gz))
 
 
@@ -59,7 +52,7 @@ def test_ustrike_fz_handles_ret_singular() -> None:
     eps = np.float32(1.0e-8)
     rmu = np.float32(0.5)
 
-    fz = _ustrike_fz(eps, rmu, q, cs, sn, xi, et)
+    fz = deform_module._ustrike_fz(eps, rmu, q, cs, sn, xi, et)
     assert np.all(np.isfinite(fz))
 
 
@@ -77,14 +70,14 @@ def _read_fixed_width_9(path: Path) -> np.ndarray:
 def test_write_deform_grid_round_trips_fixed_width_9(tmp_path: Path) -> None:
     grid = np.array([[1.5, -0.001, 123.457], [0.02, -12.3, 0.0]], dtype=np.float32)
     path = tmp_path / "deform_a.grd"
-    write_deform_grid(path, grid)
+    deform_module.write_deform_grid(path, grid)
     read_back = _read_fixed_width_9(path)
     assert read_back.shape == grid.shape
     np.testing.assert_allclose(read_back, grid, atol=5e-4)
 
 
 def test_compute_deform_grid_alaska_1964_shape() -> None:
-    grid = compute_deform_grid(
+    grid = deform_module.compute_deform_grid(
         I0=1180,
         J0=1988,
         D0=11.965752308065987,
@@ -107,7 +100,7 @@ def test_compute_deform_grid_alaska_1964_shape() -> None:
 
 
 def test_compute_deform_grid_accepts_a_zero_strike() -> None:
-    grid = compute_deform_grid(
+    grid = deform_module.compute_deform_grid(
         I0=1180,
         J0=1988,
         D0=11.965752308065987,
