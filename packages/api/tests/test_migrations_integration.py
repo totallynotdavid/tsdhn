@@ -53,6 +53,26 @@ def temporary_web_role(
         conn.commit()
 
 
+@pytest.fixture
+def unprovisioned_web_role(
+    isolated_database: str, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[str]:
+    """Name a web role that does not exist yet and drop it after the test."""
+    role = f"tsdhn_test_{uuid.uuid4().hex[:16]}"
+    monkeypatch.setattr(migrate, "APP_DB_ROLE", role)
+    monkeypatch.setattr(migrate, "APP_DB_PASSWORD", "test-password")
+    monkeypatch.setattr(web_grants, "APP_DB_ROLE", role)
+
+    yield role
+
+    with psycopg.connect(isolated_database) as conn:
+        role_identifier = sql.Identifier(role)
+        if conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", [role]).fetchone():
+            conn.execute(sql.SQL("DROP OWNED BY {}").format(role_identifier))
+            conn.execute(sql.SQL("DROP ROLE {}").format(role_identifier))
+        conn.commit()
+
+
 def test_provision_web_role_grants_only_the_runtime_boundary(
     isolated_database: str, temporary_web_role: str
 ) -> None:
@@ -213,3 +233,143 @@ def test_web_role_cannot_read_the_queue_tables(
         pytest.raises(psycopg.errors.InsufficientPrivilege),
     ):
         conn.execute(f"SELECT 1 FROM {COMPUTE_QUEUE_SCHEMA}.jobs")  # noqa: S608
+
+
+def test_provision_web_role_requires_a_password(
+    isolated_database: str,
+    unprovisioned_web_role: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(migrate, "APP_DB_PASSWORD", "")
+
+    with psycopg.connect(isolated_database) as conn:
+        with pytest.raises(RuntimeError, match="APP_DB_PASSWORD"):
+            migrate.provision_web_role(conn)
+        exists = conn.execute(
+            "SELECT 1 FROM pg_roles WHERE rolname = %s", [unprovisioned_web_role]
+        ).fetchone()
+
+    assert exists is None
+
+
+def test_provision_web_role_takes_over_the_drizzle_schema(
+    isolated_database: str, temporary_web_role: str
+) -> None:
+    with psycopg.connect(isolated_database) as conn:
+        migration_user = conn.info.user
+        role = sql.Identifier(temporary_web_role)
+        conn.execute(sql.SQL("CREATE SCHEMA drizzle AUTHORIZATION {}").format(role))
+        conn.execute(
+            "CREATE TABLE drizzle.__drizzle_migrations (id integer PRIMARY KEY)"
+        )
+        conn.execute(
+            sql.SQL("ALTER TABLE drizzle.__drizzle_migrations OWNER TO {}").format(role)
+        )
+        conn.execute("GRANT CREATE ON SCHEMA drizzle TO PUBLIC")
+        conn.commit()
+
+        migrate.provision_web_role(conn)
+        conn.commit()
+
+        schema_owner = conn.execute(
+            "SELECT pg_get_userbyid(nspowner) FROM pg_namespace "
+            "WHERE nspname = 'drizzle'"
+        ).fetchone()
+        table_owner = conn.execute(
+            "SELECT pg_get_userbyid(relowner) FROM pg_class "
+            "WHERE oid = 'drizzle.__drizzle_migrations'::regclass"
+        ).fetchone()
+        public_can_create = conn.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_namespace AS n, aclexplode(n.nspacl) AS acl
+                WHERE n.nspname = 'drizzle'
+                  AND acl.grantee = 0
+                  AND acl.privilege_type = 'CREATE'
+            )
+            """
+        ).fetchone()
+
+    with (
+        psycopg.connect(
+            isolated_database, user=temporary_web_role, password="test-password"
+        ) as conn,
+        pytest.raises(psycopg.errors.InsufficientPrivilege),
+    ):
+        conn.execute("CREATE TABLE drizzle.forbidden (id integer)")
+
+    assert schema_owner == (migration_user,)
+    assert table_owner == (migration_user,)
+    assert public_can_create == (False,)
+
+
+def test_compute_migration_main_installs_schema_and_provisions_role(
+    isolated_database: str,
+    unprovisioned_web_role: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(migrate, "COMPUTE_DATABASE_URL", isolated_database)
+    with psycopg.connect(isolated_database) as conn:
+        conn.execute("DROP SCHEMA compute CASCADE")
+        conn.commit()
+
+    migrate.main()
+
+    with psycopg.connect(isolated_database) as conn:
+        jobs_table = conn.execute("SELECT to_regclass('compute.jobs')").fetchone()
+        privileges = conn.execute(
+            """
+            SELECT
+                has_database_privilege(%s, current_database(), 'CONNECT'),
+                has_table_privilege(%s, 'compute.jobs', 'SELECT'),
+                has_table_privilege(%s, 'compute.jobs', 'INSERT')
+            """,
+            [unprovisioned_web_role] * 3,
+        ).fetchone()
+
+    with psycopg.connect(
+        isolated_database, user=unprovisioned_web_role, password="test-password"
+    ) as conn:
+        jobs = conn.execute("SELECT count(*) FROM compute.jobs").fetchone()
+
+    assert jobs_table == ("compute.jobs",)
+    assert privileges == (True, True, False)
+    assert jobs == (0,)
+
+
+def test_web_grants_main_grants_runtime_access_to_public_tables(
+    isolated_database: str,
+    temporary_web_role: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(web_grants, "COMPUTE_DATABASE_URL", isolated_database)
+    with psycopg.connect(isolated_database) as conn:
+        conn.execute("CREATE TABLE public.existing_probe (id serial PRIMARY KEY)")
+        conn.commit()
+
+    web_grants.main()
+
+    with psycopg.connect(isolated_database) as conn:
+        conn.execute("CREATE TABLE public.future_probe (id serial PRIMARY KEY)")
+        conn.commit()
+        privileges = conn.execute(
+            """
+            SELECT
+                has_table_privilege(%(role)s, 'public.existing_probe', 'SELECT'),
+                has_table_privilege(%(role)s, 'public.existing_probe', 'INSERT'),
+                has_table_privilege(%(role)s, 'public.existing_probe', 'UPDATE'),
+                has_table_privilege(%(role)s, 'public.existing_probe', 'DELETE'),
+                has_table_privilege(%(role)s, 'public.existing_probe', 'TRUNCATE'),
+                has_sequence_privilege(
+                    %(role)s, 'public.existing_probe_id_seq', 'USAGE'
+                ),
+                has_table_privilege(%(role)s, 'public.future_probe', 'INSERT'),
+                has_sequence_privilege(
+                    %(role)s, 'public.future_probe_id_seq', 'USAGE'
+                )
+            """,
+            {"role": temporary_web_role},
+        ).fetchone()
+
+    assert privileges == (True, True, True, True, False, True, True, True)
