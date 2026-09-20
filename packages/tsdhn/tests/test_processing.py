@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
+import tsdhn.utils.processing as processing_module
 from tsdhn.pipeline.types import ProcessingStep
 from tsdhn.utils.file_utils import atomic_write
-from tsdhn.utils.processing import is_step_complete, process_step
 
 
 def _write_output(working_dir: Path) -> None:
@@ -16,15 +16,15 @@ def _make_step(name: str = "toy") -> ProcessingStep:
 
 
 def test_is_step_complete_false_before_running(tmp_path: Path) -> None:
-    assert not is_step_complete(_make_step(), tmp_path)
+    assert not processing_module.is_step_complete(_make_step(), tmp_path)
 
 
 def test_process_step_marks_step_complete(tmp_path: Path) -> None:
     step = _make_step()
-    process_step(step, tmp_path)
+    processing_module.process_step(step, tmp_path)
 
     assert (tmp_path / "out.txt").is_file()
-    assert is_step_complete(step, tmp_path)
+    assert processing_module.is_step_complete(step, tmp_path)
 
 
 def test_process_step_raises_when_a_declared_output_is_missing(
@@ -38,43 +38,41 @@ def test_process_step_raises_when_a_declared_output_is_missing(
     )
 
     with pytest.raises(FileNotFoundError, match=r"never_written\.txt"):
-        process_step(step, tmp_path)
+        processing_module.process_step(step, tmp_path)
 
-    assert not is_step_complete(step, tmp_path)
+    assert not processing_module.is_step_complete(step, tmp_path)
 
 
 def test_is_step_complete_false_if_output_deleted_after_marker(tmp_path: Path) -> None:
     step = _make_step()
-    process_step(step, tmp_path)
+    processing_module.process_step(step, tmp_path)
     (tmp_path / "out.txt").unlink()
 
-    assert not is_step_complete(step, tmp_path)
+    assert not processing_module.is_step_complete(step, tmp_path)
 
 
 def test_is_step_complete_false_on_pipeline_version_bump(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     step = _make_step()
-    process_step(step, tmp_path)
-    assert is_step_complete(step, tmp_path)
-
-    import tsdhn.utils.processing as processing_module
+    processing_module.process_step(step, tmp_path)
+    assert processing_module.is_step_complete(step, tmp_path)
 
     monkeypatch.setattr(processing_module, "PIPELINE_VERSION", 999)
 
-    assert not is_step_complete(step, tmp_path)
+    assert not processing_module.is_step_complete(step, tmp_path)
 
 
 def test_is_step_complete_false_for_different_step_outputs(tmp_path: Path) -> None:
     step = _make_step()
-    process_step(step, tmp_path)
+    processing_module.process_step(step, tmp_path)
 
     changed_step = ProcessingStep(
         name=step.name,
         outputs=("out.txt", "extra.txt"),
         runner=step.runner,
     )
-    assert not is_step_complete(changed_step, tmp_path)
+    assert not processing_module.is_step_complete(changed_step, tmp_path)
 
 
 def test_atomic_write_removes_a_partial_file_on_failure(tmp_path: Path) -> None:
