@@ -1,0 +1,103 @@
+stations:
+  - name: La Cruz
+    lon: -80.5876
+    lat: -03.6337
+    code: LaCru
+    active: false
+    annotation_offset: 0.1c
+  - name: Talara
+    lon: -81.2827
+    lat: -04.5751
+    code: TALA
+    active: true
+    annotation_offset: 0.1c
+  - name: Paita
+    lon: -81.1077
+    lat: -05.0837
+    code: Paita
+    active: false
+    annotation_offset: 0.1c
+  - name: Pimentel
+    lon: -79.9423
+    lat: -06.8396
+    code: Pimen
+    active: false
+    annotation_offset: 0.1c
+  - name: Salaverry
+    lon: -78.9818
+    lat: -08.2279
+    code: Salav
+    active: false
+    annotation_offset: 0.1c
+  - name: Chimbote
+    lon: -78.6128
+    lat: -09.0763
+    code: Chimb
+    active: false
+    annotation_offset: 0.1c
+  - name: Huarmey
+    lon: -78.1616
+    lat: -10.0718
+    code: Huar
+    active: false
+    annotation_offset: 0.1c
+  - name: Huacho
+    lon: -77.6162
+    lat: -11.1218
+    code: Huacho
+    active: false
+    annotation_offset: 0.1c
+  - name: Callao
+    lon: -77.1667
+    lat: -12.06888
+    code: CALL
+    active: true
+    annotation_offset: 0.1c
+  - name: Cerro Azul
+    lon: -76.4808
+    lat: -13.025308
+    code: Cerro
+    active: false
+    annotation_offset: 0.1c
+  - name: Pisco
+    lon: -76.2919
+    lat: -13.80611
+    code: Pisco
+    active: false
+    annotation_offset: 0.1c
+  - name: San Juan
+    lon: -75.1603
+    lat: -15.35556
+    code: Marc
+    active: false
+    annotation_offset: 0.1c
+  - name: Atico
+    lon: -73.6944
+    lat: -16.2311
+    code: Atico
+    active: false
+    annotation_offset: 0.1c
+  - name: Camana
+    lon: -72.6838
+    lat: -16.6604
+    code: Caman
+    active: false
+    annotation_offset: 0.1c
+  - name: Matarani
+    lon: -72.1088
+    lat: -17.00095
+    code: MATA
+    active: true
+    annotation_offset: 0.1c
+  - name: Ilo
+    lon: -71.3486
+    lat: -17.64454
+    code: Ilo
+    active: false
+    annotation_offset: 0.1c
+  - name: Arica
+    lon: -70.3232
+    lat: -18.4758
+    code: Arica
+    active: false
+    annotation_offset: 0.1c
