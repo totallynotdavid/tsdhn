@@ -101,8 +101,6 @@ jobs:
         if: always()
         permissions:
             contents: read
-            code-quality: write
-            pull-requests: read
         steps:
             - uses: actions/checkout@v7
               with:
@@ -134,14 +132,6 @@ jobs:
                   uv run coverage xml
                   uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
                   uv run coverage report
-
-            - name: Upload coverage to GitHub code coverage
-              uses: actions/upload-code-coverage@v1
-              with:
-                  file: coverage.xml
-                  language: Python
-                  label: code-coverage/pytest
-                  fail-on-error: false
 
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v5
