@@ -8,7 +8,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-import api.main as main_module
+from api import main as main_module
 from api import routes
 from api.core import db, repository
 from api.core.storage import output_store
