@@ -76,8 +76,6 @@ class AbandonedAttempt(Exception):
     """
 
 
-# Only infrastructure failures are retried. Domain and pipeline errors are
-# terminal.
 MAX_ATTEMPTS = 3
 TRANSIENT_RETRY = RetryPolicy(
     max_attempts=MAX_ATTEMPTS,
@@ -255,7 +253,11 @@ async def _release_unreceived_claim(
     """Release a claim whose thread completed after its waiter was cancelled."""
     try:
         claim, _resume = await claim_future
-    except BaseException:
+    except Exception, asyncio.CancelledError:
+        # Nothing was received, so there is nothing to release. `claim_workspace`
+        # closes its own descriptor when it fails, and a cancelled future never
+        # produced a claim. `SystemExit` and `GeneratorExit` are left to
+        # propagate.
         return
     # Cancellation won before the coroutine received the claim, so its normal
     # path never releases its share. The drain owns both shares.
@@ -716,7 +718,7 @@ async def run_periodic_sweep(
     """Sweep abandoned workspaces until `stop` is set."""
     await _run_periodically(
         "Sweep of abandoned work directories",
-        lambda: sweep_abandoned_work_dirs(),
+        sweep_abandoned_work_dirs,
         stop,
         interval,
     )
@@ -728,7 +730,7 @@ async def run_periodic_reconcile(
     """Reconcile queue-terminal jobs until `stop` is set."""
     await _run_periodically(
         "Reconciliation of queue-terminal jobs",
-        lambda: reconcile_terminal_jobs(),
+        reconcile_terminal_jobs,
         stop,
         interval,
     )
