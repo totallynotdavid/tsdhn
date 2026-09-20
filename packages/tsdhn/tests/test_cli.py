@@ -313,7 +313,7 @@ def test_doctor_reports_the_model_and_capabilities_when_the_runtime_resolves(
 def test_doctor_reports_a_missing_model_and_still_checks_capabilities(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def unresolvable(cls: object, **_kwargs: object) -> RuntimeContext:
+    def unresolvable(cls: object, /, **_kwargs: object) -> RuntimeContext:
         raise FileNotFoundError("no model here")
 
     monkeypatch.setattr(RuntimeContext, "resolve", classmethod(unresolvable))
