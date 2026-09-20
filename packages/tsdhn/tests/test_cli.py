@@ -1,6 +1,10 @@
+import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from rich.console import Console
+from rich.logging import RichHandler
 from typer.testing import CliRunner
 
 import tsdhn.cli.main as cli_module
@@ -82,3 +86,83 @@ def test_run_command_reports_a_failed_simulation_and_keeps_the_run_path(
     assert "Simulation failed" in result.output
     assert "Inspect run directory" in result.output
     assert str(work_dir) in result.output
+
+
+@pytest.fixture(autouse=True)
+def _restore_root_logger() -> Iterator[None]:
+    root = logging.getLogger()
+    saved_level, saved_handlers = root.level, list(root.handlers)
+    saved_handler = cli_module._log_handler
+    yield
+    root.handlers[:] = saved_handlers
+    root.setLevel(saved_level)
+    cli_module._log_handler = saved_handler
+
+
+@pytest.fixture
+def root_level_seen(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    seen: list[int] = []
+
+    class _Store:
+        def status(self, _version: str) -> dict[str, object]:
+            seen.append(logging.getLogger().level)
+            return {}
+
+    monkeypatch.setattr(cli_module, "ModelStore", _Store)
+    monkeypatch.setattr(cli_module, "model_version_for_package", lambda v: v or "test")
+    return seen
+
+
+def test_log_level_defaults_to_info(
+    monkeypatch: pytest.MonkeyPatch, root_level_seen: list[int]
+) -> None:
+    monkeypatch.delenv("TSDHN_LOG_LEVEL", raising=False)
+
+    result = RUNNER.invoke(cli_module.app, ["assets", "status"])
+
+    assert result.exit_code == 0, result.output
+    assert root_level_seen == [logging.INFO]
+
+
+def test_log_level_follows_env_var(
+    monkeypatch: pytest.MonkeyPatch, root_level_seen: list[int]
+) -> None:
+    monkeypatch.setenv("TSDHN_LOG_LEVEL", "warning")
+
+    result = RUNNER.invoke(cli_module.app, ["assets", "status"])
+
+    assert result.exit_code == 0, result.output
+    assert root_level_seen == [logging.WARNING]
+
+
+def test_verbose_forces_debug_over_env_var(
+    monkeypatch: pytest.MonkeyPatch, root_level_seen: list[int]
+) -> None:
+    monkeypatch.setenv("TSDHN_LOG_LEVEL", "ERROR")
+
+    result = RUNNER.invoke(cli_module.app, ["-v", "assets", "status"])
+
+    assert result.exit_code == 0, result.output
+    assert root_level_seen == [logging.DEBUG]
+
+
+def test_log_records_go_through_the_shared_console(
+    monkeypatch: pytest.MonkeyPatch, root_level_seen: list[int]
+) -> None:
+    monkeypatch.setenv("TSDHN_LOG_LEVEL", "INFO")
+    handler_consoles: list[Console] = []
+
+    class _Store:
+        def status(self, _version: str) -> dict[str, object]:
+            handler_consoles.extend(
+                h.console
+                for h in logging.getLogger().handlers
+                if isinstance(h, RichHandler)
+            )
+            return {}
+
+    monkeypatch.setattr(cli_module, "ModelStore", _Store)
+
+    RUNNER.invoke(cli_module.app, ["assets", "status"])
+
+    assert handler_consoles == [cli_module.console]

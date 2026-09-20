@@ -1,3 +1,5 @@
+import logging
+import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -5,6 +7,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
@@ -23,6 +26,9 @@ assets_app = typer.Typer(add_completion=False, help="Manage versioned model data
 app.add_typer(assets_app, name="assets")
 console = Console()
 
+DEFAULT_LOG_LEVEL = "INFO"
+_log_handler: logging.Handler | None = None
+
 MwOpt = Annotated[float, typer.Option("--mw", help="Magnitude (Mw).")]
 DepthOpt = Annotated[float, typer.Option("--depth", "-h", help="Depth in km.")]
 LatOpt = Annotated[float, typer.Option("--lat", help="Epicenter latitude.")]
@@ -37,6 +43,38 @@ ModelVersionOpt = Annotated[
     str | None,
     typer.Option("--model-version", help="Model dataset version."),
 ]
+
+
+def _resolve_log_level(verbose: bool) -> int:
+    if verbose:
+        return logging.DEBUG
+    name = os.environ.get("TSDHN_LOG_LEVEL", DEFAULT_LOG_LEVEL).upper()
+    return logging.getLevelNamesMapping().get(name, logging.INFO)
+
+
+def _configure_logging(verbose: bool) -> None:
+    """Send log records through the shared console so they don't break Progress."""
+    global _log_handler
+    root = logging.getLogger()
+    if _log_handler is not None:
+        root.removeHandler(_log_handler)
+    _log_handler = RichHandler(console=console, show_path=False)
+    root.addHandler(_log_handler)
+    root.setLevel(_resolve_log_level(verbose))
+
+
+@app.callback()
+def _main_callback(
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Show debug logs. Overrides TSDHN_LOG_LEVEL.",
+        ),
+    ] = False,
+) -> None:
+    _configure_logging(verbose)
 
 
 def _build_input(
