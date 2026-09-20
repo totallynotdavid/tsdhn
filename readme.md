@@ -1,5 +1,7 @@
 # TSDHN
 
+[![codecov](https://codecov.io/gh/totallynotdavid/tsdhn/branch/master/graph/badge.svg)](https://codecov.io/gh/totallynotdavid/tsdhn)
+
 TSDHN runs tsunami simulations from earthquake source parameters.
 
 The repository contains the Python simulation engine and researcher CLI, the
