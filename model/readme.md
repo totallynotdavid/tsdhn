@@ -23,8 +23,6 @@ sources here also support development and legacy comparison tests.
 | File | Status |
 | --- | --- |
 | `deform.for` | Older Mansinha-Smylie deformation program. It is not the reference for the Python deformation stage. |
-| `fault_plane_n.m` | Exploratory multiple-subfault MATLAB path with spherical geometry. It is not used by the current single-fault pipeline. |
-| `mareografo_a.m` | Historical manual helper. Its source-editing instructions are not current run instructions. |
 
 Do not build `deform.for` and use its output to judge compatibility with
 `deform.py`. The two programs implement different deformation models.

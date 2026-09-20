@@ -41,10 +41,10 @@ D = M0 / (mu L W) m
 mu = 4.0e10 N/m^2
 ```
 
-The moment relation is labeled Hanks and Kanamori in the historical MATLAB
-script. The rigidity value is inherited from the active `fault_plane.f90`.
-The older `packages/tsdhn/tests/original.m` uses `4.5e10 N/m^2`; that script is
-historical and is not the active reference.
+The rigidity value is inherited from the active `fault_plane.f90`. The
+historical MATLAB script `packages/tsdhn/tests/original.m`, since removed from
+the tree, labeled the moment relation Hanks and Kanamori and used
+`4.5e10 N/m^2` for rigidity; it was not the active reference.
 
 ## Coordinate frames
 

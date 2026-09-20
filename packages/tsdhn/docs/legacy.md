@@ -21,23 +21,35 @@ based on Mansinha and Smylie and is not the reference for `deform.py`.
 
 ## Historical and exploratory files
 
-### `packages/tsdhn/tests/original.m`
+### `packages/tsdhn/tests/original.m` (removed)
 
-This is a historical logging script, not the definition of the current
-calculation. It differs from the active path in rigidity, dip handling,
-degree-distance conversion, and longitude treatment. Do not combine its
-constants with values from `fault_plane.f90` or the Python port.
+This was a historical logging script, not the definition of the current
+calculation. It differed from the active path in rigidity (`4.5e10 N/m^2`),
+dip handling, degree-distance conversion, and longitude treatment. Do not
+combine its constants with values from `fault_plane.f90` or the Python port.
+The file was removed from the working tree and is recoverable from git history
+(`git log --follow -- packages/tsdhn/tests/original.m`, then
+`git show <sha>:packages/tsdhn/tests/original.m`) if a future compatibility
+investigation needs it.
 
-### `model/fault_plane_n.m`
+### `model/fault_plane_n.m` (removed)
 
-This MATLAB program explores multiple subfaults and spherical geometry. The
+This MATLAB program explored multiple subfaults and spherical geometry. The
 current pipeline uses the single-fault geometry in `fault_plane.f90` and does
-not use these spherical corrections. Treat it as a separate research path.
+not use these spherical corrections. It was a separate research path. The file
+was removed from the working tree and is recoverable from git history
+(`git log --follow -- model/fault_plane_n.m`, then
+`git show <sha>:model/fault_plane_n.m`) if a future compatibility
+investigation needs it.
 
-### `model/mareografo_a.m`
+### `model/mareografo_a.m` (removed)
 
-This is a historical manual helper. Instructions embedded in it for editing a
-specific line in the Fortran solver are not current pipeline instructions.
+This was a historical manual helper. Instructions embedded in it for editing a
+specific line in the Fortran solver were not current pipeline instructions.
+The file was removed from the working tree and is recoverable from git history
+(`git log --follow -- model/mareografo_a.m`, then
+`git show <sha>:model/mareografo_a.m`) if a future compatibility
+investigation needs it.
 
 ### `model/deform.for`
 
