@@ -37,7 +37,6 @@ Do not build `deform.for` and use its output to judge compatibility with
 | `bathy/xa.dat`, `bathy/ya.dat` | Grid axes used to place the fault and deformation window |
 | `mecfoc.dat` | Candidate focal mechanisms used when strike and dip are absent from public input |
 | `tidal.dat` | Virtual-gauge indices for propagation output |
-| `puertos.txt` | Ports used by approximate arrival-time calculations |
 | `pacifico.mat`, `maper1.mat` | Bathymetry and coastline data used by source calculations |
 | `ttt_mundo/` | Inputs consumed by `ttt_client` and GMT arrival-time reporting |
 

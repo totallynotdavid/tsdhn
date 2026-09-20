@@ -21,7 +21,6 @@ REQUIRED_MODEL_FILES: tuple[str, ...] = (
     "pacifico.mat",
     "maper1.mat",
     "mecfoc.dat",
-    "puertos.txt",
     "tidal.dat",
     "bathy/grid_a.grd",
     "bathy/xa.dat",

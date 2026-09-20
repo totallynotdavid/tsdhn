@@ -20,7 +20,6 @@ MODEL_FILES = (
     "pacifico.mat",
     "maper1.mat",
     "mecfoc.dat",
-    "puertos.txt",
     "tidal.dat",
     "bathy/grid_a.grd",
     "bathy/xa.dat",
