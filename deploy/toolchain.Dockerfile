@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:25.10
 
 ARG TTT_SDK_REPO="https://gitlab.com/totallynotdavid/tttapi/"
 
@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     INTEL_ONEAPI_ROOT=/opt/intel/oneapi \
     PATH="/opt/intel/oneapi/compiler/latest/bin:/usr/local/bin:${PATH}" \
-    LD_LIBRARY_PATH="/opt/intel/oneapi/compiler/latest/lib:${LD_LIBRARY_PATH}"
+    LD_LIBRARY_PATH="/opt/intel/oneapi/compiler/latest/lib"
 
 RUN groupadd -r appuser \
  && useradd --no-log-init -r -g appuser -m -d /app -s /bin/bash -c "application-user" appuser
@@ -43,8 +43,8 @@ RUN apt-get update \
         make \
         pkg-config \
         ps2eps \
-        python3.12 \
-        python3.12-venv \
+        python3.13 \
+        python3.13-venv \
         python3-pip \
         wget \
         xz-utils \

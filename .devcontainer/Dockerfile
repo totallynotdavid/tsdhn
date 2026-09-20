@@ -22,7 +22,7 @@ RUN echo "appuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/appuser \
  && chmod 0440 /etc/sudoers.d/appuser
 
 ENV VIRTUAL_ENV=/opt/venv
-RUN python3.12 -m venv "${VIRTUAL_ENV}" \
+RUN python3.13 -m venv "${VIRTUAL_ENV}" \
  && "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir --upgrade pip setuptools wheel \
  && "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir \
         ipython \

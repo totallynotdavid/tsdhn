@@ -2,7 +2,7 @@
 # Edge deployments use adapter-auto and these runtime variables.
 #
 # Build context is the repo root:  docker build -f deploy/web.Dockerfile .
-FROM oven/bun:1.3.14
+FROM oven/bun:1.4.2
 
 WORKDIR /app
 
