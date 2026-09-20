@@ -3,10 +3,12 @@
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
+import yaml
 from scipy.interpolate import RegularGridInterpolator
 from scipy.io import loadmat
 
@@ -58,25 +60,14 @@ class Port:
     lat: float
 
 
-def parse_port_line(line: str) -> Port | None:
-    data, _, comment = line.partition("%")
-    parts = data.split()
-    if len(parts) < 2:
-        logger.warning("Insufficient coordinate data in port line: '%s'", line.strip())
-        return None
-
-    try:
-        lon = float(parts[0])
-        lat = float(parts[1])
-    except ValueError:
-        logger.warning("Invalid coordinate data in port line: '%s'", line.strip())
-        return None
-
-    name_parts = comment.split()
-    if len(name_parts) > 1 and len(name_parts[-1]) == 1:
-        name_parts = name_parts[:-1]
-    name = " ".join(name_parts) or f"{lat:.4f},{lon:.4f}"
-    return Port(name=name, lon=lon, lat=lat)
+def load_ports() -> list[Port]:
+    """Load every station from the shared `tsdhn.data` station list."""
+    with files("tsdhn.data").joinpath("stations.yml").open(encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return [
+        Port(name=s["name"], lon=float(s["lon"]), lat=float(s["lat"]))
+        for s in data["stations"]
+    ]
 
 
 def calculate_rectangle_parameters(
@@ -165,7 +156,7 @@ class TsunamiCalculator:
         self.bathy_interpolator: RegularGridInterpolator | None = None
         self.maper1: np.ndarray | None = None
         self.mechanism_data: np.ndarray | None = None
-        self.ports: list[str] | None = None
+        self.ports: list[Port] | None = None
         self._ensure_data_loaded()
 
     def _ensure_data_loaded(self) -> None:
@@ -213,9 +204,7 @@ class TsunamiCalculator:
                 self.mechanism_data[:, 0],
             )
 
-            puertos_path = self.model_dir / "puertos.txt"
-            with open(puertos_path) as f:
-                self.ports = f.readlines()
+            self.ports = load_ports()
         except Exception as e:
             logger.exception("Failed to load static files")
             raise RuntimeError("Static file initialization failed") from e
@@ -282,26 +271,19 @@ class TsunamiCalculator:
             time0 = float(data.hhmm[:2]) + float(data.hhmm[2:]) / 60  # Decimal hours
 
             for port in self.ports:
-                if len(port) < 15:
-                    continue
-
-                parsed_port = parse_port_line(port)
-                if parsed_port is None:
-                    continue
-
                 try:
                     distance, travel_time = self._calculate_travel_time(
                         data.lon0,
                         data.lat0,
-                        parsed_port.lon,
-                        parsed_port.lat,
+                        port.lon,
+                        port.lat,
                         time0,
                     )
 
-                    arrival_times[parsed_port.name] = format_arrival_time(
+                    arrival_times[port.name] = format_arrival_time(
                         travel_time, cast(str, data.dia)
                     )
-                    distances[parsed_port.name] = distance
+                    distances[port.name] = distance
                 except ValueError, IndexError:
                     continue
 
@@ -380,7 +362,6 @@ class TsunamiCalculator:
 
             travel_time = 0.5 * integral
 
-            # These inherited calibration rules have no source in the repository.
             if travel_time > 3.0:
                 travel_time = distance / 733 + 0.25
             elif 1.4 < travel_time < 3.0:

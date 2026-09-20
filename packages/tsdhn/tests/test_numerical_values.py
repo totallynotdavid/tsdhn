@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from tsdhn.calculator import TsunamiCalculator, parse_port_line
+from tsdhn.calculator import TsunamiCalculator, load_ports
 from tsdhn.domain import CalculationResponse, EarthquakeInput
 
 
@@ -91,21 +91,13 @@ def test_rectangle_corners(
     )
 
 
-def test_port_line_parsing_uses_semantic_name() -> None:
-    port = parse_port_line(" -77.1667  -12.06888  % Callao       C")
+def test_load_ports_reads_shared_station_list() -> None:
+    ports = {port.name: port for port in load_ports()}
 
-    assert port is not None
-    assert port.name == "Callao"
-    assert port.lon == pytest.approx(-77.1667)
-    assert port.lat == pytest.approx(-12.06888)
-
-
-@pytest.mark.parametrize(
-    "line",
-    ["", "not coordinates", "-77.0"],
-)
-def test_port_line_parsing_skips_malformed_lines(line: str) -> None:
-    assert parse_port_line(line) is None
+    assert len(ports) == 17
+    assert ports["Callao"].lon == pytest.approx(-77.1667)
+    assert ports["Callao"].lat == pytest.approx(-12.06888)
+    assert ports["San Juan"].lon == pytest.approx(-75.1603)
 
 
 def test_tsunami_travel_times_are_keyed_by_port_name(

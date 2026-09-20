@@ -54,7 +54,7 @@ class TidalStation:
 
 
 def load_stations() -> list[TidalStation]:
-    stations_path = files("tsdhn.render.data").joinpath("stations.yml")
+    stations_path = files("tsdhn.data").joinpath("stations.yml")
     logger.info("Loading stations configuration: %s", stations_path)
     try:
         with stations_path.open("r", encoding="utf-8") as f:
@@ -191,7 +191,7 @@ def add_tidal_stations(
         logger.warning("No active tidal stations found")
         return
 
-    stations_array = np.array([(s.lon - 1, s.lat) for s in active_stations])
+    stations_array = np.array([((s.lon % 360) - 1, s.lat) for s in active_stations])
 
     try:
         fig.plot(

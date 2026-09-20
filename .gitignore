@@ -20,7 +20,7 @@ htmlcov/
 
 # runtime outputs
 .data
-data
+/data
 /jobs/
 hypo.dat
 *.npy
