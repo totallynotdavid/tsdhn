@@ -1,8 +1,11 @@
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from api.core.repository import status_from_row
+import pytest
+
+from api.core.repository import record_failure, status_from_row
 from tsdhn.domain import JobStatus
 
 CREATED = datetime(2026, 8, 30, 12, 0, tzinfo=UTC)
@@ -77,3 +80,52 @@ def test_status_carries_step_progress() -> None:
         3,
         8,
     )
+
+
+class _RecordingConnection:
+    def __init__(self) -> None:
+        self.calls: list[tuple[Any, ...]] = []
+
+    def transaction(self) -> _RecordingConnection:
+        return self
+
+    async def __aenter__(self) -> None:
+        return None
+
+    async def __aexit__(self, *_exc: object) -> None:
+        return None
+
+    async def execute(self, *args: Any) -> None:
+        self.calls.append(args)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("will_retry", [False, True])
+async def test_failure_keeps_server_paths_out_of_the_client_status(
+    caplog: pytest.LogCaptureFixture, will_retry: bool
+) -> None:
+    path = "/home/dubu/picv-2025/jobs/0b7c/tsunami"
+    conn = _RecordingConnection()
+
+    with caplog.at_level(logging.ERROR, logger="api.core.repository"):
+        try:
+            raise FileNotFoundError(f"[Errno 2] No such file or directory: '{path}'")
+        except FileNotFoundError as exc:
+            await record_failure(
+                conn,
+                uuid.uuid4(),
+                uuid.uuid4(),
+                exc,
+                step="tsunami",
+                will_retry=will_retry,
+                attempt=1,
+            )
+
+    # Every parameter written to compute.jobs is what a client can read back.
+    written = " ".join(str(arg) for call in conn.calls for arg in call)
+    assert path not in written
+    assert "/home/dubu" not in written
+    assert "FileNotFoundError" in written
+
+    # The full detail stays in the server log.
+    assert path in caplog.text
