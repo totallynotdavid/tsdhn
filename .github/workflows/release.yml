@@ -32,7 +32,7 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - uses: astral-sh/setup-uv@7211c7186911605100540c5bfaaf822f462c53d8 # 8.3.2
+            - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # 10.2.0
               with:
                   version: ${{ env.UV_VERSION }}
                   python-version: ${{ env.PYTHON_VERSION }}
