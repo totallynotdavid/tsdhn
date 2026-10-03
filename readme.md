@@ -87,5 +87,6 @@ packages/api/             FastAPI service and worker
 packages/tsdhn-parity/    Legacy-output comparison tools
 scripts/                  Setup, generation, database, and end-to-end tasks
 docker-compose.yml        Self-hosted service stack
-mise.toml                 Pinned tools and project tasks
+.tool-versions            Pinned tools (read by mise and CI)
+mise.toml                 Project tasks
 ```

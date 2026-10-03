@@ -1,8 +1,12 @@
 # Compute API and worker image.
 # The toolchain base provides GMT, Intel Fortran, and ttt_client.
 #
-# Build context is the repo root:  docker build -f deploy/api.Dockerfile .
+# Build context is the repo root. The UV_VERSION default mirrors .tool-versions
+# (a test enforces it); builds that read .tool-versions pass it explicitly.
 ARG TOOLCHAIN_IMAGE=ghcr.io/totallynotdavid/tsdhn-toolchain:master
+ARG UV_VERSION=0.11.29
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
 FROM ${TOOLCHAIN_IMAGE}
 
 USER root
@@ -11,7 +15,7 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_INSTALL_DIR=/opt/uv-python
 
-COPY --from=ghcr.io/astral-sh/uv:0.11.27 /uv /uvx /usr/local/bin/
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 WORKDIR /app
 

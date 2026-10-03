@@ -1,8 +1,11 @@
 # SvelteKit image for the self-hosted web target.
 # Edge deployments use adapter-auto and these runtime variables.
 #
-# Build context is the repo root:  docker build -f deploy/web.Dockerfile .
-FROM oven/bun:1.4.2
+# Build context is the repo root. The BUN_VERSION default mirrors
+# .tool-versions (a test enforces it); builds that read .tool-versions pass it
+# explicitly.
+ARG BUN_VERSION=1.4.2
+FROM oven/bun:${BUN_VERSION}
 
 WORKDIR /app
 

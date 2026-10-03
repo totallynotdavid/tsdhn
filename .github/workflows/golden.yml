@@ -20,6 +20,10 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
+            - name: Read tool versions
+              id: tools
+              run: echo "uv=$(scripts/tool-version.sh uv)" >> "$GITHUB_OUTPUT"
+
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -38,7 +42,9 @@ jobs:
               with:
                   context: .
                   file: deploy/api.Dockerfile
-                  build-args: TOOLCHAIN_IMAGE=localhost/tsdhn-toolchain:golden-ci
+                  build-args: |
+                      TOOLCHAIN_IMAGE=localhost/tsdhn-toolchain:golden-ci
+                      UV_VERSION=${{ steps.tools.outputs.uv }}
                   tags: localhost/tsdhn-api:golden-ci
                   load: true
                   cache-from: type=gha,scope=api
