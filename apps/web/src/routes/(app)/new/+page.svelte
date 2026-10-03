@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { superForm } from "sveltekit-superforms";
   import { toast } from "svelte-sonner";
   import type { components } from "@tsdhn/api-client";
@@ -10,7 +11,8 @@
   import Alert from "$lib/components/ui/Alert.svelte";
 
   let { data } = $props();
-  const { form, errors, enhance, submitting, message } = superForm(data.form);
+  // Pass only the initial form value. superForm handles later server updates.
+  const { form, errors, enhance, submitting, message } = superForm(untrack(() => data.form));
 
   type Preview = components["schemas"]["CalculationPreview"];
   let preview = $state<Preview | null>(null);
