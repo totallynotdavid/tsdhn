@@ -116,16 +116,32 @@ description = "Start the project-local PostgreSQL cluster"
 depends = ["db:init"]
 run = """
 data_dir="$PWD/.data/postgres"
+pg_port="${TSDHN_PG_PORT:-5432}"
 
-if ! mise x postgres -- pg_isready -h 127.0.0.1 -p 5432 -U tsdhn -q; then
+project_server_running=0
+if mise x postgres -- pg_ctl -D "$data_dir" status >/dev/null 2>&1; then
+  project_server_running=1
+fi
+
+port_open=0
+if nc -z -w 1 127.0.0.1 "$pg_port" >/dev/null 2>&1; then
+  port_open=1
+fi
+
+if [ "$project_server_running" -eq 0 ] && [ "$port_open" -eq 1 ]; then
+  echo "PostgreSQL port $pg_port is already in use by another server; set TSDHN_PG_PORT to an unused port." >&2
+  exit 1
+fi
+
+if [ "$project_server_running" -eq 0 ]; then
   mise x postgres -- pg_ctl -D "$data_dir" \
     -l "$data_dir/server.log" \
-    -o "-h 127.0.0.1 -p 5432 -c fsync=off -c synchronous_commit=off -c full_page_writes=off" \
+    -o "-h 127.0.0.1 -p $pg_port -c fsync=off -c synchronous_commit=off -c full_page_writes=off" \
     -w start
 fi
 
-if ! mise x postgres -- psql -h 127.0.0.1 -p 5432 -U tsdhn -d tsdhn -qAtc "SELECT 1" >/dev/null 2>&1; then
-  mise x postgres -- createdb -h 127.0.0.1 -p 5432 -U tsdhn tsdhn
+if ! PGPASSWORD="${PGPASSWORD:-}" mise x postgres -- psql -w -h 127.0.0.1 -p "$pg_port" -U tsdhn -d tsdhn -qAtc "SELECT 1" >/dev/null 2>&1; then
+  PGPASSWORD="${PGPASSWORD:-}" mise x postgres -- createdb -w -h 127.0.0.1 -p "$pg_port" -U tsdhn tsdhn
 fi
 """
 
@@ -148,8 +164,8 @@ description = "Apply compute, queue, and web migrations to local PostgreSQL"
 depends = ["db:start"]
 run = [
   "uv run tsdhn-compute-migrate",
-  "uv run rqueue --database-url \"${COMPUTE_DATABASE_URL:-postgresql://tsdhn:tsdhn@127.0.0.1:5432/tsdhn}\" --schema \"${COMPUTE_QUEUE_SCHEMA:-task_queue}\" migrate",
+  "uv run rqueue --database-url \"${COMPUTE_DATABASE_URL:-postgresql://tsdhn:tsdhn@127.0.0.1:${TSDHN_PG_PORT:-5432}/tsdhn}\" --schema \"${COMPUTE_QUEUE_SCHEMA:-task_queue}\" migrate",
   "uv run tsdhn-queue-grants",
-  "DATABASE_URL=\"${COMPUTE_DATABASE_URL:-postgresql://tsdhn:tsdhn@127.0.0.1:5432/tsdhn}\" bun --filter web db:migrate",
+  "DATABASE_URL=\"${COMPUTE_DATABASE_URL:-postgresql://tsdhn:tsdhn@127.0.0.1:${TSDHN_PG_PORT:-5432}/tsdhn}\" bun --filter web db:migrate",
   "uv run tsdhn-web-grants",
 ]

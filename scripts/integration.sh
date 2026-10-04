@@ -2,10 +2,14 @@
 set -euo pipefail
 
 # These tests own this project-local cluster and never accept a production URL.
-base_url="postgresql://tsdhn:tsdhn@127.0.0.1:5432/tsdhn"
+pg_port="${TSDHN_PG_PORT:-5432}"
+base_url="postgresql://tsdhn:tsdhn@127.0.0.1:${pg_port}/tsdhn"
 database_name="tsdhn_integration_$(date +%s)_$$"
 app_role="${database_name}_role"
 app_password="tsdhn-web-test-password"
+data_dir="$PWD/.data/postgres"
+server_started=0
+database_created=0
 queue_schema="${COMPUTE_QUEUE_SCHEMA:-task_queue}"
 queue_name="${COMPUTE_QUEUE:-simulations}"
 
@@ -21,9 +25,39 @@ case "${1:-}" in
     *) echo "usage: $0 [--coverage]" >&2; exit 2 ;;
 esac
 
+cleanup() {
+    status=$?
+    if [ "$database_created" -eq 1 ]; then
+        uv run python -m scripts.database drop \
+            --base-url "$base_url" \
+            --name "$database_name" \
+            --role "$app_role" \
+            --role "$producer_role" \
+            --role "$worker_role" \
+            --role "$purger_role" >/dev/null || status=$?
+    fi
+    if [ "$server_started" -eq 1 ]; then
+        mise run db:stop >/dev/null || status=$?
+    fi
+    return "$status"
+}
+trap cleanup EXIT
+
 # Skip database startup if COMPUTE_DATABASE_URL is set (e.g., by CI with service container)
 if [ -z "${COMPUTE_DATABASE_URL:-}" ]; then
-    mise run db:start
+    project_server_running=0
+    if mise x postgres -- pg_ctl -D "$data_dir" status >/dev/null 2>&1; then
+        project_server_running=1
+    fi
+    if ! mise run db:start; then
+        if [ "$project_server_running" -eq 0 ] && mise x postgres -- pg_ctl -D "$data_dir" status >/dev/null 2>&1; then
+            server_started=1
+        fi
+        exit 1
+    fi
+    if [ "$project_server_running" -eq 0 ]; then
+        server_started=1
+    fi
 fi
 
 admin_url="$(
@@ -31,6 +65,7 @@ admin_url="$(
         --base-url "$base_url" \
         --name "$database_name"
 )"
+database_created=1
 app_url="$(
     uv run python -m scripts.database url \
         --base-url "$admin_url" \
@@ -38,17 +73,6 @@ app_url="$(
         --user "$app_role" \
         --password "$app_password"
 )"
-
-cleanup() {
-    uv run python -m scripts.database drop \
-        --base-url "$base_url" \
-        --name "$database_name" \
-        --role "$app_role" \
-        --role "$producer_role" \
-        --role "$worker_role" \
-        --role "$purger_role" >/dev/null
-}
-trap cleanup EXIT
 
 COMPUTE_DATABASE_URL="$admin_url" \
 APP_DB_ROLE="$app_role" \
