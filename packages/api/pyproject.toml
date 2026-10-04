@@ -10,7 +10,7 @@ authors = [
 ]
 dependencies = [
     "tsdhn",
-    "fastapi==0.139.0",
+    "fastapi==0.142.2",
     "uvicorn==0.51.0",
     "pydantic==2.13.5",
     "anyio==4.14.2",
