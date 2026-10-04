@@ -133,8 +133,7 @@ async def run() -> None:
 
 def main() -> None:  # pragma: no cover
     if NUMBA_THREADS is not None:
-        # Numba lacks type stubs, so suppress type checking.
-        numba.set_num_threads(NUMBA_THREADS)  # type: ignore[no-untyped-call]
+        numba.set_num_threads(NUMBA_THREADS)
         logger.info(
             "numba parallel-region thread count capped to %d (TSDHN_NUMBA_THREADS)",
             NUMBA_THREADS,
