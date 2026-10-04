@@ -33,19 +33,18 @@ RUN apt-get update \
         gmt-dcw \
         gmt-gshhg \
         libblas-dev \
-        libcurl4 \
+        libcurl4t64 \
         libfftw3-dev \
         libgdal-dev \
         liblapack-dev \
         libnetcdf-dev \
-        libpcre3 \
         lsb-release \
         make \
         pkg-config \
         ps2eps \
-        python3.13 \
-        python3.13-venv \
+        python3 \
         python3-pip \
+        python3-venv \
         wget \
         xz-utils \
  && apt-get clean \
@@ -63,11 +62,16 @@ RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRO
  && rm -rf /var/lib/apt/lists/* /opt/intel/oneapi/installer_payloads \
           "${INTEL_ONEAPI_ROOT}/logs" /root/.intel/
 
-RUN mkdir -p /tmp/ttt-sdk-build \
+# tttapi sets CMP0026 to OLD, which CMake 4 removed.
+# Build tttapi with pinned CMake 3 in a temporary virtual environment.
+RUN python3 -m venv /tmp/cmake3 \
+ && /tmp/cmake3/bin/pip install --no-cache-dir cmake==3.31.6 \
+ && export PATH="/tmp/cmake3/bin:${PATH}" \
+ && mkdir -p /tmp/ttt-sdk-build \
  && git clone --depth 1 "${TTT_SDK_REPO}" /tmp/ttt-sdk-build/tttapi \
  && make -C /tmp/ttt-sdk-build/tttapi config compile \
  && make -C /tmp/ttt-sdk-build/tttapi install clean \
- && rm -rf /tmp/ttt-sdk-build
+ && rm -rf /tmp/ttt-sdk-build /tmp/cmake3
 
 # pygmt expects an unversioned libgmt.so on the dynamic linker path.
 RUN set -eux; \
