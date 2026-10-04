@@ -35,9 +35,10 @@ __all__ = [
     "worker_pool_size",
 ]
 
+local_pg_port = os.environ.get("TSDHN_PG_PORT", "5432")
 COMPUTE_DATABASE_URL = os.environ.get(
     "COMPUTE_DATABASE_URL",
-    "postgresql://tsdhn:tsdhn@localhost:5432/tsdhn",
+    f"postgresql://tsdhn:tsdhn@localhost:{local_pg_port}/tsdhn",
 )
 # A passwordless endpoint for runtime processes. It keeps the schema-owner URL
 # out of long-running containers while preserving its DSN authority details.

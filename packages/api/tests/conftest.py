@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from collections.abc import AsyncIterator, Iterator
 
@@ -17,7 +18,10 @@ from api.core.settings import COMPUTE_QUEUE_SCHEMA
 from api.core.tasks import register_tasks
 from scripts.database import create_database, drop_database
 
-LOCAL_DATABASE_URL = "postgresql://tsdhn:tsdhn@127.0.0.1:5432/tsdhn"
+LOCAL_DATABASE_URL = (
+    "postgresql://tsdhn:tsdhn@127.0.0.1:"
+    f"{os.environ.get('TSDHN_PG_PORT', '5432')}/tsdhn"
+)
 
 
 @pytest.fixture
