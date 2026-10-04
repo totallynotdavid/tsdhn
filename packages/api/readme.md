@@ -25,11 +25,13 @@ with separate passwords from `.env`:
 ```sh
 uv run tsdhn-compute-migrate
 uv run rqueue \
-  --database-url "${COMPUTE_DATABASE_URL:-postgresql://tsdhn:tsdhn@localhost:5432/tsdhn}" \
+  --database-url "${COMPUTE_DATABASE_URL:-postgresql://tsdhn:tsdhn@localhost:${TSDHN_PG_PORT:-5432}/tsdhn}" \
   --schema "${COMPUTE_QUEUE_SCHEMA:-task_queue}" \
   migrate
 uv run tsdhn-queue-grants
 ```
+
+Local PostgreSQL listens on port 5432 unless `TSDHN_PG_PORT` names another.
 
 `tsdhn-compute-migrate` also provisions the web application's database role, so
 set `APP_DB_PASSWORD` alongside `COMPUTE_PRODUCER_PASSWORD`,
