@@ -169,17 +169,18 @@ APT_PACKAGES=(
     gmt-dcw
     gmt-gshhg
     libblas-dev
-    libcurl4
+    libcurl4t64
     libfftw3-dev
     libgdal-dev
     libgmt-dev
     liblapack-dev
     libnetcdf-dev
-    libpcre3
     lsb-release
     make
     pkg-config
     ps2eps
+    python3
+    python3-venv
     wget
     xz-utils
 )
@@ -299,10 +300,16 @@ if [[ "$INSTALL_TTT" == true ]]; then
     TTT_BUILD_DIR="$(mktemp -d)"
     trap 'rm -rf "${GMT_BUILD_DIR:-}" "${TTT_BUILD_DIR:-}"' EXIT
 
+    # tttapi sets CMP0026 to OLD, which CMake 4 removed.
+    # Build it with pinned CMake 3 from a venv that the EXIT trap removes with the build dir.
+    run "Creating CMake 3 environment" python3 -m venv "$TTT_BUILD_DIR/cmake3"
+    run "Installing CMake 3.31.6" "$TTT_BUILD_DIR/cmake3/bin/pip" install -q --no-cache-dir cmake==3.31.6
+    TTT_PATH="$TTT_BUILD_DIR/cmake3/bin:$PATH"
+
     run "Cloning TTT SDK" git clone --depth 1 "$TTT_SDK_REPO" "$TTT_BUILD_DIR/tttapi"
-    run "Configuring and compiling TTT SDK" make -C "$TTT_BUILD_DIR/tttapi" config compile
-    run "Installing TTT SDK" sudo make -C "$TTT_BUILD_DIR/tttapi" install datadir docs
-    run "Testing and cleaning TTT SDK" make -C "$TTT_BUILD_DIR/tttapi" test clean
+    run "Configuring and compiling TTT SDK" env PATH="$TTT_PATH" make -C "$TTT_BUILD_DIR/tttapi" config compile
+    run "Installing TTT SDK" sudo env PATH="$TTT_PATH" make -C "$TTT_BUILD_DIR/tttapi" install datadir docs
+    run "Testing and cleaning TTT SDK" env PATH="$TTT_PATH" make -C "$TTT_BUILD_DIR/tttapi" test clean
 fi
 
 if [[ "$BUILD_TOOLS" == true ]]; then

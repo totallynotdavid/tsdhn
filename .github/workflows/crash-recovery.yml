@@ -17,6 +17,11 @@ jobs:
         timeout-minutes: 90
         permissions:
             contents: read
+        services:
+            registry:
+                image: registry:2
+                ports:
+                    - 5000:5000
         env:
             COMPUTE_API_TOKEN: compose-e2e-token
             APP_DB_PASSWORD: compose-e2e-app-db-password
@@ -37,14 +42,16 @@ jobs:
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+              with:
+                  driver-opts: network=host
 
             - name: Build toolchain image (cached)
               uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
               with:
                   context: .
                   file: deploy/toolchain.Dockerfile
-                  tags: localhost/tsdhn-toolchain:crash-recovery-ci
-                  load: true
+                  tags: localhost:5000/tsdhn-toolchain:crash-recovery-ci
+                  push: true
                   cache-from: type=gha,scope=toolchain
                   cache-to: type=gha,mode=max,scope=toolchain
 
@@ -54,7 +61,7 @@ jobs:
                   context: .
                   file: deploy/api.Dockerfile
                   build-args: |
-                      TOOLCHAIN_IMAGE=localhost/tsdhn-toolchain:crash-recovery-ci
+                      TOOLCHAIN_IMAGE=localhost:5000/tsdhn-toolchain:crash-recovery-ci
                       UV_VERSION=${{ steps.tools.outputs.uv }}
                   tags: localhost/tsdhn-api:crash-recovery-ci
                   load: true
