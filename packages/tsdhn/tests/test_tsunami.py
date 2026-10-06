@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import tsdhn.tsunami as tsunami_module
+from tsdhn.pipeline_version import PIPELINE_VERSION
 
 MODEL_DIR = Path(__file__).resolve().parents[3] / "model"
 
@@ -380,6 +381,29 @@ def test_read_checkpoint_rejects_a_gauge_count_mismatch(tmp_path: Path) -> None:
         zeros,
         zeros,
         [(0.0, gauges)],
+    )
+
+    result = tsunami_module._read_checkpoint(checkpoint_path, ia=6, ja=5, n_gauges=2)
+
+    assert result is None
+
+
+def test_read_checkpoint_rejects_a_gauge_length_mismatch(tmp_path: Path) -> None:
+    zeros = np.zeros((6, 5), dtype=np.float32)
+    checkpoint_path = tmp_path / "checkpoint.npz"
+    np.savez(
+        checkpoint_path,
+        pipeline_version=np.int64(PIPELINE_VERSION),
+        k=np.int64(5),
+        z1=zeros,
+        z2=zeros,
+        m1=zeros,
+        m2=zeros,
+        n1=zeros,
+        n2=zeros,
+        zmxa=zeros,
+        gauge_minutes=np.array([0.0, 1.0]),
+        gauge_values=np.zeros((1, 2), dtype=np.float32),
     )
 
     result = tsunami_module._read_checkpoint(checkpoint_path, ia=6, ja=5, n_gauges=2)
