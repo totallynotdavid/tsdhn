@@ -321,13 +321,13 @@ def _read_checkpoint(
             raise ValueError("checkpoint gauge count mismatch")
         if not (0 <= k <= KE):
             raise ValueError("checkpoint step index out of range")
+        gauge_rows = list(zip(gauge_minutes.tolist(), gauge_values, strict=True))
     except Exception:
         logger.warning(
             "tsunami checkpoint at %s is unusable, starting from step 0", path
         )
         return None
 
-    gauge_rows = list(zip(gauge_minutes.tolist(), gauge_values, strict=True))
     return k, z1, z2, m1, m2, n1, n2, zmxa, gauge_rows
 
 
