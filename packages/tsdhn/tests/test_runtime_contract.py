@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 from pygmt.enums import GridRegistration, GridType
 
+from tsdhn.constants import MAXOLA_GRID_KILOMETERS_PER_DEGREE
 from tsdhn.pipeline.types import ProcessingStep
 from tsdhn.render import ttt_inverso
 from tsdhn.render.maxola import GridConfig, load_stations, process_grid
@@ -113,7 +114,7 @@ def test_process_grid_returns_pixel_registered_dataarray(tmp_path: Path) -> None
     zfolder.mkdir(parents=True)
     np.savetxt(zfolder / "zmax_a.grd", np.arange(12, dtype=np.float32))
 
-    grid_config = GridConfig(ncols=4, nrows=3, dx=111.1994)
+    grid_config = GridConfig(ncols=4, nrows=3, dx=MAXOLA_GRID_KILOMETERS_PER_DEGREE)
     grid = process_grid(work_dir, grid_config)
 
     assert grid.dims == ("lat", "lon")

@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import tsdhn.tsunami as tsunami_module
+from tsdhn.constants import STANDARD_GRAVITY_M_PER_S2, TSUNAMI_SOLVER_EARTH_RADIUS_M
 from tsdhn.pipeline_version import PIPELINE_VERSION
 
 MODEL_DIR = Path(__file__).resolve().parents[3] / "model"
@@ -29,15 +30,24 @@ def test_prelim_factors_match_formulas() -> None:
     delta = 240.0 / 3600.0
     da = math.pi * delta / 180.0
     rz0 = math.radians(-76.006)
-    assert rx[0] == pytest.approx(3.0 / (6.37e6 * math.cos(rz0) * da), rel=1e-5)
+    assert rx[0] == pytest.approx(
+        3.0 / (TSUNAMI_SOLVER_EARTH_RADIUS_M * math.cos(rz0) * da), rel=1e-5
+    )
     assert cj[0] == pytest.approx(math.cos(rz0 + da / 2.0), rel=1e-5)
     # A later latitude catches changes to the repeated float32 angle step.
     assert rx[3] == pytest.approx(
-        3.0 / (6.37e6 * math.cos(rz0 + 3 * da) * da), rel=1e-5
+        3.0 / (TSUNAMI_SOLVER_EARTH_RADIUS_M * math.cos(rz0 + 3 * da) * da),
+        rel=1e-5,
     )
 
-    np.testing.assert_allclose(xx, rx[np.newaxis, :4] * np.float32(9.8) * hm, rtol=1e-6)
-    np.testing.assert_allclose(yy, 3.0 * 9.8 * hn / (6.37e6 * da), rtol=1e-5)
+    np.testing.assert_allclose(
+        xx, rx[np.newaxis, :4] * np.float32(STANDARD_GRAVITY_M_PER_S2) * hm, rtol=1e-6
+    )
+    np.testing.assert_allclose(
+        yy,
+        3.0 * STANDARD_GRAVITY_M_PER_S2 * hn / (TSUNAMI_SOLVER_EARTH_RADIUS_M * da),
+        rtol=1e-5,
+    )
 
 
 def test_mass_step_hand_computed() -> None:
@@ -111,7 +121,7 @@ def test_bout_radiation_sign_and_corner_order() -> None:
     z2 = np.zeros((ia, ja), dtype=np.float32)
     tsunami_module._bout(z2, m_prev, n_prev, h)
 
-    cc = math.sqrt(9.8 * 100.0)
+    cc = math.sqrt(STANDARD_GRAVITY_M_PER_S2 * 100.0)
     assert z2[2, 1] == pytest.approx(7.0 / cc, rel=1e-6)
     # The second edge pass overwrites the corner with its independent value.
     assert z2[1, 1] == pytest.approx(3.5 / cc, rel=1e-6)

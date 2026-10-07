@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import tsdhn.calculator as calculator_module
 from tsdhn.calculator import TsunamiCalculator, load_ports
 from tsdhn.domain import CalculationResponse, EarthquakeInput
 
@@ -111,6 +112,18 @@ def test_tsunami_travel_times_are_keyed_by_port_name(
     assert travel.arrival_times["Callao"].startswith("12:36 05")
     assert travel.distances["Callao"] == pytest.approx(19.6797, rel=1e-4)
     assert not any(name.startswith("-") for name in travel.arrival_times)
+
+
+def test_travel_time_uses_standard_gravity(
+    calculator: TsunamiCalculator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = (-77.0, -12.0, -77.1667, -12.06888, 0.0)
+    _, standard_time = calculator._calculate_travel_time(*args)
+
+    monkeypatch.setattr(calculator_module, "STANDARD_GRAVITY_M_PER_S2", 1.0)
+    _, lower_gravity_time = calculator._calculate_travel_time(*args)
+
+    assert lower_gravity_time > standard_time
 
 
 if __name__ == "__main__":

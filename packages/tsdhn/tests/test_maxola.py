@@ -123,9 +123,13 @@ def test_cleanup_files_removes_existing_and_ignores_missing(tmp_path: Path) -> N
 
 
 def _tiny_grid() -> xr.DataArray:
-    config = GridConfig(ncols=4, nrows=3, dx=111.1994)
+    config = GridConfig(ncols=4, nrows=3)
     data = np.linspace(0, 1, 12, dtype=np.float32).reshape(3, 4)
     return create_grid_dataarray(data, config)
+
+
+def test_grid_config_preserves_legacy_240_arcsecond_spacing() -> None:
+    assert GridConfig().cellsize == pytest.approx(0.06666398478409057)
 
 
 def test_generate_maxola_plot_produces_a_pdf(
