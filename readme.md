@@ -1,15 +1,10 @@
 # TSDHN
 
-[![codecov](https://codecov.io/gh/totallynotdavid/tsdhn/branch/master/graph/badge.svg)](https://codecov.io/gh/totallynotdavid/tsdhn)
+TSDHN runs tsunami simulations from earthquake source parameters. It provides a
+Python engine and researcher CLI, a FastAPI compute service and worker, and a
+SvelteKit web app for submitting simulations and downloading their outputs.
 
-TSDHN runs tsunami simulations from earthquake source parameters.
-
-The repository contains the Python simulation engine and researcher CLI, the
-FastAPI compute service and worker, the SvelteKit web app, the generated
-TypeScript client, and tools that compare the Python results with the older
-MATLAB and Fortran programs.
-
-## Get started
+## Install
 
 Install the pinned tools and project dependencies:
 
@@ -19,74 +14,79 @@ mise run install
 mise run web-install
 ```
 
-Run the researcher CLI without starting the services:
+Install the model dataset and inspect the local toolchain:
 
 ```sh
 uv run tsdhn assets install
 uv run tsdhn doctor
+```
+
+## Calculate
+
+Calculate source parameters and approximate arrival times without starting the
+services:
+
+```sh
 uv run tsdhn calc --mw 8.0 --lat -20.5 --lon -70.5
 ```
 
-Create `.env` and fill in `COMPUTE_API_TOKEN`, `BETTER_AUTH_SECRET`,
-`APP_DB_PASSWORD`, and the three queue-role passwords it lists, then run the
-self-hosted stack:
-
-```sh
-cp .env.example .env
-mise run dev-up
-mise run dev-web
-```
-
-The web app is at <http://localhost:3000>. The API is at
-<http://localhost:8000/api-docs>.
-
-## Commands
-
-| Command | Purpose |
-| --- | --- |
-| `mise run install` | Install Python dependencies |
-| `mise run web-install` | Install the Bun workspace |
-| `mise run dev-up` | Start the API, worker, Postgres, and MinIO |
-| `mise run dev-web` | Run web migrations and start the web app |
-| `mise run db-migrate` | Apply local database migrations |
-| `mise run test` | Run the fast Python test suite |
-| `mise run test-integration` | Run disposable PostgreSQL tests |
-| `mise run web-test` | Run the fast web test suite |
-| `mise run lint-all` | Run Python and JavaScript checks |
-| `mise run gen-client` | Regenerate the OpenAPI client |
-| `mise run test-golden` | Run the real pipeline regression |
-| `mise run test-parity` | Compare Python output with the older programs |
-
-The fast test suites do not need services. `mise run test-integration` starts
-the project-local PostgreSQL cluster, creates disposable databases, runs the
-database-backed tests, and removes those databases when it exits.
-
-## Documentation
-
-| Document | Use it for |
-| --- | --- |
-| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Responsibilities, database ownership, identifiers, displayed state, and request flows |
-| `DEPLOY.md` | Compose deployment, configuration, and operations |
-| [`packages/tsdhn`](./packages/tsdhn/readme.md) | Engine, CLI, model files, and simulation outputs |
-| [`packages/api`](./packages/api/readme.md) | Compute API and worker development |
-| [`apps/web`](./apps/web/readme.md) | SvelteKit development and server modules |
-| [`libs/api-client`](./libs/api-client/readme.md) | Generated client and regeneration |
-| [`packages/tsdhn-parity`](./packages/tsdhn-parity/readme.md) | Comparing Python results with MATLAB and Fortran results |
-
-Start with the architecture document when changing a boundary. Start with a
-component README when changing code inside one component.
-
-## Repository layout
+The command prints the calculated source parameters and arrival-time table:
 
 ```text
-apps/web/                 SvelteKit web app
-deploy/                   Container images
-libs/api-client/          Generated TypeScript client
-packages/tsdhn/           Simulation engine and researcher CLI
-packages/api/             FastAPI service and worker
-packages/tsdhn-parity/    Legacy-output comparison tools
-scripts/                  Setup, generation, database, and end-to-end tasks
-docker-compose.yml        Self-hosted service stack
-.tool-versions            Pinned tools (read by mise and CI)
-mise.toml                 Project tasks
+                 Source parameters
+┌──────────────────────┬───────────────────────────┐
+│ Rupture length (km)  │ 162.18                    │
+│ Rupture width (km)   │ 70.79                     │
+│ Dislocation (m)      │ 2.741                     │
+│ Seismic moment (N.m) │ 1.259e+21                 │
+│ Azimuth (deg)        │ 358.0                     │
+│ Dip (deg)            │ 14.0                      │
+│ Coast distance (km)  │ 115.5                     │
+│ Epicenter location   │ mar                       │
+│ Tsunami warning      │ Genera un Tsunami pequeno │
+└──────────────────────┴───────────────────────────┘
+           Tsunami arrival times
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Port       ┃ Arrival     ┃ Distance (km) ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ La Cruz    │ 02:56 23Oct │        2170.3 │
+│ Talara     │ 02:53 23Oct │        2120.1 │
+│ Paita      │ 02:48 23Oct │        2062.0 │
+│ Pimentel   │ 02:30 23Oct │        1828.1 │
+│ Salaverry  │ 02:16 23Oct │        1641.0 │
+│ Chimbote   │ 02:08 23Oct │        1539.8 │
+│ Huarmey    │ 01:59 23Oct │        1420.4 │
+│ Huacho     │ 01:50 23Oct │        1290.5 │
+│ Callao     │ 01:41 23Oct │        1176.4 │
+│ Cerro Azul │ 01:31 23Oct │        1046.6 │
+│ Pisco      │ 01:25 23Oct │         965.4 │
+│ San Juan   │ 01:09 23Oct │         755.0 │
+│ Atico      │ 00:49 23Oct │         582.1 │
+│ Camana     │ 00:41 23Oct │         485.0 │
+│ Matarani   │ 00:36 23Oct │         424.3 │
+│ Ilo        │ 00:28 23Oct │         329.8 │
+│ Arica      │ 00:19 23Oct │         225.8 │
+└────────────┴─────────────┴───────────────┘
 ```
+
+Run the full local pipeline with the same inputs:
+
+```sh
+uv run tsdhn run --mw 8.0 --lat -20.5 --lon -70.5
+```
+
+## Features
+
+- The Python engine calculates source parameters, propagates the tsunami, and
+  writes fixed-format maps, station reports, and checkpoints.
+- The CLI installs versioned model data, checks external capabilities, previews
+  a calculation, and runs the pipeline.
+- The compute API queues simulations, and the worker resumes interrupted work
+  and stores completed files in MinIO.
+- The web app authenticates researchers, tracks simulations, streams progress,
+  and creates output downloads.
+- The parity package compares selected Python results with saved MATLAB and
+  Fortran results.
+
+Read the [manual](./docs/readme.md) for operations, architecture, and testing.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contributor workflow.

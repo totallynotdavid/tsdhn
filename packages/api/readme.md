@@ -1,115 +1,61 @@
 # tsdhn-api
 
-`tsdhn-api` accepts requests from the web server, records job state in
-PostgreSQL, queues work with `rqueue`, runs the shared `tsdhn` engine,
-and stores output files in MinIO.
+`tsdhn-api` accepts requests from the web server, records compute jobs in
+PostgreSQL, queues work with `rqueue`, runs the shared `tsdhn` engine, and
+stores output files in MinIO. The browser calls the web app, not this service.
 
-The browser does not call this service. The web app calls it with
-`COMPUTE_API_TOKEN`. See [`ARCHITECTURE.md`](../../ARCHITECTURE.md) for service
-responsibilities and `DEPLOY.md` for configuration,
-migrations, storage, and worker resources.
+See [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) for boundaries and
+[`../../docs/deploy.md`](../../docs/deploy.md) for service configuration and
+startup.
 
-## Commands
+## Run it
 
-Run the service and worker from the repository root:
+From the repository root, run the API and worker in separate terminals:
 
 ```sh
 uv run tsdhn-api
 uv run tsdhn-worker
 ```
 
-Create the compute and queue tables before starting the API or worker. The
-migration connection is the schema owner; runtime processes use three roles
-with separate passwords from `.env`:
+Apply all local database migrations first:
 
 ```sh
-uv run tsdhn-compute-migrate
-uv run rqueue \
-  --database-url "${COMPUTE_DATABASE_URL:-postgresql://tsdhn:tsdhn@localhost:${TSDHN_PG_PORT:-5432}/tsdhn}" \
-  --schema "${COMPUTE_QUEUE_SCHEMA:-task_queue}" \
-  migrate
-uv run tsdhn-queue-grants
+mise run db-migrate
 ```
 
-Local PostgreSQL listens on port 5432 unless `TSDHN_PG_PORT` names another.
-
-`tsdhn-compute-migrate` also provisions the web application's database role, so
-set `APP_DB_PASSWORD` alongside `COMPUTE_PRODUCER_PASSWORD`,
-`COMPUTE_WORKER_PASSWORD`, and `COMPUTE_PURGER_PASSWORD` before running these
-commands. `tsdhn-queue-grants` provisions the API producer, worker consumer,
-and retention purger roles.
-`COMPUTE_DATABASE_URL` remains the owner URL used only for migrations and
-grants. Every runtime role password is required: if one is absent, that
-process fails closed before opening a database connection. Set the missing
-password and run `tsdhn-queue-grants` to provision or repair the role, even in
-development. The worker's retention path opens its own purger-role pool rather
-than reusing the consumer pool.
-
-`rqueue`'s CLI reads `RQUEUE_DATABASE_URL`, not `COMPUTE_DATABASE_URL`, which is
-why the URL is passed explicitly.
-
-`rqueue` owns the queue tables and their migrations; `--schema` is a global
-flag, before the subcommand. They live in `COMPUTE_QUEUE_SCHEMA` (default
-`task_queue`), never in `compute`.
-
-For a complete deployment, including web migrations and grants, follow
-`DEPLOY.md`. For local PostgreSQL, `mise run db-migrate`
-applies every database change. `mise run test-integration` creates disposable
-databases and runs the database-backed tests.
-
-## API definition
-
-The OpenAPI UI at <http://127.0.0.1:8000/api-docs> is the current list of
-routes, inputs, and responses. Health and version checks are public. Simulation
-and calculation routes require `COMPUTE_API_TOKEN`.
-
-The API accepts `simulation_id` as the web app's identifier. Repeating a
-submission with the same ID and input returns the existing job. Output
-responses expose output names and filenames, while storage keys remain private.
-See [`ARCHITECTURE.md`](../../ARCHITECTURE.md) for the full submission and
-download flows.
+The compute API's OpenAPI UI is at <http://127.0.0.1:8000/api-docs>. Health and
+version routes are public. Simulation and calculation routes require
+`COMPUTE_API_TOKEN`.
 
 ## Package map
 
-- `api/routes.py` defines health, calculation, submission, progress, and output
-  routes.
-- `api/schemas.py` defines public request and response models.
-- `api/security.py` checks `COMPUTE_API_TOKEN`.
-- `api/core/repository.py` reads and updates compute jobs.
-- `api/core/tasks.py` registers and runs the queued simulation task.
-- `api/core/storage.py` uploads output files and creates download URLs.
-- `api/core/queue.py` holds the `rqueue.Queue` the API and worker share.
-- `api/core/db.py` owns the process-wide asyncpg pool.
-- `api/migrate.py` and `api/web_grants.py` apply the database changes described
-  in `DEPLOY.md`; `rqueue migrate` applies the queue's own.
-- `api/queue_grants.py` provisions the least-privilege queue roles and their
-  `compute.jobs` grants.
-- `api/worker.py` starts an `rqueue.Worker` for the configured queue, the
-  periodic workspace sweep, and the hourly queue-retention purge.
+- `api/routes.py`: health, calculation, submission, progress, and output routes.
+- `api/schemas.py`: public request and response models.
+- `api/security.py`: API token checks.
+- `api/core/repository.py`: compute-job reads and updates.
+- `api/core/tasks.py`: queued simulation task.
+- `api/core/storage.py`: output uploads and download URLs.
+- `api/core/queue.py`: shared rqueue instance.
+- `api/migrate.py`: compute schema migration.
+- `api/queue_grants.py`: least-privilege queue roles.
+- `api/worker.py`: queue worker, workspace sweep, and retention.
 
-## Tests
+## Tests and generated client
 
 Run the fast API tests with:
 
 ```sh
 uv run --package tsdhn-api pytest packages/api/tests
-uv run --package tsdhn-api pytest packages/api/tests/test_api.py::test_version
 ```
 
-The integration tests use PostgreSQL and disposable databases:
+Database-backed tests use:
 
 ```sh
 mise run test-integration
 ```
 
-## Generated client
-
-After changing `api/routes.py` or `api/schemas.py`, regenerate the TypeScript
-client:
+After changing a route or schema, regenerate the TypeScript client:
 
 ```sh
 mise run gen-client
 ```
-
-The generation command exports OpenAPI from the running application code. Do
-not edit the exported schema or generated TypeScript by hand.

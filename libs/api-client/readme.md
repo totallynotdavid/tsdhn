@@ -1,7 +1,7 @@
 # @tsdhn/api-client
 
-`@tsdhn/api-client` is generated from the compute API's OpenAPI definition.
-The SvelteKit server is its only consumer.
+`@tsdhn/api-client` is generated from the compute API's OpenAPI definition. The
+SvelteKit server is its only consumer.
 
 The client sends `COMPUTE_API_TOKEN` with every authenticated request. Use it
 only in server code; importing it into browser code could expose the token.
@@ -34,8 +34,8 @@ mise run gen-client
 ```
 
 The command exports the FastAPI schema to `openapi.json`, then generates
-`src/generated/schema.ts`. Do not edit either generated output by hand.
+`src/generated/schema.ts`.
 
-Route behavior belongs to the compute API and is visible in its OpenAPI UI.
-This package owns only the generated TypeScript representation and the
-server-only client wrapper.
+Route behavior belongs to the compute API and is visible in its OpenAPI UI. This
+package owns only the generated TypeScript representation and the server-only
+client wrapper.
