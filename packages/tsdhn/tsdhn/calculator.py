@@ -12,7 +12,11 @@ import yaml
 from scipy.interpolate import RegularGridInterpolator
 from scipy.io import loadmat
 
-from tsdhn.constants import STANDARD_GRAVITY_M_PER_S2, TSUNAMI_MODEL_EARTH_RADIUS_KM
+from tsdhn.constants import (
+    FAULT_PLANE_KILOMETERS_PER_DEGREE,
+    STANDARD_GRAVITY_M_PER_S2,
+    TSUNAMI_MODEL_EARTH_RADIUS_KM,
+)
 from tsdhn.domain import (
     CalculationResponse,
     EarthquakeInput,
@@ -110,8 +114,12 @@ def calculate_rectangle_parameters(
         "a1": 0.5 * h1 * np.sin(np.deg2rad(alfa + beta)) / 1000,
         "b1": 0.5 * h1 * np.cos(np.deg2rad(alfa + beta)) / 1000,
         # Use the longitude frame expected by the legacy grid.
-        "xo": lon0 + (0.5 * h1 * np.cos(np.deg2rad(alfa + beta)) / 1000) / 111.0,
-        "yo": lat0 - (0.5 * h1 * np.sin(np.deg2rad(alfa + beta)) / 1000) / 111.0,
+        "xo": lon0
+        + (0.5 * h1 * np.cos(np.deg2rad(alfa + beta)) / 1000)
+        / FAULT_PLANE_KILOMETERS_PER_DEGREE,
+        "yo": lat0
+        - (0.5 * h1 * np.sin(np.deg2rad(alfa + beta)) / 1000)
+        / FAULT_PLANE_KILOMETERS_PER_DEGREE,
     }
     checkpoint("a1", params["a1"])
     checkpoint("b1", params["b1"])

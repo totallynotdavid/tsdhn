@@ -11,6 +11,7 @@ import yaml
 from pygmt.enums import GridRegistration, GridType
 from pygmt.helpers import GMTTempFile
 
+from tsdhn.constants import MAXOLA_GRID_KILOMETERS_PER_DEGREE
 from tsdhn.render.meca import read_meca_spec
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,14 @@ class GridConfig:
     dx: float = 7412.9951096
     xllcorner: float = 128.02777778
     yllcorner: float = -76.00555556
-    cellsize: float = dx / 1000.0 / 111.1994
+    cellsize: float = dx / 1000.0 / MAXOLA_GRID_KILOMETERS_PER_DEGREE
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "cellsize", self.dx / 1000.0 / 111.1994)
+        object.__setattr__(
+            self,
+            "cellsize",
+            self.dx / 1000.0 / MAXOLA_GRID_KILOMETERS_PER_DEGREE,
+        )
 
 
 @dataclass(frozen=True)

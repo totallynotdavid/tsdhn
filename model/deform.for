@@ -103,7 +103,8 @@ C
      & ,RD,HH,DX)
       REAL L
       PARAMETER(A=3.141592,B=4.848E-06)
-      PARAMETER(RR=6.37E+6,E=1.7453E-2)
+      INCLUDE 'physical_constants.inc'
+      PARAMETER(RR=TSUNAMI_SOLVER_EARTH_RADIUS_M,E=1.7453E-2)
       DIMENSION Z(IF,JF)
 
 C      XL=A*RR*(X0-XO)*COS(E*YO)/180.0

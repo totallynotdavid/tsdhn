@@ -17,7 +17,8 @@ c     PARAMETER(IDS=151,IDE=271,JDS=1651,JDE=1771)
       PARAMETER(DT=3.0)
       PARAMETER(KE=33602,KD=20,KA=300)
       PARAMETER(NG=17)
-      PARAMETER(RT=6.37E+6)
+      INCLUDE 'physical_constants.inc'
+      PARAMETER(RT=TSUNAMI_SOLVER_EARTH_RADIUS_M)
 c      REAL MA,NA
       CHARACTER PNAME
 C
@@ -249,8 +250,9 @@ C    BLAT=EXTREMO SUR DE LATITUD EN GRADOS (+N, -S)
       DIMENSION  RX(JA),CJ(JA),HM(IA,JA),HN(IA,JA)
       DIMENSION  XX(IA,JA),YY(IA,JA)
 
+      INCLUDE 'physical_constants.inc'
       PI=4.0*ATAN(1.0)
-      GG=9.8
+      GG=STANDARD_GRAVITY_M_PER_S2
 
 	RZ=BLAT*PI/180.0
 	RN=RZ+DY/2.0
@@ -357,12 +359,13 @@ C**** CONDICIONES DE FRONTERA ABIERTA EN EL DOMINIO "A"
       REAL MA,NA
       DIMENSION ZA(IA,JA,2),MA(IA,JA,2),NA(IA,JA,2),HA(IA,JA)
 
+      INCLUDE 'physical_constants.inc'
       DO 10 KK=1,2
         J=2
         IF(KK.EQ.2)J=JA
         DO 10 I=2,IA-1
           IF(HA(I,J).LT.0.0)GOTO 10
-          CC=SQRT(9.8*HA(I,J))
+          CC=SQRT(STANDARD_GRAVITY_M_PER_S2*HA(I,J))
           UU=0.5*ABS(MA(I,J,2)+MA(I-1,J,2))
           IF(J.EQ.2)UU=SQRT(UU**2+NA(I,J,2)**2)
           IF(J.EQ.JA)UU=SQRT(UU**2+NA(I,J-1,2)**2)
@@ -376,7 +379,7 @@ C**** CONDICIONES DE FRONTERA ABIERTA EN EL DOMINIO "A"
         IF(KK.EQ.2)I=IA
         DO 20 J=2,JA-1
           IF(HA(I,J).LT.0.0)GOTO 20
-          CC=SQRT(9.8*HA(I,J))
+          CC=SQRT(STANDARD_GRAVITY_M_PER_S2*HA(I,J))
           UU=0.5*ABS(NA(I,J,2)+NA(I,J-1,2))
           IF(I.EQ.2)UU=SQRT(UU**2+MA(I,J,2)**2)
           IF(I.EQ.IA)UU=SQRT(UU**2+MA(I-1,J,2)**2)

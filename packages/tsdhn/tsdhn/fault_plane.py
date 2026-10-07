@@ -10,6 +10,7 @@ from tsdhn.calculator import (
     calculate_rectangle_parameters,
     rupture_dimensions,
 )
+from tsdhn.constants import FAULT_PLANE_KILOMETERS_PER_DEGREE
 from tsdhn.utils.file_utils import atomic_write
 
 _RAKE = 90.0
@@ -62,7 +63,7 @@ def _grid_window(
 ) -> tuple[int, int, int, int]:
     """Return the deformation window in full-grid indices."""
     cte = 1.4 if mw > 8.0 else 2.8
-    off = cte * l_km / 111.0
+    off = cte * l_km / FAULT_PLANE_KILOMETERS_PER_DEGREE
     # The Fortran assignment truncates each geographic bound before snapping.
     ids = int(np.argmin(np.abs(xa - int(xep - off)))) + 1
     ide = int(np.argmin(np.abs(xa - int(xep + off)))) + 1
@@ -75,8 +76,8 @@ def _recompute_depth(
     lon0: float, lat0: float, xo: float, yo: float, zep_km: float, az: float, dip: float
 ) -> float:
     """Compute the fault's upper-edge depth in meters."""
-    delta_x = (lon0 - xo) * 111.0
-    delta_y = (lat0 - yo) * 111.0
+    delta_x = (lon0 - xo) * FAULT_PLANE_KILOMETERS_PER_DEGREE
+    delta_y = (lat0 - yo) * FAULT_PLANE_KILOMETERS_PER_DEGREE
     h = zep_km - (
         delta_x * math.cos(math.radians(-az)) + delta_y * math.sin(math.radians(-az))
     ) * math.tan(math.radians(dip))

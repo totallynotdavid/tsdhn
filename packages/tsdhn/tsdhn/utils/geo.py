@@ -1,12 +1,9 @@
-import math
 from datetime import datetime
 from typing import Any
 
 import numpy as np
 
-from tsdhn.constants import MEAN_EARTH_RADIUS_KM
-
-DEG_TO_KM = (MEAN_EARTH_RADIUS_KM * math.pi) / 180.0
+from tsdhn.constants import MEAN_EARTH_KILOMETERS_PER_DEGREE
 
 
 def calculate_distance_to_coast(
@@ -14,7 +11,7 @@ def calculate_distance_to_coast(
 ) -> float:
     distances = np.hypot(coast_points[:, 0] - lon0, coast_points[:, 1] - lat0)
     min_deg: np.floating[Any] = distances.min()
-    return float(min_deg) * DEG_TO_KM
+    return float(min_deg) * MEAN_EARTH_KILOMETERS_PER_DEGREE
 
 
 def format_arrival_time(time: float, day: str) -> str:

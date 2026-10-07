@@ -8,6 +8,10 @@ from typing import cast
 import numba
 import numpy as np
 
+from tsdhn.constants import (
+    STANDARD_GRAVITY_M_PER_S2,
+    TSUNAMI_SOLVER_EARTH_RADIUS_M,
+)
 from tsdhn.pipeline_version import PIPELINE_VERSION
 from tsdhn.utils.file_utils import atomic_write
 
@@ -29,12 +33,12 @@ _DT = np.float32(3.0)
 KE = 33602
 KD = 20
 NG = 17
-_RT = np.float32(6.37e6)
+_RT = np.float32(TSUNAMI_SOLVER_EARTH_RADIUS_M)
 _BLATA = np.float32(-76.006)
 # Compute pi through float32 atan to match legacy Fortran arithmetic (like deform.py).
 _PI = np.float32(4.0) * np.arctan(np.float32(1.0))
 _DA = _PI * _DELTA / np.float32(180.0)
-_GG = np.float32(9.8)
+_GG = np.float32(STANDARD_GRAVITY_M_PER_S2)
 _FLUSH = np.float32(1.0e-5)
 
 

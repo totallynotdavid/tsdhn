@@ -11,6 +11,8 @@ integer i,j,k,pos,I0,J0
 real    xo,yo,xep,yep,a,b,slip,L,W,Az,echado,rake,h,M0,Mw
 character(len=4) :: t0
 
+include 'physical_constants.inc'
+
  OPEN(9,FILE='hypo.dat',STATUS='OLD')
  DO I=1,1
    READ(9,*) t0, xep, yep, zep, Mw
@@ -70,8 +72,8 @@ alfa = Az - 270
 h = sqrt(L*L+W1*W1)
 a = 0.5*h*sin((alfa+beta)*pi/180)/1000
 b = 0.5*h*cos((alfa+beta)*pi/180)/1000
-xo = xep+b/111.0
-yo = yep-a/111.0
+xo = xep+b/FAULT_PLANE_KILOMETERS_PER_DEGREE
+yo = yep-a/FAULT_PLANE_KILOMETERS_PER_DEGREE
 
  OPEN(2,FILE='./bathy/xa.dat')
  DO I=1,IA
@@ -99,8 +101,8 @@ pos = minloc(dy,1)
 J0 = pos
 
 ! Calculo de la profundidad de la parte superior de la falla
-delta_x = (xep-xo)*111.0
-delta_y = (yep-yo)*111.0
+delta_x = (xep-xo)*FAULT_PLANE_KILOMETERS_PER_DEGREE
+delta_y = (yep-yo)*FAULT_PLANE_KILOMETERS_PER_DEGREE
 h = zep-(delta_x*cos(-Az*pi/180.0)+delta_y*sin(-Az*pi/180.0))*tan(echado*pi/180.0)
 h = h*1e3
 if (h < 0) then
@@ -119,22 +121,22 @@ else
   cte = 2.8
 end if
 OPEN(5,FILE='xyo.dat')
-IDS = xep - (cte*L/1000)/111.0
+IDS = xep - (cte*L/1000)/FAULT_PLANE_KILOMETERS_PER_DEGREE
 do I=1,IA
   dx(I) = abs(xa(I)-IDS)
 end do
 IDS = minloc(dx,1)
-IDE = xep + (cte*L/1000)/111.0
+IDE = xep + (cte*L/1000)/FAULT_PLANE_KILOMETERS_PER_DEGREE
 do I=1,IA
   dx(I) = abs(xa(I)-IDE)
 end do
 IDE = minloc(dx,1)
-JDS = yep - (cte*L/1000)/111.0
+JDS = yep - (cte*L/1000)/FAULT_PLANE_KILOMETERS_PER_DEGREE
 do J=1,JA
   dy(J) = abs(ya(J)-JDS)
 end do
 JDS = minloc(dy,1)
-JDE = yep + (cte*L/1000)/111.0
+JDE = yep + (cte*L/1000)/FAULT_PLANE_KILOMETERS_PER_DEGREE
 do J=1,JA
   dy(J) = abs(ya(J)-JDE)
 end do

@@ -5,11 +5,11 @@ deform: def_oka.f
 	$(VER) -O def_oka.f -o deform $(com)
 espejo: espejo.f
 	$(VER) -O espejo.f -o espejo $(com)
-fault_plane: fault_plane.f90
+fault_plane: fault_plane.f90 physical_constants.inc
 	$(VER) -O fault_plane.f90 -o fault_plane $(com)
 reporte: reporte.f90
 	$(VER) -O reporte.f90 -o reporte
 ttt_max: ttt_max.f90
 	$(VER) -O ttt_max.f90 -o ttt_max $(com)
-tsunami: tsunami1.for
+tsunami: tsunami1.for physical_constants.inc
 	$(VER) -O tsunami1.for -o tsunami $(com) -qopenmp
