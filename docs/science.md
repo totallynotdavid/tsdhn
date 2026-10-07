@@ -43,9 +43,13 @@ inputs use `0..360`. The fault-plane stage adds 360 to negative longitudes
 before searching the mechanism and bathymetry files. The calculator preview
 converts mechanism records to the public frame.
 
-Fault placement uses 111.0 km per degree. Displayed fault corners use
-`60 * 1853 m` per degree. These are the current calculation rules, not a general
-geodesic model.
+Fault placement uses `FAULT_PLANE_KILOMETERS_PER_DEGREE` (`111.0 km`),
+preserving the legacy model rule. Coast distances use the mean-Earth radius
+conversion `MEAN_EARTH_KILOMETERS_PER_DEGREE` (derived from `6371.0 km`). The
+maximum-height grid retains its calibrated `MAXOLA_GRID_KILOMETERS_PER_DEGREE`
+value (`111.1994 km`) so its 240-arcsecond cells remain aligned with the solver.
+Displayed fault corners use `60 * 1853 m` per degree. These are current
+calculation rules, not a general geodesic model.
 
 ## Fault plane and deformation
 
@@ -68,16 +72,16 @@ alongside the other stage-file formats.
 `tsunami.py` follows the active linear shallow-water calculation in
 `model/tsunami1.for`:
 
-| Quantity        |                          Value |
-| --------------- | -----------------------------: |
-| Grid shape      |             2461 by 2056 cells |
-| Angular spacing | 240 arcseconds, or 1/15 degree |
-| Time step       |                      3 seconds |
-| Number of steps |                         33,602 |
-| Gauge sampling  |  Every 20 steps, or 60 seconds |
-| Gauges          |                             17 |
-| Earth radius    |                     `6.37e6 m` |
-| Gravity         |                    `9.8 m/s^2` |
+| Quantity        |                                         Value |
+| --------------- | --------------------------------------------: |
+| Grid shape      |                            2461 by 2056 cells |
+| Angular spacing |                240 arcseconds, or 1/15 degree |
+| Time step       |                                     3 seconds |
+| Number of steps |                                        33,602 |
+| Gauge sampling  |                 Every 20 steps, or 60 seconds |
+| Gauges          |                                            17 |
+| Earth radius    |  `TSUNAMI_SOLVER_EARTH_RADIUS_M` = `6.37e6 m` |
+| Gravity         | `STANDARD_GRAVITY_M_PER_S2` = `9.80665 m/s^2` |
 
 Positive bathymetry values are water depths. Negative values are land. Water
 depths below 10 m are raised to 10 m before integration. The solver updates
@@ -100,7 +104,7 @@ The CLI's port arrival times are separate from the propagation solver. The
    km-per-degree path factor. Add the 101 values of
    `index * (degrees(alpha) / 100) * direction` to `[lon0, lat0]`, then sample
    bathymetry at each `(lat, lon)` point. Take the absolute depth, convert
-   `sqrt(9.81 * depth)` using `STANDARD_GRAVITY_M_PER_S2` from
+   `sqrt(STANDARD_GRAVITY_M_PER_S2 * depth)` from
    `packages/tsdhn/tsdhn/constants.py`, convert it to km/h by multiplying by
    3.6, and integrate reciprocal speed with Simpson's rule. The travel time is
    half of that integral.
