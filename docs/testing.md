@@ -17,9 +17,11 @@ scientific model is correct by itself.
 
 ## Fast behavior tests
 
-`mise run test` runs the Python suite without services. The suite covers source
-parameters, longitude conversion, file formats, numerical update rules,
-checkpoints, resume behavior, and report transformations with focused inputs.
+`mise run test` runs the Python suite without services or GMT. When the GMT
+library cannot load, pytest names the GMT-backed module it does not collect in
+its report header. The suite covers source parameters, longitude conversion,
+file formats, numerical update rules, checkpoints, resume behavior, and report
+transformations with focused inputs.
 
 Run one test with:
 

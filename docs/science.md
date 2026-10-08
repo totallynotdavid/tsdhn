@@ -39,9 +39,10 @@ al. (2004). The repository does not include the paper or a full citation.
 ## Coordinate frames
 
 Public inputs use `-180..180` longitude. The bathymetry axis and fault-plane
-inputs use `0..360`. The fault-plane stage adds 360 to negative longitudes
-before searching the mechanism and bathymetry files. The calculator preview
-converts mechanism records to the public frame.
+inputs use `0..360`. The fault-plane stage and the calculator preview both add
+360 to negative longitudes before searching the mechanism and bathymetry files,
+through the same `nearest_focal_mechanism` function, so the preview shows the
+strike and dip the run uses on either side of the antimeridian.
 
 Fault placement uses `FAULT_PLANE_KILOMETERS_PER_DEGREE` (`111.0 km`),
 preserving the legacy model rule. Coast distances use the mean-Earth radius

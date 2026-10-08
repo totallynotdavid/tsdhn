@@ -26,8 +26,8 @@ The first five stages run in the run root. The travel-time map stages use
 `hypo.dat` stores origin time, longitude, latitude, hypocentral depth, and
 moment magnitude. `pfalla.inp` stores one-based grid indices, slip, fault
 dimensions, angles, and top-edge depth. `xyo.dat` stores one-based inclusive
-grid bounds and the full grid dimensions. `meca.dat` is a fixed-width mechanism
-record whose longitude uses the `0..360` frame.
+grid bounds. `meca.dat` is a fixed-width mechanism record whose longitude uses
+the `0..360` frame.
 
 ### `pfalla.inp`
 
@@ -58,16 +58,13 @@ record across display lines, but whitespace separates the fields.
 
 ### `xyo.dat`
 
-The writer emits six whitespace-separated integer fields with variable width:
+The writer emits four whitespace-separated integer fields with variable width:
 
 ```text
-IDS IDE JDS JDE IA JA
+IDS IDE JDS JDE
 ```
 
-`IDS`, `IDE`, `JDS`, and `JDE` are one-based inclusive full-grid bounds. `IA`
-and `JA` are the full grid dimensions, currently 2461 and 2056. The deformation
-and tsunami readers consume only the first four fields; `IA` and `JA` are legacy
-trailing padding retained in the generated file.
+They are one-based inclusive full-grid bounds of the deformation window.
 
 ### `meca.dat`
 

@@ -13,9 +13,11 @@ startup.
 From the repository root, run the API and worker in separate terminals:
 
 ```sh
-uv run tsdhn-api
-uv run tsdhn-worker
+mise run api
+mise run worker
 ```
+
+Both tasks read `.env` and stop at start when the model assets are missing.
 
 Apply all local database migrations first:
 
@@ -36,7 +38,8 @@ version routes are public. Simulation and calculation routes require
 - `api/core/tasks.py`: queued simulation task.
 - `api/core/storage.py`: output uploads and download URLs.
 - `api/core/queue.py`: shared rqueue instance.
-- `api/migrate.py`: compute schema migration.
+- `api/migrate.py`: applies the numbered files in `api/migrations/`.
+- `api/core/lifecycle.py`: retention, terminal statuses, and the job id pattern.
 - `api/queue_grants.py`: least-privilege queue roles.
 - `api/worker.py`: queue worker, workspace sweep, and retention.
 

@@ -20,8 +20,9 @@ worker, and retention purger respectively.
 
 The example configures queue `simulations` in schema `task_queue`, uses
 PostgreSQL on the Compose service name, and exposes MinIO at `localhost:9000`
-for browser downloads. Set `MINIO_PUBLIC_ENDPOINT` to the host and port a
-browser can reach when that is different.
+for browser downloads. Set `TSDHN_MINIO_PUBLIC_ENDPOINT` to the host and port a
+browser can reach when that is different. Compose sets the runtime database
+endpoint and the MinIO endpoint for the containers itself.
 
 ## Start
 
@@ -82,6 +83,12 @@ mise run api
 mise run worker
 ```
 
-Set the runtime URLs and passwords from `.env` when using this path. The API
-uses the producer role, the worker uses the worker role, and retention uses the
-purger role.
+`mise run api`, `mise run worker`, and `mise run db-migrate` read `.env`, so the
+passwords and token you set for Compose apply here too. The API uses the
+producer role, the worker uses the worker role, and retention uses the purger
+role.
+
+Both processes stop at start with the missing paths when the model assets are
+not installed. Run `uv run tsdhn assets install`, or point `TSDHN_MODEL_DIR` at
+the repository's `model/` directory. `scripts/setup.sh` records that variable in
+`.tsdhn/env`, which mise loads.
