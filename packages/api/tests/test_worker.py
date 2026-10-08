@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -12,24 +13,16 @@ from api.core import db
 worker_any: Any = worker_module
 
 
+@pytest.fixture(autouse=True)
+def _model_dir(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TSDHN_MODEL_DIR", str(Path(__file__).parents[3] / "model"))
+
+
 @pytest.mark.asyncio
 async def test_the_worker_detaches_from_its_blocking_threads_on_shutdown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Shutdown must not wait for a thread that cannot be stopped.
-
-    The simulation kernel runs on a thread through `asyncio.to_thread`, and
-    Python cannot kill a thread. Under rqueue's default `executor_shutdown=
-    "wait"`, tearing down the bounded executor blocks until that thread
-    finishes on its own -- measured at 3.00s for a 3s kernel against a
-    coroutine cancelled at 0.00s. `run()` would then not return for as long as
-    the simulation takes, so the `finally` that closes the pool never runs and
-    only the orchestrator's SIGKILL ends the process.
-
-    `detach` does not stop the thread; it stops waiting for it, once the leases
-    are already handed back. That is safe here precisely because the process is
-    exiting: `run()` returns into `main()` and the loop closes behind it.
-    """
+    """Shutdown must not wait for the kernel thread, which cannot be stopped."""
     captured: dict[str, Any] = {}
 
     class _Worker:
@@ -63,24 +56,10 @@ async def test_the_worker_detaches_from_its_blocking_threads_on_shutdown(
 def test_main_exits_the_process_instead_of_joining_abandoned_threads(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Detach is only half a fix if the process then hangs on its way out.
-
-    `executor_shutdown="detach"` stops rqueue waiting for the abandoned kernel
-    thread, but that thread belongs to a ThreadPoolExecutor and is therefore
-    non-daemon, and CPython joins every non-daemon thread during interpreter
-    shutdown. Returning normally from `main()` parks the process for the rest
-    of the simulation -- 3.20s for a 3s thread, against 0.16s with the hard
-    exit -- which is the same wait, relocated from rqueue's executor teardown
-    into Python's own atexit machinery.
-
-    So `main()` must not fall off the end. The real call would take this test
-    process with it, hence the stub.
-    """
+    """CPython joins non-daemon executor threads at exit, so `main()` hard-exits."""
     calls: list[Any] = []
 
     def fake_run(coro: Any) -> None:
-        # Close it so the loop-less coroutine does not warn about never
-        # being awaited; the point here is what happens after run() returns.
         coro.close()
         calls.append("run")
 
@@ -96,13 +75,7 @@ def test_main_exits_the_process_instead_of_joining_abandoned_threads(
 
 
 def test_the_shutdown_story_holds_together(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The two halves are only correct as a pair, so assert them as a pair.
-
-    Detach without the hard exit relocates the hang; the hard exit without
-    detach is unnecessary and would be cargo cult. Either one alone reads as
-    defensible, which is exactly why a later change could drop one and leave
-    the other looking deliberate.
-    """
+    """Detach and the hard exit only make sense together, so assert both."""
     captured: dict[str, Any] = {}
 
     class _Worker:

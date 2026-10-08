@@ -11,9 +11,9 @@ import pytest
 import pytest_asyncio
 from rqueue import Queue, migrations
 
+from api import migrate
 from api.core import db
 from api.core.queue import build_queue, set_queue
-from api.core.schema import COMPUTE_SCHEMA_SQL
 from api.core.settings import COMPUTE_QUEUE_SCHEMA
 from api.core.tasks import register_tasks
 from scripts.database import create_database, drop_database
@@ -39,7 +39,7 @@ def isolated_database() -> Iterator[str]:
 
     try:
         with psycopg.connect(target.database_url) as connection:
-            connection.execute(COMPUTE_SCHEMA_SQL)
+            migrate.install_compute_schema(connection)
         yield target.database_url
     finally:
         drop_database(LOCAL_DATABASE_URL, database_name)

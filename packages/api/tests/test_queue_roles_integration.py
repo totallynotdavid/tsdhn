@@ -23,8 +23,9 @@ from rqueue.roles import revoke_role
 from api import queue_grants
 from api import worker as worker_module
 from api.core import db
+from api.core.lifecycle import JOB_RETENTION
 from api.core.settings import COMPUTE_QUEUE, COMPUTE_QUEUE_SCHEMA
-from api.core.tasks import JOB_RETENTION, RUN_SIMULATION, purge_finished_jobs
+from api.core.tasks import RUN_SIMULATION, purge_finished_jobs
 from scripts.database import database_target
 
 pytestmark = pytest.mark.integration

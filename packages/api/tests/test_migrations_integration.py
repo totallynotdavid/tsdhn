@@ -3,6 +3,7 @@
 import asyncio
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 
 import asyncpg
 import psycopg
@@ -11,7 +12,6 @@ from psycopg import sql
 from rqueue import migrations
 
 from api import migrate, web_grants
-from api.core.schema import COMPUTE_SCHEMA_SQL
 from api.core.settings import COMPUTE_QUEUE_SCHEMA
 
 pytestmark = pytest.mark.integration
@@ -40,7 +40,6 @@ def temporary_web_role(
     monkeypatch.setattr(web_grants, "APP_DB_ROLE", role)
 
     with psycopg.connect(isolated_database) as conn:
-        conn.execute(COMPUTE_SCHEMA_SQL)
         migrate.provision_web_role(conn)
         conn.commit()
 
@@ -132,28 +131,63 @@ def test_provision_web_role_is_idempotent(
     assert exists is not None
 
 
-def test_compute_migration_renames_old_job_columns(isolated_database: str) -> None:
+def test_install_compute_schema_records_versions_and_applies_each_once(
+    isolated_database: str, tmp_path: Path
+) -> None:
+    (tmp_path / "0001_first.sql").write_text("CREATE TABLE compute.probe (a integer);")
+    (tmp_path / "0002_second.sql").write_text(
+        "ALTER TABLE compute.probe ADD b integer;"
+    )
+
     with psycopg.connect(isolated_database) as conn:
-        conn.execute(
-            "ALTER TABLE compute.jobs RENAME COLUMN simulation_id TO external_id"
+        first = migrate.install_compute_schema(conn, tmp_path)
+        again = migrate.install_compute_schema(conn, tmp_path)
+        (tmp_path / "0003_third.sql").write_text(
+            "ALTER TABLE compute.probe RENAME COLUMN b TO c;"
         )
-        conn.execute("ALTER TABLE compute.jobs RENAME COLUMN outputs TO artifacts")
-        migrate.install_compute_schema(conn)
+        third = migrate.install_compute_schema(conn, tmp_path)
+        columns = [
+            row[0]
+            for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'compute' AND table_name = 'probe' "
+                "ORDER BY ordinal_position"
+            )
+        ]
+
+    assert first == ["0001_first", "0002_second"]
+    assert again == []
+    assert third == ["0003_third"]
+    assert columns == ["a", "c"]
+
+
+def test_install_compute_schema_rolls_back_a_failing_migration(
+    isolated_database: str, tmp_path: Path
+) -> None:
+    (tmp_path / "0001_broken.sql").write_text(
+        "CREATE TABLE compute.probe (a integer); SELECT 1/0;"
+    )
+
+    with psycopg.connect(isolated_database) as conn:
+        with pytest.raises(psycopg.errors.DivisionByZero):
+            migrate.install_compute_schema(conn, tmp_path)
+        conn.rollback()
+        probe = conn.execute("SELECT to_regclass('compute.probe')").fetchone()
+
+    assert probe == (None,)
+
+
+def test_compute_schema_defines_the_job_columns(isolated_database: str) -> None:
+    with psycopg.connect(isolated_database) as conn:
         columns = {
             row[0]
             for row in conn.execute(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'compute' AND table_name = 'jobs'
-                """
-            ).fetchall()
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'compute' AND table_name = 'jobs'"
+            )
         }
 
-    assert "simulation_id" in columns
-    assert "outputs" in columns
-    assert "external_id" not in columns
-    assert "artifacts" not in columns
+    assert {"simulation_id", "outputs", "owner_attempt"} <= columns
 
 
 def test_web_role_can_use_future_tables_but_cannot_run_ddl(

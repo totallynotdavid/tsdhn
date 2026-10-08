@@ -250,7 +250,7 @@ async def test_the_queue_tables_stay_out_of_the_compute_schema(queue: Queue) -> 
             )
         }
 
-    assert compute_tables == {"jobs"}
+    assert compute_tables == {"jobs", "schema_migrations"}
     assert {"jobs", "job_attempts", "schema_migrations"} <= queue_tables
 
 
