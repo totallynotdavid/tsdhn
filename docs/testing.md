@@ -1,27 +1,15 @@
-# Test the engine
+# Testing
 
-Each test group answers a different question. None of them establishes that the
-scientific model is correct by itself.
+Each suite answers a different question.
 
-## Common commands
-
-| Command                     | Purpose                                   |
-| --------------------------- | ----------------------------------------- |
-| `mise run test`             | Run the fast Python test suite            |
-| `mise run test-integration` | Run database-backed tests                 |
-| `mise run web-test`         | Run the fast web test suite               |
-| `mise run lint-all`         | Run Python and JavaScript checks          |
-| `mise run gen-client`       | Regenerate the OpenAPI client             |
-| `mise run test-golden`      | Run the full pipeline regression          |
-| `mise run test-parity`      | Compare Python output with older programs |
-
-## Fast behavior tests
-
-`mise run test` runs the Python suite without services or GMT. When the GMT
-library cannot load, pytest names the GMT-backed module it does not collect in
-its report header. The suite covers source parameters, longitude conversion,
-file formats, numerical update rules, checkpoints, resume behavior, and report
-transformations with focused inputs.
+| Command                     | Question                                       | Needs                               |
+| --------------------------- | ---------------------------------------------- | ----------------------------------- |
+| `mise run test`             | Do the Python units behave as specified?       | nothing                             |
+| `mise run web-test`         | Do the web units behave as specified?          | nothing                             |
+| `mise run test-integration` | Do the queue, roles and migrations work?       | PostgreSQL, which the task starts   |
+| `mise run test-golden`      | Did the full pipeline output change?           | GMT and `ttt_client`                |
+| `mise run test-parity`      | Does Python match the MATLAB and Fortran runs? | `TSDHN_TOOLS_DIR` for Fortran cases |
+| `mise run lint-all`         | Do Python and JavaScript pass the linters?     | nothing                             |
 
 Run one test with:
 
@@ -29,31 +17,25 @@ Run one test with:
 uv run pytest packages/tsdhn/tests/test_tsunami.py::test_mass_step_hand_computed
 ```
 
-## Golden pipeline tests
+## Fast tests
 
-`mise run test-golden` runs the full Python pipeline with GMT and `ttt_client`.
-It checks output sets, fixed-width fingerprints, and selected spatial values for
-a saved scenario. A golden result answers whether the output changed for that
-scenario. It does not establish which result is physically correct.
+`mise run test` runs the Python suite without services or GMT. When the GMT
+library cannot load, pytest names the GMT-backed module it does not collect in
+its report header. The suite covers source parameters, longitude conversion,
+file formats, numerical update rules, checkpoints, resume behavior and report
+transformations with focused inputs.
 
-## Legacy comparisons
+## Golden tests
+
+`mise run test-golden` runs the full Python pipeline. It checks output sets,
+fixed-width fingerprints and selected spatial values for a saved scenario. A
+golden result tells you whether the output changed for that scenario.
+
+## Parity tests
 
 `mise run test-parity` compares Python checkpoints with saved MATLAB data and
-compiled Fortran output. It checks whether Python matches the selected reference
-within an explicit tolerance. See [`legacy.md`](legacy.md) for the active
-reference map.
-
-The saved MATLAB fixtures are captured evidence. A refresh records the input
-case, source, checkpoint names, and reason for the new capture. The capture
-command is:
-
-```sh
-uv run python scripts/capture_matlab_fixtures.py fault_plane
-```
-
-It needs the MathWorks container and license. Ordinary tests read the saved
-fixtures and do not start MATLAB. Fortran cases need compiled tools in
-`TSDHN_TOOLS_DIR`.
+compiled Fortran output within an explicit tolerance. [Parity](parity.md)
+describes the references, the Fortran tools and the MATLAB capture.
 
 ## Choose evidence for a change
 
@@ -67,7 +49,6 @@ fixtures and do not start MATLAB. Fortran cases need compiled tools in
 | Checkpoint layout or meaning               | Resume equivalence and version rejection          |
 | Display transformation                     | Raw-value preservation and report regression      |
 
-Start investigating a comparison failure at the earliest failing checkpoint.
-Later checkpoints can differ because an earlier stage changed. Keep units,
-coordinate frames, dtypes, indexing, and output precision explicit in expected
-values.
+When a comparison fails, start at the earliest failing checkpoint, because later
+checkpoints differ when an earlier stage changed. Keep units, coordinate frames,
+dtypes, indexing and output precision explicit in expected values.

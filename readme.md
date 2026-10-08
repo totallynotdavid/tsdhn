@@ -1,36 +1,14 @@
 # TSDHN
 
-TSDHN runs tsunami simulations from earthquake source parameters. It provides a
-Python engine and researcher CLI, a FastAPI compute service and worker, and a
-SvelteKit web app for submitting simulations and downloading their outputs.
-
-## Install
-
-Install the pinned tools and project dependencies:
-
-```sh
-mise install
-mise run install
-mise run web-install
-```
-
-Install the model dataset and inspect the local toolchain:
-
-```sh
-uv run tsdhn assets install
-uv run tsdhn doctor
-```
-
-## Calculate
-
-Calculate source parameters and approximate arrival times without starting the
-services:
+TSDHN simulates tsunamis from earthquake source parameters. Researchers use it
+to estimate source dimensions, port arrival times and wave propagation across
+the Pacific Ocean from the command line or a web app. The model grid covers the
+Pacific from 76°S to 61°N, and the 17 report ports are on the coast of Peru and
+at Arica.
 
 ```sh
 uv run tsdhn calc --mw 8.0 --lat -20.5 --lon -70.5
 ```
-
-The command prints the calculated source parameters and arrival-time table:
 
 ```text
                  Source parameters
@@ -69,24 +47,53 @@ The command prints the calculated source parameters and arrival-time table:
 └────────────┴─────────────┴───────────────┘
 ```
 
-Run the full local pipeline with the same inputs:
+`calc` is an estimate that needs no services. `tsdhn run` runs the full
+pipeline: fault plane, seafloor deformation, wave propagation and the report
+maps. The web app and compute API run the same pipeline for many users.
+
+## Install
+
+Install the pinned tools and the Python dependencies, then download the model
+data and check the toolchain:
+
+```sh
+mise install
+mise run install
+uv run tsdhn assets install
+uv run tsdhn doctor
+```
+
+`tsdhn run` also needs GMT (6.5.0 or newer) and `ttt_client` on `PATH`.
+`tsdhn doctor` reports which of them are missing. `calc` needs neither. On an
+apt-based system, `scripts/setup.sh` installs both with `sudo`. It prints its
+plan and asks before it changes anything. It also installs Intel Fortran and
+compiles the parity tools unless you pass `--skip-ifx` or `--skip-tools`.
+`--help` lists every option.
+
+Run the full pipeline with the same inputs:
 
 ```sh
 uv run tsdhn run --mw 8.0 --lat -20.5 --lon -70.5
 ```
 
+The run directory defaults to `jobs/<timestamp>`. Install the web app
+dependencies with `mise run web-install`, and start the services as described in
+[Deploy](docs/deploy.md).
+
 ## Features
 
-- The Python engine calculates source parameters, propagates the tsunami, and
-  writes fixed-format maps, station reports, and checkpoints.
-- The CLI installs versioned model data, checks external capabilities, previews
-  a calculation, and runs the pipeline.
-- The compute API queues simulations, and the worker resumes interrupted work
-  and stores completed files in MinIO.
-- The web app authenticates researchers, tracks simulations, streams progress,
+- The Python engine calculates source parameters, propagates the tsunami and
+  writes fixed-format maps, station reports and checkpoints.
+- The CLI installs versioned model data, checks external tools, previews a
+  calculation and runs the pipeline.
+- The compute API queues simulations. The worker resumes interrupted work and
+  stores finished files in MinIO.
+- The web app signs researchers in, tracks their simulations, streams progress
   and creates output downloads.
 - The parity package compares selected Python results with saved MATLAB and
   Fortran results.
 
-Read the [manual](./docs/readme.md) for operations, architecture, and testing.
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contributor workflow.
+## Learn more
+
+- [Manual](docs/readme.md): architecture, operations, pipeline and tests.
+- [Contributing](.github/contributing.md): set up, check and change the code.

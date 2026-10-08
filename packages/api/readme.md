@@ -4,25 +4,20 @@
 PostgreSQL, queues work with `rqueue`, runs the shared `tsdhn` engine, and
 stores output files in MinIO. The browser calls the web app, not this service.
 
-See [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) for boundaries and
-[`../../docs/deploy.md`](../../docs/deploy.md) for service configuration and
-startup.
+[Architecture](../../docs/architecture.md) states the boundaries,
+[Jobs](../../docs/jobs.md) the job rules, and [Deploy](../../docs/deploy.md) the
+configuration and startup.
 
 ## Run it
 
-From the repository root, run the API and worker in separate terminals:
-
-```sh
-mise run api
-mise run worker
-```
-
-Both tasks read `.env` and stop at start when the model assets are missing.
-
-Apply all local database migrations first:
+From the repository root, apply all local database migrations, then run the API
+and the worker in separate terminals. What they need before they start is in
+[Deploy](../../docs/deploy.md#run-without-compose).
 
 ```sh
 mise run db-migrate
+mise run api
+mise run worker
 ```
 
 The compute API's OpenAPI UI is at <http://127.0.0.1:8000/api-docs>. Health and
@@ -40,25 +35,19 @@ version routes are public. Simulation and calculation routes require
 - `api/core/queue.py`: shared rqueue instance.
 - `api/migrate.py`: applies the numbered files in `api/migrations/`.
 - `api/core/lifecycle.py`: retention, terminal statuses, and the job id pattern.
+- `api/core/model_assets.py`: start-time check for the installed model data.
 - `api/queue_grants.py`: least-privilege queue roles.
+- `api/web_grants.py`: web role grants.
 - `api/worker.py`: queue worker, workspace sweep, and retention.
 
-## Tests and generated client
+## Tests
 
 Run the fast API tests with:
 
 ```sh
-uv run --package tsdhn-api pytest packages/api/tests
+uv run --package tsdhn-api pytest packages/api/tests -m "not integration"
 ```
 
-Database-backed tests use:
-
-```sh
-mise run test-integration
-```
-
-After changing a route or schema, regenerate the TypeScript client:
-
-```sh
-mise run gen-client
-```
+Database-backed tests use `mise run test-integration`. After a route or schema
+change, regenerate the TypeScript client as described in
+[`libs/api-client`](../../libs/api-client/readme.md#regenerate).

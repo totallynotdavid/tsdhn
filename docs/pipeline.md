@@ -2,8 +2,14 @@
 
 This guide follows one researcher run from its input files to its reports. The
 engine validates the model directory, prepares a run directory, and executes the
-registered stages in order. A stage is skipped on resume only when its
-completion marker and every declared output are valid.
+registered stages in order. On resume, a stage is skipped only when its
+completion marker matches the stage fingerprint and every declared output
+exists.
+
+A finished stage leaves `.{stage}.complete` in its directory. The marker holds
+the first 16 hex digits of the SHA-256 of
+`PIPELINE_VERSION:{stage}:{declared outputs}`. A change to the pipeline version
+or to a stage's outputs therefore reruns the stage.
 
 ## Stage map
 
@@ -149,24 +155,14 @@ SVG, and corrected station files are report products.
 
 ## Resume behavior
 
-The tsunami checkpoint stores both elevation buffers, both momentum buffers, the
-sampled maximum grid, gauge rows, and the last completed step. It is written
-after a buffer swap, so a resumed run starts at a complete step. A
-pipeline-version change is required when the meaning or order of saved state
-changes.
+The tsunami checkpoint is written after a buffer swap, so a resumed run starts
+at a complete step. Change `PIPELINE_VERSION` when the meaning or order of the
+saved state changes.
 
 The engine runs the tsunami stage in a workspace that can be reused after a
 worker restart. The compute service's workspace lock and job rules are in
-[`jobs.md`](jobs.md).
+[Jobs](jobs.md#workspace-lock).
 
 ## Find the implementation
 
-| Behavior                                | Code                                        |
-| --------------------------------------- | ------------------------------------------- |
-| Source parameters and arrival estimates | `packages/tsdhn/tsdhn/calculator.py`        |
-| Fault geometry and input files          | `packages/tsdhn/tsdhn/fault_plane.py`       |
-| Deformation                             | `packages/tsdhn/tsdhn/deform.py`            |
-| Propagation and checkpoints             | `packages/tsdhn/tsdhn/tsunami.py`           |
-| Stage order                             | `packages/tsdhn/tsdhn/pipeline/registry.py` |
-| Report transformations                  | `packages/tsdhn/tsdhn/render/`              |
-| Run setup and output collection         | `packages/tsdhn/tsdhn/engine.py`            |
+[Architecture](architecture.md#where-the-code-is) lists the code for each stage.

@@ -1,32 +1,23 @@
 # tsdhn
 
 `tsdhn` is the simulation engine and researcher CLI. The CLI, API, and worker
-run the same Python pipeline.
+run the same Python pipeline. The [root README](../../readme.md#install) covers
+installation and a first run.
 
-## Run it
+## Commands
 
-Install model files and check external tools:
+| Command                | Purpose                                          |
+| ---------------------- | ------------------------------------------------ |
+| `tsdhn assets install` | Download and install the versioned model data    |
+| `tsdhn doctor`         | Report the model data and external tools         |
+| `tsdhn calc`           | Preview source parameters and port arrival times |
+| `tsdhn run`            | Run the complete pipeline                        |
 
-```sh
-mise run install
-uv run tsdhn assets install
-uv run tsdhn doctor
-```
-
-Preview source parameters and port arrival-time estimates:
-
-```sh
-uv run tsdhn calc --mw 8.0 --lat -20.5 --lon -70.5
-```
-
-Run the complete pipeline:
-
-```sh
-uv run tsdhn run --mw 8.0 --lat -20.5 --lon -70.5
-```
-
-Use `--model-version` to select an installed dataset, `--model-dir` to use a
-specific directory, and `--work-dir` to choose the run directory.
+`calc` and `run` take `--mw` (default 9.0), `--lat` (-20.5), `--lon` (-70.5),
+`--depth` in km (12.0), `--time` as HHMM UTC (0000) and `--day` of the month
+(23). Use `--model-version` to select an installed dataset and `--model-dir` to
+use a specific directory. `run` also takes `--work-dir` to choose the run
+directory. Run `uv run tsdhn run --help` for every option.
 
 ## Model files
 
@@ -40,8 +31,8 @@ Model files resolve in this order:
 `$XDG_DATA_HOME/tsdhn/models`, or `$HOME/.local/share/tsdhn/models` when
 `XDG_DATA_HOME` is unset. `TSDHN_DATA_HOME` selects another data root.
 
-The report stages use GMT and `ttt_client`. The older Fortran programs are used
-by comparison tests.
+The report stages use GMT and `ttt_client`. The comparison tests use the older
+Fortran programs.
 
 ## Outputs
 
@@ -55,9 +46,8 @@ by comparison tests.
 | `ttt.pdf`            | Arrival-time map made with `ttt_client` and GMT |
 | `mareograma.svg`     | Selected station series after report scaling    |
 
-The raw solver files and report transformations are described in
-[`../../docs/pipeline.md`](../../docs/pipeline.md). Numerical rules are in
-[`../../docs/science.md`](../../docs/science.md).
+[Pipeline](../../docs/pipeline.md) describes the raw solver files and the report
+transformations. [Science](../../docs/science.md) states the numerical rules.
 
 ## Code map
 
@@ -72,6 +62,4 @@ The raw solver files and report transformations are described in
 - `tsdhn/assets.py`: versioned model installation.
 - `tsdhn/cli/`: researcher commands.
 
-Service deployment is documented in
-[`../../docs/deploy.md`](../../docs/deploy.md). System boundaries are documented
-in [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md).
+[Architecture](../../docs/architecture.md) states the system boundaries.

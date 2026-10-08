@@ -5,8 +5,8 @@ history, the input form, progress pages, and output downloads.
 
 The browser talks to SvelteKit. Server code calls the FastAPI compute service
 with `COMPUTE_API_URL` and `COMPUTE_API_TOKEN`. See
-[`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) for data ownership and
-[`../../docs/deploy.md`](../../docs/deploy.md) for the local stack.
+[Architecture](../../docs/architecture.md) for data ownership and
+[Deploy](../../docs/deploy.md) for the local stack.
 
 ## Development
 
