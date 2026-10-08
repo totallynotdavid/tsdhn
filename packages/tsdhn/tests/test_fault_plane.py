@@ -5,9 +5,7 @@ import pytest
 
 from tsdhn.fault_plane import (
     _grid_window,
-    _nearest_mechanism,
     _recompute_depth,
-    _to_0_360,
     _write_meca_dat,
     _write_pfalla_inp,
     _write_xyo_dat,
@@ -16,12 +14,7 @@ from tsdhn.fault_plane import (
 from tsdhn.utils.file_utils import prepare_simulation_workspace
 
 MODEL_DIR = Path(__file__).resolve().parents[3] / "model"
-
-
-def test_to_0_360_shifts_only_negative_longitudes() -> None:
-    assert _to_0_360(-156.0) == pytest.approx(204.0)
-    assert _to_0_360(156.0) == pytest.approx(156.0)
-    assert _to_0_360(0.0) == pytest.approx(0.0)
+TEST_DATA_DIR = Path(__file__).parent / "data"
 
 
 def test_grid_window_truncates_target_before_snapping() -> None:
@@ -31,13 +24,6 @@ def test_grid_window_truncates_target_before_snapping() -> None:
     ya = np.array([9.0, 10.0, 11.0, 12.0])
     ids, ide, jds, jde = _grid_window(xa, ya, xep=10.9, yep=10.9, l_km=0.0, mw=9.0)
     assert (ids, ide, jds, jde) == (2, 2, 2, 2)
-
-
-def test_nearest_mechanism_matches_real_mecfoc_alaska_1964() -> None:
-    mecfoc = np.loadtxt(MODEL_DIR / "mecfoc.dat")
-    az, dip = _nearest_mechanism(mecfoc, xep=204.0, yep=56.0)
-    assert az == pytest.approx(247.0)
-    assert dip == pytest.approx(8.0)
 
 
 def test_recompute_depth_clamps_negative_to_5000() -> None:
@@ -58,17 +44,16 @@ def test_write_pfalla_inp_is_nine_whitespace_tokens(tmp_path: Path) -> None:
     assert int(tokens[1]) == 1987
 
 
-def test_write_xyo_dat_includes_trailing_ia_ja_padding(tmp_path: Path) -> None:
+def test_write_xyo_dat_writes_the_four_window_indices(tmp_path: Path) -> None:
     path = tmp_path / "xyo.dat"
     _write_xyo_dat(path, 1021, 1246, 1861, 2056)
-    tokens = path.read_text().split()
-    assert tokens == ["1021", "1246", "1861", "2056", "2461", "2056"]
+    assert path.read_text().split() == ["1021", "1246", "1861", "2056"]
 
 
 def test_write_meca_dat_matches_real_captured_format(tmp_path: Path) -> None:
     path = tmp_path / "meca.dat"
     _write_meca_dat(path, 204.0, 56.0, 12.0, 247.0, 8.0, 9.0, "0000")
-    real = (MODEL_DIR / "meca.dat").read_text().strip()
+    real = (TEST_DATA_DIR / "meca.dat").read_text().strip()
     assert path.read_text().strip() == real
 
 
@@ -90,7 +75,7 @@ def test_run_fault_plane_matches_real_captured_alaska_1964(tmp_path: Path) -> No
         real_dip,
         real_rake,
         real_h,
-    ) = (float(t) for t in (MODEL_DIR / "pfalla.inp").read_text().split())
+    ) = (float(t) for t in (TEST_DATA_DIR / "pfalla.inp").read_text().split())
     (
         mine_i0,
         mine_j0,
@@ -113,11 +98,14 @@ def test_run_fault_plane_matches_real_captured_alaska_1964(tmp_path: Path) -> No
         rtol=2e-4,
     )
 
-    assert (tmp_path / "xyo.dat").read_text().split() == (
-        MODEL_DIR / "xyo.dat"
-    ).read_text().split()
+    assert (tmp_path / "xyo.dat").read_text().split() == [
+        "1021",
+        "1246",
+        "1861",
+        "2056",
+    ]
     assert (tmp_path / "meca.dat").read_text().strip() == (
-        MODEL_DIR / "meca.dat"
+        TEST_DATA_DIR / "meca.dat"
     ).read_text().strip()
 
 

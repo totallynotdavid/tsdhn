@@ -9,6 +9,7 @@ from tsdhn.constants import STANDARD_GRAVITY_M_PER_S2, TSUNAMI_SOLVER_EARTH_RADI
 from tsdhn.pipeline_version import PIPELINE_VERSION
 
 MODEL_DIR = Path(__file__).resolve().parents[3] / "model"
+TEST_DATA_DIR = Path(__file__).parent / "data"
 
 
 def test_hmn_staggered_averages_and_edges() -> None:
@@ -147,19 +148,15 @@ def test_read_tidal_dat_real_file() -> None:
     assert (ip[-1], jp[-1]) == (2425, 864)
 
 
-def test_read_xyo_dat_real_file() -> None:
-    # The captured file includes grid dimensions after the four consumed fields.
-    assert tsunami_module._read_xyo_dat(MODEL_DIR / "xyo.dat") == (
-        1021,
-        1246,
-        1861,
-        2056,
-    )
+def test_read_xyo_dat_reads_the_four_window_indices(tmp_path: Path) -> None:
+    path = tmp_path / "xyo.dat"
+    path.write_text("        1021        1246        1861        2056\n")
+    assert tsunami_module._read_xyo_dat(path) == (1021, 1246, 1861, 2056)
 
 
 def test_read_deform_a_real_file() -> None:
     grid = tsunami_module._read_deform_a(
-        MODEL_DIR / "deform_a.grd", 1021, 1246, 1861, 2056
+        TEST_DATA_DIR / "deform_a.grd", 1021, 1246, 1861, 2056
     )
     assert grid.shape == (226, 196)
     assert grid.dtype == np.float32

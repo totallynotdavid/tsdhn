@@ -25,8 +25,6 @@ _ALASKA_1964_WINDOW = {
     "IDE": 1249,
     "JDS": 1872,
     "JDE": 2056,
-    "IA": 2461,
-    "JA": 2056,
 }
 
 CASES = [
@@ -62,8 +60,6 @@ CASES = [
     ),
 ]
 
-# The deformation step ignores the grid dimensions after the requested window.
-_UNUSED_PARAMS = ("IA", "JA")
 _READ_GRID = read_fixed_width_grid(9)  # Legacy deformation grids use F9.3 fields.
 
 
@@ -74,7 +70,7 @@ def _prepare(case: Case, working_dir: Path) -> None:
         f"{p['TH']} {p['DL']} {p['RD']} {p['HH']}\n"
     )
     (working_dir / "xyo.dat").write_text(
-        f"{p['IDS']} {p['IDE']} {p['JDS']} {p['JDE']} {p['IA']} {p['JA']}\n"
+        f"{p['IDS']} {p['IDE']} {p['JDS']} {p['JDE']}\n"
     )
 
 
@@ -87,8 +83,7 @@ LEGACY = FortranBinaryAdapter(
 
 
 def _run(on_checkpoint: OnCheckpoint, **kwargs: Any) -> None:
-    params = {k: v for k, v in kwargs.items() if k not in _UNUSED_PARAMS}
-    grid = clip_anomalous_values(compute_deform_grid(**params))
+    grid = clip_anomalous_values(compute_deform_grid(**kwargs))
     with tempfile.TemporaryDirectory(prefix="tsdhn-parity-deform-") as raw_dir:
         path = Path(raw_dir) / "deform_a.grd"
         write_deform_grid(path, grid)

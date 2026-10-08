@@ -68,7 +68,10 @@ def _read_slip(path: Path) -> np.ndarray:
 
 def _run(on_checkpoint: OnCheckpoint, **kwargs: Any) -> None:
     calculator = TsunamiCalculator(MODEL_DIR)
-    response = calculator.calculate_earthquake_parameters(EarthquakeInput(**kwargs))
+    with tempfile.TemporaryDirectory() as output_dir:
+        response = calculator.calculate_earthquake_parameters(
+            EarthquakeInput(**kwargs), Path(output_dir)
+        )
     on_checkpoint("pfalla.inp", np.asarray(response.dislocation))
 
 

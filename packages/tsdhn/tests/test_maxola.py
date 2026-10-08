@@ -8,7 +8,9 @@ import numpy as np
 import pygmt
 import pytest
 import xarray as xr
+from pygmt.enums import GridRegistration, GridType
 
+from tsdhn.constants import MAXOLA_GRID_KILOMETERS_PER_DEGREE
 from tsdhn.render.maxola import (
     GridConfig,
     StyleConfig,
@@ -18,6 +20,8 @@ from tsdhn.render.maxola import (
     create_cpt_files,
     create_grid_dataarray,
     generate_maxola_plot,
+    load_stations,
+    process_grid,
 )
 
 MECA_LINE = "210.25 -9.50 10 20 30 40 7.5 210 -9 event\n"
@@ -164,3 +168,49 @@ def test_generate_maxola_plot_cleans_up_cpt_files_even_on_failure(
 
     assert not (tmp_path / "depth.cpt").exists()
     assert not (tmp_path / "hgt.cpt").exists()
+
+
+def test_load_stations_uses_package_resource(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    stations = load_stations()
+
+    assert {station.code for station in stations if station.active} == {
+        "TALA",
+        "CALL",
+        "MATA",
+    }
+
+
+def test_process_grid_returns_pixel_registered_dataarray(tmp_path: Path) -> None:
+    work_dir = tmp_path / "work"
+    zfolder = work_dir / "zfolder"
+    zfolder.mkdir(parents=True)
+    np.savetxt(zfolder / "zmax_a.grd", np.arange(12, dtype=np.float32))
+
+    grid_config = GridConfig(ncols=4, nrows=3, dx=MAXOLA_GRID_KILOMETERS_PER_DEGREE)
+    grid = process_grid(work_dir, grid_config)
+
+    assert grid.dims == ("lat", "lon")
+    assert grid.shape == (3, 4)
+    assert grid.gmt.registration is GridRegistration.PIXEL
+    assert grid.gmt.gtype is GridType.GEOGRAPHIC
+    assert grid.lon.to_numpy().tolist() == pytest.approx(
+        [128.02827778, 128.02927778, 128.03027778, 128.03127778]
+    )
+    assert grid.lat.to_numpy().tolist() == pytest.approx(
+        [-76.00505556, -76.00405556, -76.00305556]
+    )
+    np.testing.assert_allclose(
+        grid.to_numpy(),
+        np.array(
+            [
+                [0.0, 1.09, 2.18, 3.27],
+                [4.36, 5.45, 6.55, 7.64],
+                [8.73, 9.82, 10.91, 12.0],
+            ],
+            dtype=np.float32,
+        ),
+    )

@@ -56,9 +56,13 @@ expected_corners = [
 
 @pytest.fixture(scope="module")
 def calc_result(
-    calculator: TsunamiCalculator, input_data: EarthquakeInput
+    calculator: TsunamiCalculator,
+    input_data: EarthquakeInput,
+    tmp_path_factory: pytest.TempPathFactory,
 ) -> CalculationResponse:
-    return calculator.calculate_earthquake_parameters(input_data)
+    return calculator.calculate_earthquake_parameters(
+        input_data, tmp_path_factory.mktemp("calc")
+    )
 
 
 @pytest.mark.parametrize("param,expected", list(expected_basic.items()))

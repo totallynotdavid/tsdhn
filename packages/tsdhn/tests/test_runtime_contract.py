@@ -1,14 +1,10 @@
 import subprocess
 from pathlib import Path
 
-import numpy as np
 import pytest
-from pygmt.enums import GridRegistration, GridType
 
-from tsdhn.constants import MAXOLA_GRID_KILOMETERS_PER_DEGREE
 from tsdhn.pipeline.types import ProcessingStep
 from tsdhn.render import ttt_inverso
-from tsdhn.render.maxola import GridConfig, load_stations, process_grid
 from tsdhn.runtime import (
     REQUIRED_MODEL_FILES,
     RuntimeContext,
@@ -92,52 +88,6 @@ def test_prepare_simulation_workspace_links_only_required_inputs(
         assert (work_dir / relative_name).is_file()
 
     assert not (work_dir / "zfolder" / "green.dat").exists()
-
-
-def test_load_stations_uses_package_resource(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.chdir(tmp_path)
-
-    stations = load_stations()
-
-    assert {station.code for station in stations if station.active} == {
-        "TALA",
-        "CALL",
-        "MATA",
-    }
-
-
-def test_process_grid_returns_pixel_registered_dataarray(tmp_path: Path) -> None:
-    work_dir = tmp_path / "work"
-    zfolder = work_dir / "zfolder"
-    zfolder.mkdir(parents=True)
-    np.savetxt(zfolder / "zmax_a.grd", np.arange(12, dtype=np.float32))
-
-    grid_config = GridConfig(ncols=4, nrows=3, dx=MAXOLA_GRID_KILOMETERS_PER_DEGREE)
-    grid = process_grid(work_dir, grid_config)
-
-    assert grid.dims == ("lat", "lon")
-    assert grid.shape == (3, 4)
-    assert grid.gmt.registration is GridRegistration.PIXEL
-    assert grid.gmt.gtype is GridType.GEOGRAPHIC
-    assert grid.lon.to_numpy().tolist() == pytest.approx(
-        [128.02827778, 128.02927778, 128.03027778, 128.03127778]
-    )
-    assert grid.lat.to_numpy().tolist() == pytest.approx(
-        [-76.00505556, -76.00405556, -76.00305556]
-    )
-    np.testing.assert_allclose(
-        grid.to_numpy(),
-        np.array(
-            [
-                [0.0, 1.09, 2.18, 3.27],
-                [4.36, 5.45, 6.55, 7.64],
-                [8.73, 9.82, 10.91, 12.0],
-            ],
-            dtype=np.float32,
-        ),
-    )
 
 
 @pytest.mark.parametrize(
