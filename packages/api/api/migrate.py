@@ -5,11 +5,11 @@ database owner. The web role is a runtime-only role.
 """
 
 import logging
+from pathlib import Path
 
 import psycopg
 from psycopg import sql
 
-from api.core.schema import COMPUTE_SCHEMA_SQL
 from api.core.settings import (
     APP_DB_PASSWORD,
     APP_DB_ROLE,
@@ -18,9 +18,39 @@ from api.core.settings import (
 
 logger = logging.getLogger(__name__)
 
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
-def install_compute_schema(conn: psycopg.Connection[tuple[str, ...]]) -> None:
-    conn.execute(COMPUTE_SCHEMA_SQL)
+# Serializes concurrent `tsdhn-compute-migrate` runs, such as two Compose stacks.
+_MIGRATION_LOCK_ID = 0x7364686E
+
+
+def install_compute_schema(
+    conn: psycopg.Connection[tuple[str, ...]], migrations_dir: Path = MIGRATIONS_DIR
+) -> list[str]:
+    """Apply the numbered `*.sql` files that are not recorded yet, in name order.
+
+    Returns the versions applied by this call. Each file runs in the caller's
+    transaction, so a failure leaves the schema as it was.
+    """
+    conn.execute("SELECT pg_advisory_xact_lock(%s)", [_MIGRATION_LOCK_ID])
+    conn.execute("CREATE SCHEMA IF NOT EXISTS compute")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS compute.schema_migrations ("
+        "version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())"
+    )
+    applied = {
+        row[0] for row in conn.execute("SELECT version FROM compute.schema_migrations")
+    }
+    newly_applied = []
+    for path in sorted(migrations_dir.glob("*.sql")):
+        if path.stem in applied:
+            continue
+        conn.execute(path.read_text())
+        conn.execute(
+            "INSERT INTO compute.schema_migrations (version) VALUES (%s)", [path.stem]
+        )
+        newly_applied.append(path.stem)
+    return newly_applied
 
 
 def transfer_web_ownership(
@@ -132,10 +162,14 @@ def provision_web_role(conn: psycopg.Connection[tuple[str, ...]]) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
     with psycopg.connect(COMPUTE_DATABASE_URL, connect_timeout=5) as conn:
-        install_compute_schema(conn)
+        applied = install_compute_schema(conn)
         provision_web_role(conn)
         conn.commit()
-    logger.info("compute schema applied; role %s provisioned", APP_DB_ROLE)
+    logger.info(
+        "compute migrations applied: %s; role %s provisioned",
+        ", ".join(applied) or "none pending",
+        APP_DB_ROLE,
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -32,6 +32,7 @@ from rqueue.limits import MAX_QUEUE_NAME_LENGTH, validate_name
 from rqueue.models import TERMINAL_STATES
 from rqueue.roles import Capability, provision_role, revoke_role
 
+from api.core.lifecycle import JOB_ID_RE, JOB_RETENTION, TERMINAL_STATUSES
 from api.core.settings import (
     APP_DB_ROLE,
     COMPUTE_DATABASE_URL,
@@ -50,9 +51,6 @@ __all__ = ["QueueRole", "provision_queue_roles", "queue_roles"]
 logger = logging.getLogger(__name__)
 
 _PURGER_DELETE_FUNCTION = "compute_purger_can_delete"
-_PURGE_RETENTION_DAYS = 7
-_COMPUTE_TERMINAL_STATUSES = ("completed", "failed")
-_COMPUTE_JOB_ID_RE = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 _ROLE_STATE_TABLE = "queue_runtime_roles"
 _ROLE_KINDS = ("producer", "worker", "purger")
 _DEFAULT_PRIVILEGE_OBJECT_TYPES = {
@@ -287,7 +285,7 @@ async def _grant_purger_delete_policy(
     only to this role. The RLS policy can therefore use its result without
     giving the purger direct visibility into the compute schema.
     """
-    status_literals = ", ".join(f"'{status}'" for status in _COMPUTE_TERMINAL_STATUSES)
+    status_literals = ", ".join(f"'{status}'" for status in TERMINAL_STATUSES)
     function_body = """
         SELECT CASE
             WHEN payload->>'compute_job_id' !~* __UUID_RE__
@@ -303,7 +301,7 @@ async def _grant_purger_delete_policy(
                   AND compute_job.status = ANY (ARRAY[__TERMINAL_STATUSES__]::text[])
             )
         END
-    """.replace("__UUID_RE__", f"'{_COMPUTE_JOB_ID_RE}'").replace(
+    """.replace("__UUID_RE__", f"'{JOB_ID_RE}'").replace(
         "__TERMINAL_STATUSES__", status_literals
     )
     await _ddl(
@@ -344,7 +342,7 @@ async def _grant_purger_delete_policy(
         f"USING (state = ANY(ARRAY[{state_placeholders}]::text[]) "
         "AND finished_at IS NOT NULL "
         f"AND finished_at < CURRENT_TIMESTAMP - INTERVAL "
-        f"'{_PURGE_RETENTION_DAYS} days' "
+        f"'{int(JOB_RETENTION.total_seconds())} seconds' "
         "AND %I.%I(payload))",
         policy_name,
         COMPUTE_QUEUE_SCHEMA,

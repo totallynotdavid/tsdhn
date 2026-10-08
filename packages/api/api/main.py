@@ -1,5 +1,4 @@
 import logging
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -9,8 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api import __version__
 from api.core import db
+from api.core.model_assets import require_model_assets
 from api.core.queue import build_queue
 from api.core.settings import (
+    ALLOWED_ORIGINS,
+    API_HOST,
+    API_PORT,
     COMPUTE_PRODUCER_PASSWORD,
     COMPUTE_PRODUCER_ROLE,
     LOG_LEVEL,
@@ -54,10 +57,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    origins = [o for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=ALLOWED_ORIGINS,
         allow_credentials=True,
         allow_methods=["GET", "POST"],
         allow_headers=["Authorization", "Content-Type"],
@@ -72,10 +74,11 @@ app = create_app()
 
 
 def start_app() -> None:
+    require_model_assets()
     uvicorn.run(
         app,
-        host=os.environ.get("APP_HOST", "127.0.0.1"),
-        port=int(os.environ.get("APP_PORT", "8000")),
+        host=API_HOST,
+        port=API_PORT,
         log_level=LOG_LEVEL.lower(),
     )
 

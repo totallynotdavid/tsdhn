@@ -11,6 +11,7 @@ import numba
 from rqueue import Admin, Worker
 
 from api.core import db
+from api.core.model_assets import require_model_assets
 from api.core.queue import build_queue
 from api.core.settings import (
     COMPUTE_PURGER_PASSWORD,
@@ -53,11 +54,9 @@ def worker_id() -> str:
 
 @asynccontextmanager
 async def purge_pool() -> AsyncIterator[asyncpg.Pool]:
-    """Yield the pool used by retention, credentialed separately from consume.
+    """Yield the retention pool, credentialed as the purger role.
 
-    The purger password is required. The worker pool uses the CONSUME role,
-    which cannot delete queue jobs, and falling back to the owner would bypass
-    every runtime boundary.
+    The worker role cannot delete queue jobs, and the owner must not be used.
     """
     # Retention is hourly, so one lazy connection is enough.
     pool = await asyncpg.create_pool(
@@ -85,25 +84,15 @@ async def run() -> None:
             worker_id=worker_id(),
             concurrency=WORKER_CONCURRENCY,
             lease_duration=WORKER_LEASE_SECONDS,
-            # The kernel runs on a thread that Python cannot kill. With the
-            # default "wait", shutdown blocks on that thread for the length of
-            # the simulation, so `run()` never returns and the `finally` below
-            # never closes the pool. "detach" stops waiting once the leases are
-            # back.
+            # "wait" would block shutdown on the kernel thread for the length of
+            # the simulation.
             executor_shutdown="detach",
         )
 
         loop = asyncio.get_running_loop()
         for received in (signal.SIGTERM, signal.SIGINT):
-            # `stop()` stops claiming and gives in-flight work rqueue's
-            # `shutdown_timeout` (30 seconds by default). A simulation runs for
-            # tens of minutes, so rqueue cancels it and returns the lease as
-            # `pending`. The next worker resumes from the checkpoints in the
-            # work directory.
-            #
-            # "detach" lets `run()` return once the leases are back, so the
-            # pool closes. It does not stop the abandoned kernel thread. That
-            # thread fails at its next progress write because its loop is gone.
+            # A simulation outlasts rqueue's shutdown timeout, so it is
+            # cancelled and the next worker resumes from the checkpoints.
             loop.add_signal_handler(received, worker.stop)
 
         stop_maintenance = asyncio.Event()
@@ -132,6 +121,7 @@ async def run() -> None:
 
 
 def main() -> None:  # pragma: no cover
+    require_model_assets()
     if NUMBA_THREADS is not None:
         numba.set_num_threads(NUMBA_THREADS)
         logger.info(
@@ -141,19 +131,8 @@ def main() -> None:  # pragma: no cover
 
     asyncio.run(run())
 
-    # `run()` returning means the leases are back and the pool is closed. An
-    # abandoned kernel thread can still be alive because the worker runs with
-    # `executor_shutdown="detach"`.
-    #
-    # Executor threads are non-daemon, and CPython joins every non-daemon
-    # thread during interpreter shutdown. Returning from `main()` would park
-    # the process until the simulation ends, which is the wait "detach" exists
-    # to avoid. Detaching is safe only because the process exits instead of
-    # being reused.
-    #
-    # Nothing durable is lost. The leases are back, the pool is closed, and the
-    # abandoned thread's writes are fenced. `os._exit` skips the log flush, so
-    # flush first.
+    # An abandoned kernel thread may still run, and CPython would join it on a
+    # normal exit. Its writes are fenced, so exit without waiting.
     logging.shutdown()
     os._exit(0)
 

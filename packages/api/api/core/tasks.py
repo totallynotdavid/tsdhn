@@ -1,15 +1,8 @@
 """Queue tasks for simulation runs and worker maintenance.
 
-The simulation kernel runs on a thread that Python cannot kill. When rqueue
-cancels the handler coroutine after the lease is lost, the thread keeps
-running and can still write for a job that another attempt now owns. Two
-fences stop it from harming that attempt.
-
-The database fence is `compute.jobs.owner_attempt`, checked in the same
-statement as every write (see `repository.mark_started`). The workspace fence
-is an exclusive `flock` on a lock file beside the workspace (see
-`claim_workspace`). `ARCHITECTURE.md` describes the ownership rules they
-implement.
+The kernel thread outlives a cancelled handler, so two fences keep it from
+harming the attempt that took over: `compute.jobs.owner_attempt` in the
+database and an exclusive `flock` on the workspace.
 """
 
 import asyncio
@@ -39,13 +32,13 @@ from rqueue.models import TERMINAL_STATES
 
 from api.core import db, repository
 from api.core.errors import TransientInfraError
+from api.core.lifecycle import JOB_ID_RE, JOB_RETENTION, TERMINAL_STATUSES
 from api.core.queue import get_queue
 from api.core.settings import COMPUTE_QUEUE, JOBS_DIR
 from tsdhn.domain import EarthquakeInput, JobStatus
 from tsdhn.engine import run_simulation
 
 __all__ = [
-    "JOB_RETENTION",
     "MAX_ATTEMPTS",
     "RUN_SIMULATION",
     "TRANSIENT_RETRY",
@@ -68,12 +61,7 @@ RUN_SIMULATION = "api.run_simulation"
 
 
 class AbandonedAttempt(Exception):
-    """Raised in the kernel thread when its attempt no longer owns the job.
-
-    `run_simulation_task` converts it to `rqueue.CancelJob` when the coroutine
-    is still awaiting the thread. After cancellation nothing receives it and
-    the thread ends.
-    """
+    """Raised in the kernel thread when its attempt no longer owns the job."""
 
 
 MAX_ATTEMPTS = 3
@@ -84,58 +72,28 @@ TRANSIENT_RETRY = RetryPolicy(
     retry_on=(TransientInfraError,),
 )
 
-# A simulation runs for tens of minutes and has no meaningful upper bound, so
-# it is left untimed. rqueue's lease recovery, not a timeout, reclaims a run
+# A simulation has no meaningful upper bound. Lease recovery reclaims a run
 # whose worker died.
 RUN_TIMEOUT_SECONDS: float | None = None
 
-# The lock lives beside the workspace, not inside it. `prepare_simulation_workspace`
-# removes the whole directory when a run starts without resuming, which would
-# remove the lock too.
+# Beside the workspace, not inside it: a fresh run removes the whole directory.
 WORKSPACE_LOCK_SUFFIX = ".lock"
 
-# Keep terminal workspaces for local inspection and manual recovery.
 WORK_DIR_TTL = timedelta(hours=24)
 SWEEP_INTERVAL_SECONDS = 3600.0
 
-# How long a queue job must have been terminal before reconciliation claims it.
-# A terminal queue row implies that no worker holds its lease. The grace covers
-# a worker that was wedged long enough to lose its lease and then writes its
-# own outcome after rqueue has failed the row. Five minutes is longer than any
-# such write.
+# Longer than any write by a worker that lost its lease and reports after
+# rqueue failed the row.
 RECONCILE_GRACE = timedelta(minutes=5)
-
-# Shorter than the sweep interval because this pass ends a user-visible stuck
-# `running` status, while the sweep only reclaims disk. The pass is one indexed
-# statement over jobs the queue has already finished. The stuck window is
-# bounded by the lease duration plus the grace, not by this interval.
 RECONCILE_INTERVAL_SECONDS = 60.0
 
-# Strong references to cancellation drain tasks, which asyncio would otherwise
-# hold only weakly, until they have released the claim their thread returned.
+# asyncio holds tasks weakly.
 _CLAIM_DRAIN_TASKS: set[asyncio.Task[None]] = set()
 
-# A terminal queue row has no application value after the handler records its
-# outcome. Its attempt history is kept for a week. `compute.jobs` is never
-# purged.
-JOB_RETENTION = timedelta(days=7)
 PURGE_INTERVAL_SECONDS = 3600.0
 
-# Bounds each purge pass so a first run against a long-unpurged table does not
-# hold one enormous delete open. The next hourly pass takes the rest.
+# Bounds one purge pass; the next pass takes the rest.
 PURGE_LIMIT = 10000
-
-# `compute.jobs` uses application statuses, not rqueue's states. A queue row
-# may be purged only after its compute job has one of these statuses.
-COMPUTE_TERMINAL_STATUSES = (
-    JobStatus.COMPLETED.value,
-    JobStatus.FAILED.value,
-)
-
-# Keeps the `::uuid` cast in the purge CTE from aborting the statement on a
-# malformed payload. `repository.CANONICAL_UUID_RE` does the same for
-# reconciliation.
-COMPUTE_JOB_ID_RE = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
 
 def decode_payload(payload: Any) -> uuid.UUID:
@@ -170,10 +128,8 @@ async def enqueue_simulation(
 class WorkspaceClaim:
     """One exclusive `flock` on a workspace, closed by whichever holder releases last.
 
-    The kernel thread holds one share, and the coroutine holds the other until
-    the result upload finishes. They can end in either order because a
-    cancelled coroutine ends while the kernel thread is still running. The
-    descriptor, and the lock with it, closes when both shares are released.
+    The kernel thread and the coroutine each hold a share and can end in either
+    order.
     """
 
     def __init__(self, fd: int, shares: int = 2) -> None:
@@ -199,27 +155,8 @@ def _lock_path(work_dir: Path) -> Path:
 def claim_workspace(work_dir: Path, attempt: int) -> tuple[WorkspaceClaim, bool]:
     """Take this attempt's exclusive claim on `work_dir` and return whether to resume.
 
-    The workspace is keyed by simulation id, not by attempt, so the database
-    fence does not protect it. An abandoned kernel thread keeps writing
-    checkpoints, and a replacement that resumed from a half-written one would
-    produce a wrong scientific result instead of an error.
-
-    The claim carries two shares (see `WorkspaceClaim`) because it must outlast
-    the kernel. `complete_job` reads the result files after the kernel thread
-    returns.
-
-    Raises `TransientInfraError` while another live holder has the lock, so
-    rqueue's backoff waits for an abandoned thread to unwind.
-
-    `flock` is held on the open file description, so it also refuses a second
-    attempt from another thread of this process. The kernel drops it when the
-    holding process dies, so a worker crash leaves the workspace resumable.
-    `scripts/e2e/crash_recovery_e2e.sh` scenario 1 depends on that.
-
-    Two limits are accepted. An abandoned thread that never reaches another
-    progress write keeps the claim until it finishes, and the replacement can
-    exhaust its attempts waiting. `flock` also protects a single host only, so
-    workers on different hosts sharing one network volume are not covered.
+    Raises `TransientInfraError` while another holder has the lock, so rqueue's
+    backoff waits for an abandoned kernel thread to unwind.
     """
     lock_path = _lock_path(work_dir)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -228,20 +165,14 @@ def claim_workspace(work_dir: Path, attempt: int) -> tuple[WorkspaceClaim, bool]
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as e:
-            # Transient because the previous attempt's thread unwinds at its
-            # next progress write, which the database fence refuses.
             raise TransientInfraError(
                 f"simulation workspace {work_dir.name} is still held by an "
                 "earlier attempt"
             ) from e
         os.ftruncate(fd, 0)
         os.write(fd, f"attempt {attempt}\n".encode())
-        # Checked under the lock. Without it the directory could be mid-write
-        # by another attempt.
         return WorkspaceClaim(fd), work_dir.exists()
     except BaseException:
-        # This function owns the descriptor until the claim is returned. That
-        # includes failures after `flock` succeeds.
         with contextlib.suppress(OSError):
             os.close(fd)
         raise
@@ -254,13 +185,8 @@ async def _release_unreceived_claim(
     try:
         claim, _resume = await claim_future
     except Exception, asyncio.CancelledError:
-        # Nothing was received, so there is nothing to release. `claim_workspace`
-        # closes its own descriptor when it fails, and a cancelled future never
-        # produced a claim. `SystemExit` and `GeneratorExit` are left to
-        # propagate.
         return
-    # Cancellation won before the coroutine received the claim, so its normal
-    # path never releases its share. The drain owns both shares.
+    # The coroutine never received the claim, so the drain owns both shares.
     claim.release()
     claim.release()
 
@@ -270,9 +196,8 @@ async def _claim_workspace_safely(
 ) -> tuple[WorkspaceClaim, bool]:
     """Claim a workspace without leaking the claim when cancelled.
 
-    `asyncio.to_thread` cannot stop a thread that already holds the lock. The
-    task is shielded so the thread finishes. If cancellation wins before this
-    coroutine receives the claim, a detached drain task releases both shares.
+    The thread cannot be stopped once it holds the lock, so it is shielded and
+    a detached drain task releases the claim if cancellation wins.
     """
     claim_future = asyncio.create_task(
         asyncio.to_thread(claim_workspace, work_dir, attempt)
@@ -289,21 +214,16 @@ async def _claim_workspace_safely(
 def remove_workspace(work_dir: Path) -> bool:
     """Remove a workspace and its lock unless something still holds the lock.
 
-    The lock is taken before the unlink. Unlinking a locked file drops the
-    directory entry while the holder keeps its lock on the orphaned inode, so
-    the next `O_CREAT` at that path locks a new inode without contention and
-    two threads both believe they own the workspace. The sweep can reach a
-    terminal job whose kernel thread is still alive, so this can happen.
+    The lock is taken before the unlink because unlinking a locked file lets the
+    next `O_CREAT` lock a new inode without contention.
 
-    Returns whether the workspace was removed. A refusal is not an error, and
-    the next sweep retries.
+    Returns whether the workspace was removed. A refusal is not an error.
     """
     lock_path = _lock_path(work_dir)
     try:
         fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
     except OSError:
-        # No lock file exists and none can be created, so nothing has claimed
-        # this workspace.
+        # No lock file exists and none can be created: nothing claimed it.
         shutil.rmtree(work_dir, ignore_errors=True)
         return True
     try:
@@ -411,48 +331,29 @@ async def run_simulation_task(compute_job_id: uuid.UUID, context: TaskContext) -
 
     claim: WorkspaceClaim | None = None
     try:
-        # rqueue installs a ThreadPoolExecutor sized from the worker's
-        # concurrency as the loop's default executor, which bounds these hops.
         held, resume = await _claim_workspace_safely(work_dir, context.attempt)
         claim = held
         result = await asyncio.to_thread(run_kernel_if_not_cancelled, held, resume)
         async with db.acquire() as conn:
-            # The claim is still held. `complete_job` reads the result files
-            # from the workspace, and releasing the lock earlier would let a
-            # redelivered attempt write into the directory being uploaded.
+            # `complete_job` reads the workspace, so the claim stays held.
             recorded = await repository.complete_job(conn, row, result, context.attempt)
     except asyncio.CancelledError:
-        # rqueue cancels this coroutine when the heartbeat finds the lease gone.
-        # The kernel thread keeps running, so tell it to stop.
+        # The lease is gone but the kernel thread keeps running, so stop it.
         abandoned.set()
         with kernel_state_guard:
             kernel_cancelled = True
             kernel_was_started = kernel_started
         if claim is not None and not kernel_was_started:
-            # The executor may cancel a queued work item before `run_kernel`
-            # reaches its `finally`. Release the kernel's share here in that case.
+            # The kernel never started, so its `finally` will not release it.
             claim.release()
         raise
     except AbandonedAttempt as e:
-        # A refused write, not a broken run. This is the only path where the
-        # coroutine is still live when the fence fires. Letting it reach
-        # `except Exception` would record a failure and log tracebacks for the
-        # fence working correctly, and rqueue's failure accounting has to mean
-        # genuine failures.
-        #
-        # `CancelJob` means stop without retry. A newer attempt owns the row or
-        # the job is terminal, so this attempt's lease is already gone and
-        # rqueue's finalization will hit `LeaseLost`. If the lease survived,
-        # the job becomes `cancelled`, which reconciliation treats as the queue
-        # giving up.
+        # A refused write means the fence is working. Stop without retrying or
+        # recording a failure.
         logger.warning("Standing down attempt %d: %s", context.attempt, e)
         raise CancelJob(str(e)) from e
     except Exception as e:
-        # Finalization is as retryable as the run. A MinIO outage raises
-        # `TransientInfraError` from `complete_job`, and the retry must be
-        # visible in compute.jobs. `record_failure` refuses to touch a terminal
-        # row, so an UPDATE that committed before the connection dropped is
-        # not reported as a failure.
+        # This also covers `complete_job`. A MinIO outage is retryable.
         await _record_failure(compute_job_id, simulation_id, e, context)
         raise
     finally:
@@ -460,26 +361,17 @@ async def run_simulation_task(compute_job_id: uuid.UUID, context: TaskContext) -
             claim.release()
 
     if not recorded:
-        # Superseded between the last progress write and here. `complete_job`
-        # already logged the orphaned upload. Do not remove the work directory,
-        # because the attempt that took over is resuming from it.
+        # Keep the workspace so the attempt that took over can resume from it.
         raise CancelJob(
             f"attempt {context.attempt} of compute job {compute_job_id} "
             "no longer owns this job"
         )
 
-    # The claim was released above. `remove_workspace` takes the lock again
-    # itself, because unlinking a held lock file creates two owners.
     await _remove_finished_workspace(work_dir, compute_job_id)
 
 
 async def _remove_finished_workspace(work_dir: Path, compute_job_id: uuid.UUID) -> bool:
-    """Remove a finished job's workspace and log when a held lock prevented it.
-
-    Nothing retries after a refusal. The periodic sweep reclaims the
-    directory, which depends on `list_abandoned_work_dirs` selecting completed
-    jobs as well as failed ones. Returns what `remove_workspace` returned.
-    """
+    """Remove a finished job's workspace; the periodic sweep reclaims a refusal."""
     removed = await asyncio.to_thread(remove_workspace, work_dir)
     if not removed:
         logger.warning(
@@ -495,17 +387,13 @@ async def _stand_down(compute_job_id: uuid.UUID, work_dir: Path, attempt: int) -
     """Finish an attempt whose `mark_started` claim was refused.
 
     Returns for a redelivery of a completed job and raises `CancelJob`
-    otherwise. The status read only chooses between those two outcomes, so a
-    stale read is harmless.
+    otherwise.
     """
     async with db.acquire() as conn:
         current = await repository.fetch_by_id(conn, compute_job_id)
 
     if current is not None and current["status"] == JobStatus.COMPLETED.value:
-        # rqueue delivers at least once. A worker that died between
-        # `complete_job`'s commit and rqueue's finalization gets the job again.
-        # The result is durable, so this delivery succeeds after finishing the
-        # workspace removal the dead attempt may not have reached.
+        # At-least-once delivery: the result is already durable.
         logger.info(
             "Compute job %s is already completed; skipping redelivered attempt %d",
             compute_job_id,
@@ -514,9 +402,7 @@ async def _stand_down(compute_job_id: uuid.UUID, work_dir: Path, attempt: int) -
         await _remove_finished_workspace(work_dir, compute_job_id)
         return
 
-    # Either a newer attempt owns the row, or the queue gave up and
-    # reconciliation already marked it failed. In the second case this attempt
-    # is the wedged one whose lease was spent, and it must not reopen the row.
+    # A newer attempt owns the row, or reconciliation already failed it.
     logger.warning(
         "Compute job %s is not attempt %d's to run (status %s); standing down",
         compute_job_id,
@@ -549,15 +435,8 @@ async def _record_failure(
 ) -> None:
     """Persist a failed run using the retry decision rqueue is about to make.
 
-    The worker repeats the `context.will_retry` call when it finalizes the
-    handler, so the `details` a client sees cannot differ from what the queue
-    does with the job.
-
-    `TRANSIENT_RETRY` cannot answer this. It holds the budget from task
-    registration, while the job carries its own, which `Admin.retry_job`
-    raises when an operator restarts a failed job. On attempt 3 of a budget
-    widened to 5 the job will be retried, but the registered policy would
-    record `failed`.
+    `context.will_retry` reads the job's own attempt budget, which
+    `Admin.retry_job` can raise. The registered `TRANSIENT_RETRY` cannot.
     """
     try:
         async with db.acquire() as conn:
@@ -615,8 +494,8 @@ async def _eligible_queue_job_ids(
             COMPUTE_QUEUE,
             list(TERMINAL_STATES),
             cutoff,
-            COMPUTE_JOB_ID_RE,
-            list(COMPUTE_TERMINAL_STATUSES),
+            JOB_ID_RE,
+            list(TERMINAL_STATUSES),
             PURGE_LIMIT,
         )
     return [row["id"] for row in rows]

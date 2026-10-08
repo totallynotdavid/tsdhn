@@ -3,6 +3,9 @@ from pathlib import Path
 from urllib.parse import quote, urlsplit, urlunsplit
 
 __all__ = [
+    "ALLOWED_ORIGINS",
+    "API_HOST",
+    "API_PORT",
     "APP_DB_PASSWORD",
     "APP_DB_ROLE",
     "COMPUTE_DATABASE_URL",
@@ -56,8 +59,8 @@ LOG_LEVEL = os.environ.get("TSDHN_LOG_LEVEL", "INFO").upper()
 
 # Zero keeps the pool lazy, so a process starts before PostgreSQL is reachable
 # and reports the outage through /health instead of refusing to boot.
-DB_POOL_MIN_SIZE = int(os.environ.get("DB_POOL_MIN_SIZE", "0"))
-DB_POOL_MAX_SIZE = int(os.environ.get("DB_POOL_MAX_SIZE", "10"))
+DB_POOL_MIN_SIZE = int(os.environ.get("TSDHN_DB_POOL_MIN_SIZE", "0"))
+DB_POOL_MAX_SIZE = int(os.environ.get("TSDHN_DB_POOL_MAX_SIZE", "10"))
 
 # One simulation saturates the machine's cores, so the worker runs one job at a
 # time unless a deployment says otherwise.
@@ -133,22 +136,32 @@ def role_database_url(role: str, password: str) -> str:
     return urlunsplit(parts._replace(netloc=f"{credentials}@{authority}"))
 
 
-MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "localhost:9000")
+MINIO_ENDPOINT = os.environ.get("TSDHN_MINIO_ENDPOINT", "localhost:9000")
 # Browsers download from this endpoint, which can differ from the one the API
 # uploads to.
-MINIO_PUBLIC_ENDPOINT = os.environ.get("MINIO_PUBLIC_ENDPOINT", MINIO_ENDPOINT)
-MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
-MINIO_BUCKET = os.environ.get("MINIO_BUCKET", "tsdhn-results")
-MINIO_SECURE = os.environ.get("MINIO_SECURE", "false").lower() in {
+MINIO_PUBLIC_ENDPOINT = os.environ.get("TSDHN_MINIO_PUBLIC_ENDPOINT", MINIO_ENDPOINT)
+MINIO_ACCESS_KEY = os.environ.get("TSDHN_MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.environ.get("TSDHN_MINIO_SECRET_KEY", "minioadmin")
+MINIO_BUCKET = os.environ.get("TSDHN_MINIO_BUCKET", "tsdhn-results")
+MINIO_SECURE = os.environ.get("TSDHN_MINIO_SECURE", "false").lower() in {
     "1",
     "true",
     "yes",
 }
 
-OUTPUT_URL_TTL = int(os.environ.get("OUTPUT_URL_TTL_SECONDS", str(15 * 60)))
+OUTPUT_URL_TTL = int(os.environ.get("TSDHN_OUTPUT_URL_TTL_SECONDS", str(15 * 60)))
 
-SSE_MAX_DURATION = int(os.environ.get("SSE_MAX_DURATION_SECONDS", str(30 * 60)))
+SSE_MAX_DURATION = int(os.environ.get("TSDHN_SSE_MAX_DURATION_SECONDS", str(30 * 60)))
+
+# Comma-separated browser origins allowed to call the API directly.
+ALLOWED_ORIGINS = [
+    origin
+    for origin in os.environ.get("TSDHN_ALLOWED_ORIGINS", "").split(",")
+    if origin
+]
+
+API_HOST = os.environ.get("TSDHN_HOST", "127.0.0.1")
+API_PORT = int(os.environ.get("TSDHN_PORT", "8000"))
 
 # Unset means Numba uses the CPUs visible to the process.
 NUMBA_THREADS: int | None = (

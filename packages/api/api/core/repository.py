@@ -16,6 +16,7 @@ import anyio
 import asyncpg
 
 from api.core.db import JobRow, acquire, notify_channel, transient_connection_errors
+from api.core.lifecycle import JOB_ID_RE, TERMINAL_STATUSES
 from api.core.storage import iso, output_store
 from tsdhn.domain import EarthquakeInput, JobStatus
 from tsdhn.engine import SimulationResult
@@ -57,14 +58,6 @@ RECONCILED_ERROR = (
 # The queue records it only after `run_simulation_task` returned, which happens
 # only after `complete_job` committed compute.jobs.
 QUEUE_GAVE_UP = ("failed", "cancelled")
-
-# A job that reported its own outcome is never overwritten, by anyone.
-TERMINAL_STATUSES = [JobStatus.COMPLETED.value, JobStatus.FAILED.value]
-
-# The canonical form `str(uuid.UUID(...))` produces, and the only form
-# `enqueue_simulation` writes. Reconciliation skips any other form instead of
-# casting it. See `_reconcile_sql`.
-CANONICAL_UUID_RE = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
 # The jsonb columns come back as text and are decoded below.
 _JSON_COLUMNS = ("input_params", "calculation", "travel_times", "outputs")
@@ -356,7 +349,7 @@ async def reconcile_terminal_jobs(
             list(QUEUE_GAVE_UP),
             cutoff,
             TERMINAL_STATUSES,
-            CANONICAL_UUID_RE,
+            JOB_ID_RE,
         )
         # Same transaction as the update, so a watching SSE stream wakes only
         # for a state that has committed.
