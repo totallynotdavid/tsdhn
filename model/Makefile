@@ -1,15 +1,16 @@
-VER=ifort
-com=-parallel
+FC = ifx
+FFLAGS = -O -parallel
+OUT = .
 
-deform: def_oka.f
-	$(VER) -O def_oka.f -o deform $(com)
-espejo: espejo.f
-	$(VER) -O espejo.f -o espejo $(com)
-fault_plane: fault_plane.f90 physical_constants.inc
-	$(VER) -O fault_plane.f90 -o fault_plane $(com)
-reporte: reporte.f90
-	$(VER) -O reporte.f90 -o reporte
-ttt_max: ttt_max.f90
-	$(VER) -O ttt_max.f90 -o ttt_max $(com)
-tsunami: tsunami1.for physical_constants.inc
-	$(VER) -O tsunami1.for -o tsunami $(com) -qopenmp
+all: $(OUT)/deform $(OUT)/fault_plane $(OUT)/tsunami
+
+$(OUT)/deform: def_oka.f
+	$(FC) $(FFLAGS) def_oka.f -o $@
+
+$(OUT)/fault_plane: fault_plane.f90 physical_constants.inc
+	$(FC) $(FFLAGS) fault_plane.f90 -o $@
+
+$(OUT)/tsunami: tsunami1.for physical_constants.inc
+	$(FC) $(FFLAGS) -qopenmp tsunami1.for -o $@
+
+.PHONY: all

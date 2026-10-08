@@ -9,7 +9,7 @@ set -euo pipefail
 #   mise run install
 #   mise run web-install
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TOOLS_DIR="${TSDHN_TOOLS_DIR:-$ROOT_DIR/.tsdhn/tools}"
 ENV_FILE="$ROOT_DIR/.tsdhn/env"
 
@@ -30,7 +30,7 @@ log_error() { printf "error: %s\n" "$1" >&2; }
 
 usage() {
     cat <<EOF
-Usage: ./setup.sh [options]
+Usage: scripts/setup.sh [options]
 
 Options:
   --yes              Run without confirmation prompts.
@@ -319,10 +319,7 @@ if [[ "$BUILD_TOOLS" == true ]]; then
     }
 
     mkdir -p "$TOOLS_DIR"
-    run "Compiling fault_plane" ifx -parallel "$ROOT_DIR/model/fault_plane.f90" -o "$TOOLS_DIR/fault_plane"
-    run "Compiling deform" ifx -parallel "$ROOT_DIR/model/def_oka.f" -o "$TOOLS_DIR/deform"
-    run "Compiling tsunami" ifx -parallel -qopenmp "$ROOT_DIR/model/tsunami1.for" -o "$TOOLS_DIR/tsunami"
-    chmod +x "$TOOLS_DIR/fault_plane" "$TOOLS_DIR/deform" "$TOOLS_DIR/tsunami"
+    run "Compiling model executables" make -C "$ROOT_DIR/model" OUT="$TOOLS_DIR"
 fi
 
 mkdir -p "$(dirname "$ENV_FILE")"
