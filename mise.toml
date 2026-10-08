@@ -57,8 +57,8 @@ build = [
   "uv build --package tsdhn-api --out-dir dist/api",
 ]
 
-api = "uv run tsdhn-api"
-worker = "uv run tsdhn-worker"
+api = { description = "Run the API against the local PostgreSQL", env = { _ = { file = ".env" } }, run = "uv run tsdhn-api" }
+worker = { description = "Run the simulation worker against the local PostgreSQL", env = { _ = { file = ".env" } }, run = "uv run tsdhn-worker" }
 
 web-install = "bun install"
 web-dev = "bun --filter web dev"
@@ -162,6 +162,7 @@ rm -rf "$PWD/.data/postgres"
 [tasks."db:migrate"]
 description = "Apply compute, queue, and web migrations to local PostgreSQL"
 depends = ["db:start"]
+env = { _ = { file = ".env" } }
 run = [
   "uv run tsdhn-compute-migrate",
   "uv run rqueue --database-url \"${COMPUTE_DATABASE_URL:-postgresql://tsdhn:tsdhn@127.0.0.1:${TSDHN_PG_PORT:-5432}/tsdhn}\" --schema \"${COMPUTE_QUEUE_SCHEMA:-task_queue}\" migrate",

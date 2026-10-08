@@ -30,9 +30,9 @@ jobs:
             COMPUTE_PURGER_PASSWORD: compose-e2e-purger-password
             BETTER_AUTH_SECRET: compose-e2e-better-auth-secret
             ORIGIN: http://localhost:3000
-            MINIO_ACCESS_KEY: minioadmin
-            MINIO_SECRET_KEY: minioadmin
-            MINIO_BUCKET: tsdhn-results
+            TSDHN_MINIO_ACCESS_KEY: minioadmin
+            TSDHN_MINIO_SECRET_KEY: minioadmin
+            TSDHN_MINIO_BUCKET: tsdhn-results
         steps:
             - uses: actions/checkout@v7
 

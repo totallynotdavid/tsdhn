@@ -3,9 +3,9 @@ set -euo pipefail
 
 : "${SIMULATION_ID:=4cfe522f-7e7d-46e0-96ca-7b98743fb9f5}"
 : "${COMPUTE_API_TOKEN:=compose-e2e-token}"
-: "${MINIO_ACCESS_KEY:=minioadmin}"
-: "${MINIO_SECRET_KEY:=minioadmin}"
-: "${MINIO_BUCKET:=tsdhn-results}"
+: "${TSDHN_MINIO_ACCESS_KEY:=minioadmin}"
+: "${TSDHN_MINIO_SECRET_KEY:=minioadmin}"
+: "${TSDHN_MINIO_BUCKET:=tsdhn-results}"
 : "${COMPUTE_API_URL:=http://localhost:8000}"
 : "${COMPUTE_QUEUE_SCHEMA:=task_queue}"
 : "${COMPUTE_QUEUE:=simulations}"
@@ -25,8 +25,8 @@ wait_for_api() {
 
 create_results_bucket() {
     docker compose exec -T minio \
-        mc alias set local http://127.0.0.1:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
-    docker compose exec -T minio mc mb --ignore-existing "local/$MINIO_BUCKET"
+        mc alias set local http://127.0.0.1:9000 "$TSDHN_MINIO_ACCESS_KEY" "$TSDHN_MINIO_SECRET_KEY"
+    docker compose exec -T minio mc mb --ignore-existing "local/$TSDHN_MINIO_BUCKET"
 }
 
 submit_idempotent_simulation() {
@@ -160,9 +160,9 @@ assert_completed_outputs() {
       and (.travel_times | type == "object")
     ' final-status.json
 
-    docker compose exec -T minio mc stat "local/$MINIO_BUCKET/simulations/$SIMULATION_ID/metadata.json"
-    docker compose exec -T minio mc stat "local/$MINIO_BUCKET/simulations/$SIMULATION_ID/outputs/calculation.json"
-    docker compose exec -T minio mc stat "local/$MINIO_BUCKET/simulations/$SIMULATION_ID/outputs/travel_times.csv"
+    docker compose exec -T minio mc stat "local/$TSDHN_MINIO_BUCKET/simulations/$SIMULATION_ID/metadata.json"
+    docker compose exec -T minio mc stat "local/$TSDHN_MINIO_BUCKET/simulations/$SIMULATION_ID/outputs/calculation.json"
+    docker compose exec -T minio mc stat "local/$TSDHN_MINIO_BUCKET/simulations/$SIMULATION_ID/outputs/travel_times.csv"
 
     persisted="$(
         docker compose exec -T postgres psql -U tsdhn -d tsdhn -tAc \

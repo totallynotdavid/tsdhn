@@ -38,12 +38,12 @@ RUN command -v gmt \
 RUN mkdir -p /var/tmp/jobs \
  && chown -R appuser:appuser /app /var/tmp/jobs
 
-ENV APP_HOST=0.0.0.0 \
-    APP_PORT=8000 \
-    MINIO_ENDPOINT=minio:9000 \
-    MINIO_ACCESS_KEY=minioadmin \
-    MINIO_SECRET_KEY=minioadmin \
-    MINIO_BUCKET=tsdhn-results \
+ENV TSDHN_HOST=0.0.0.0 \
+    TSDHN_PORT=8000 \
+    TSDHN_MINIO_ENDPOINT=minio:9000 \
+    TSDHN_MINIO_ACCESS_KEY=minioadmin \
+    TSDHN_MINIO_SECRET_KEY=minioadmin \
+    TSDHN_MINIO_BUCKET=tsdhn-results \
     TSDHN_MODEL_DIR=/app/model \
     TSDHN_JOBS_DIR=/var/tmp/jobs \
     HOME=/var/tmp

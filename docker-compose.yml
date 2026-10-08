@@ -19,8 +19,8 @@ services:
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${TSDHN_MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${TSDHN_MINIO_SECRET_KEY:-minioadmin}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -78,16 +78,16 @@ services:
       minio:
         condition: service_healthy
     environment:
-      COMPUTE_RUNTIME_DATABASE_URL: ${COMPUTE_RUNTIME_DATABASE_URL:-postgresql://postgres:5432/tsdhn}
+      COMPUTE_RUNTIME_DATABASE_URL: postgresql://postgres:5432/tsdhn
       COMPUTE_QUEUE: ${COMPUTE_QUEUE:-simulations}
       COMPUTE_QUEUE_SCHEMA: ${COMPUTE_QUEUE_SCHEMA:-task_queue}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-localhost:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:-tsdhn-results}
+      TSDHN_MINIO_ENDPOINT: minio:9000
+      TSDHN_MINIO_PUBLIC_ENDPOINT: ${TSDHN_MINIO_PUBLIC_ENDPOINT:-localhost:9000}
+      TSDHN_MINIO_ACCESS_KEY: ${TSDHN_MINIO_ACCESS_KEY:-minioadmin}
+      TSDHN_MINIO_SECRET_KEY: ${TSDHN_MINIO_SECRET_KEY:-minioadmin}
+      TSDHN_MINIO_BUCKET: ${TSDHN_MINIO_BUCKET:-tsdhn-results}
       COMPUTE_API_TOKEN: ${COMPUTE_API_TOKEN:?set COMPUTE_API_TOKEN in .env}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      TSDHN_ALLOWED_ORIGINS: ${TSDHN_ALLOWED_ORIGINS:-}
       COMPUTE_PRODUCER_ROLE: ${COMPUTE_PRODUCER_ROLE:-tsdhn_producer}
       COMPUTE_PRODUCER_PASSWORD: ${COMPUTE_PRODUCER_PASSWORD:?set COMPUTE_PRODUCER_PASSWORD in .env}
     ports:
@@ -108,13 +108,13 @@ services:
       minio:
         condition: service_healthy
     environment:
-      COMPUTE_RUNTIME_DATABASE_URL: ${COMPUTE_RUNTIME_DATABASE_URL:-postgresql://postgres:5432/tsdhn}
+      COMPUTE_RUNTIME_DATABASE_URL: postgresql://postgres:5432/tsdhn
       COMPUTE_QUEUE: ${COMPUTE_QUEUE:-simulations}
       COMPUTE_QUEUE_SCHEMA: ${COMPUTE_QUEUE_SCHEMA:-task_queue}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:-tsdhn-results}
+      TSDHN_MINIO_ENDPOINT: minio:9000
+      TSDHN_MINIO_ACCESS_KEY: ${TSDHN_MINIO_ACCESS_KEY:-minioadmin}
+      TSDHN_MINIO_SECRET_KEY: ${TSDHN_MINIO_SECRET_KEY:-minioadmin}
+      TSDHN_MINIO_BUCKET: ${TSDHN_MINIO_BUCKET:-tsdhn-results}
       TSDHN_MODEL_DIR: /app/model
       TSDHN_JOBS_DIR: /var/tmp/jobs
       COMPUTE_WORKER_ROLE: ${COMPUTE_WORKER_ROLE:-tsdhn_worker}

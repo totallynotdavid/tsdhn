@@ -5,9 +5,9 @@ set -euo pipefail
 : "${CRASH_SIMULATION_ID:=b6e1f5a0-2c1b-4a7c-9c7a-3f7b6a5d9e11}"
 : "${TRANSIENT_SIMULATION_ID:=c1a2b3c4-5d6e-4f70-8a9b-0c1d2e3f4a5b}"
 : "${COMPUTE_API_TOKEN:=compose-e2e-token}"
-: "${MINIO_ACCESS_KEY:=minioadmin}"
-: "${MINIO_SECRET_KEY:=minioadmin}"
-: "${MINIO_BUCKET:=tsdhn-results}"
+: "${TSDHN_MINIO_ACCESS_KEY:=minioadmin}"
+: "${TSDHN_MINIO_SECRET_KEY:=minioadmin}"
+: "${TSDHN_MINIO_BUCKET:=tsdhn-results}"
 : "${COMPUTE_API_URL:=http://localhost:8000}"
 : "${COMPUTE_QUEUE_SCHEMA:=task_queue}"
 # The crash must happen after the resumable step writes a checkpoint.
@@ -31,8 +31,8 @@ wait_for_api() {
 
 create_results_bucket() {
     docker compose exec -T minio \
-        mc alias set local http://127.0.0.1:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
-    docker compose exec -T minio mc mb --ignore-existing "local/$MINIO_BUCKET"
+        mc alias set local http://127.0.0.1:9000 "$TSDHN_MINIO_ACCESS_KEY" "$TSDHN_MINIO_SECRET_KEY"
+    docker compose exec -T minio mc mb --ignore-existing "local/$TSDHN_MINIO_BUCKET"
 }
 
 submit_simulation() {
@@ -157,7 +157,7 @@ scenario_crash_and_requeue() {
     }
     echo "Confirmed: worker log shows checkpoint resume"
 
-    docker compose exec -T minio mc stat "local/$MINIO_BUCKET/simulations/$CRASH_SIMULATION_ID/metadata.json"
+    docker compose exec -T minio mc stat "local/$TSDHN_MINIO_BUCKET/simulations/$CRASH_SIMULATION_ID/metadata.json"
 }
 
 scenario_ttl_sweep() {
