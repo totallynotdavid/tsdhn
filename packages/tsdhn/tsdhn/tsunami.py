@@ -43,8 +43,7 @@ _FLUSH = np.float32(1.0e-5)
 
 
 def _read_xyo_dat(path: Path) -> tuple[int, int, int, int]:
-    # Parse the first four tokens; trailing values are padding from fault-plane.
-    ids, ide, jds, jde = path.read_text().split()[:4]
+    ids, ide, jds, jde = path.read_text().split()
     return int(float(ids)), int(float(ide)), int(float(jds)), int(float(jde))
 
 

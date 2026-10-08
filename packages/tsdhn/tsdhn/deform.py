@@ -221,9 +221,7 @@ def _parse_pfalla_inp(
 
 
 def _parse_xyo_dat(path: Path) -> tuple[int, int, int, int]:
-    # The legacy reader consumes four tokens; trailing grid dimensions are
-    # padding written by the fault-plane step.
-    ids, ide, jds, jde = path.read_text().split()[:4]
+    ids, ide, jds, jde = path.read_text().split()
     return int(float(ids)), int(float(ide)), int(float(jds)), int(float(jde))
 
 

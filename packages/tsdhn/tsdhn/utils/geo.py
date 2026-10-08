@@ -6,6 +6,11 @@ import numpy as np
 from tsdhn.constants import MEAN_EARTH_KILOMETERS_PER_DEGREE
 
 
+def to_0_360(lon: Any) -> Any:
+    """Convert longitudes to the 0..360 frame of the model grids."""
+    return lon % 360.0
+
+
 def calculate_distance_to_coast(
     coast_points: np.ndarray, lon0: float, lat0: float
 ) -> float:

@@ -28,6 +28,7 @@ from tsdhn.utils.geo import (
     determine_epicenter_location,
     determine_tsunami_warning,
     format_arrival_time,
+    to_0_360,
 )
 
 logger = logging.getLogger(__name__)
@@ -149,6 +150,21 @@ def calculate_rectangle_parameters(
     return params, corners
 
 
+def nearest_focal_mechanism(
+    mecfoc: np.ndarray, lon: float, lat: float
+) -> tuple[float, float]:
+    """Return (strike, dip) of the Global CMT mechanism nearest the epicenter.
+
+    The inputs omit strike. Distances are planar degrees with the longitude
+    difference taken around the circle, so neither the antimeridian nor the
+    Greenwich meridian is a discontinuity.
+    """
+    dlon = np.abs(to_0_360(mecfoc[:, 0]) - to_0_360(lon))
+    dlon = np.minimum(dlon, 360.0 - dlon)
+    closest = int(np.argmin(np.hypot(dlon, mecfoc[:, 1] - lat)))
+    return float(mecfoc[closest, 2]), float(mecfoc[closest, 3])
+
+
 class TsunamiCalculator:
     def __init__(self, model_dir: Path | None = None) -> None:
         self.model_dir = (
@@ -204,28 +220,24 @@ class TsunamiCalculator:
         try:
             mech_path = self.model_dir / "mecfoc.dat"
             self.mechanism_data = np.loadtxt(mech_path)
-
-            # CMT data uses eastern-positive longitudes; lookup uses western negatives.
-            self.mechanism_data[:, 0] = np.where(
-                self.mechanism_data[:, 0] > 0,
-                self.mechanism_data[:, 0] - 360,
-                self.mechanism_data[:, 0],
-            )
-
             self.ports = load_ports()
         except Exception as e:
             logger.exception("Failed to load static files")
             raise RuntimeError("Static file initialization failed") from e
 
     def calculate_earthquake_parameters(
-        self, data: EarthquakeInput, output_dir: Path | None = None
+        self, data: EarthquakeInput, output_dir: Path
     ) -> CalculationResponse:
         """Calculate source parameters and write hypo.dat for the simulation."""
         try:
             L, W = rupture_dimensions(data.Mw)  # km
             M0, D = average_slip(data.Mw, L, W)  # N*m, m
 
-            azimuth, dip = self._get_focal_mechanism(data.lon0, data.lat0)
+            if self.mechanism_data is None:
+                raise RuntimeError("Mechanism data not loaded")
+            azimuth, dip = nearest_focal_mechanism(
+                self.mechanism_data, data.lon0, data.lat0
+            )
 
             rect_params, rect_corners = calculate_rectangle_parameters(
                 L, W, data.lon0, data.lat0, azimuth, dip
@@ -246,7 +258,7 @@ class TsunamiCalculator:
             location = determine_epicenter_location(h0, distance_to_coast)
             warning = determine_tsunami_warning(data.Mw, data.h, h0, distance_to_coast)
 
-            self._write_hypo_dat(data, output_dir or Path.cwd())
+            self._write_hypo_dat(data, output_dir)
 
             return CalculationResponse(
                 length=L,
@@ -310,21 +322,6 @@ class TsunamiCalculator:
         except Exception as e:
             logger.exception("Travel time calculation failed")
             raise RuntimeError("Tsunami travel time error") from e
-
-    def _get_focal_mechanism(self, lon0: float, lat0: float) -> tuple[float, float]:
-        """Use the nearest Global CMT mechanism because inputs omit strike."""
-        if self.mechanism_data is None:
-            raise RuntimeError("Mechanism data not loaded")
-
-        distances = np.sqrt(
-            (self.mechanism_data[:, 0] - lon0) ** 2
-            + (self.mechanism_data[:, 1] - lat0) ** 2
-        )
-        closest_idx = np.argmin(distances)
-        return (
-            self.mechanism_data[closest_idx, 2],
-            self.mechanism_data[closest_idx, 3],
-        )
 
     def _calculate_travel_time(
         self, lon0: float, lat0: float, port_lon: float, port_lat: float, time0: float

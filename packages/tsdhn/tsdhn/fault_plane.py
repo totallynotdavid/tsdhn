@@ -8,19 +8,14 @@ import numpy as np
 from tsdhn.calculator import (
     average_slip,
     calculate_rectangle_parameters,
+    nearest_focal_mechanism,
     rupture_dimensions,
 )
 from tsdhn.constants import FAULT_PLANE_KILOMETERS_PER_DEGREE
 from tsdhn.utils.file_utils import atomic_write
+from tsdhn.utils.geo import to_0_360
 
 _RAKE = 90.0
-_IA = 2461
-_JA = 2056
-
-
-def _to_0_360(lon: float) -> float:
-    """Convert a negative longitude to the legacy 0..360 convention."""
-    return lon + 360.0 if lon < 0 else lon
 
 
 def _read_hypo_dat(path: Path) -> tuple[str, float, float, float, float]:
@@ -32,21 +27,6 @@ def _read_hypo_dat(path: Path) -> tuple[str, float, float, float, float]:
     zep_km = float(lines[3])
     mw = float(lines[4])
     return hhmm, lon0, lat0, zep_km, mw
-
-
-def _nearest_mechanism(
-    mecfoc: np.ndarray, xep: float, yep: float
-) -> tuple[float, float]:
-    """Choose the nearest mechanism in the legacy 0..360 longitude frame.
-
-    This lookup intentionally uses a different longitude frame from the
-    calculator's preview lookup. The two results can differ near the wrap.
-    """
-    lon = np.where(mecfoc[:, 0] < 0, mecfoc[:, 0] + 360.0, mecfoc[:, 0])
-    lat = mecfoc[:, 1]
-    dist = np.sqrt((lon - xep) ** 2 + (lat - yep) ** 2)
-    pos = int(np.argmin(dist))
-    return float(mecfoc[pos, 2]), float(mecfoc[pos, 3])
 
 
 def _grid_snap(
@@ -105,16 +85,10 @@ def _write_pfalla_inp(
         tmp_path.write_text(f"{i0} {j0} {d0_m} {l0_m} {w0_m} {az} {dip} {rake} {h_m}\n")
 
 
-def _write_xyo_dat(
-    path: Path, ids: int, ide: int, jds: int, jde: int, ia: int = _IA, ja: int = _JA
-) -> None:
-    """Write the grid window plus the legacy trailing grid dimensions.
-
-    The tsunami reader consumes the first four tokens. The final two remain
-    as padding because legacy producers still write them.
-    """
+def _write_xyo_dat(path: Path, ids: int, ide: int, jds: int, jde: int) -> None:
+    """Write the deformation window as four 1-based grid indices."""
     with atomic_write(path) as tmp_path:
-        tmp_path.write_text(f"{ids} {ide} {jds} {jde} {ia} {ja}\n")
+        tmp_path.write_text(f"{ids} {ide} {jds} {jde}\n")
 
 
 def _write_meca_dat(
@@ -137,13 +111,13 @@ def _write_meca_dat(
 def run_fault_plane(working_dir: Path) -> None:
     """Read the workspace inputs and write the fault-plane files."""
     hhmm, lon0, lat0, zep_km, mw = _read_hypo_dat(working_dir / "hypo.dat")
-    xep = _to_0_360(lon0)
+    xep = to_0_360(lon0)
 
     l_km, w_km = rupture_dimensions(mw)
     _, dislocation_m = average_slip(mw, l_km, w_km)
 
     mecfoc = np.loadtxt(working_dir / "mecfoc.dat")
-    az, dip = _nearest_mechanism(mecfoc, xep, lat0)
+    az, dip = nearest_focal_mechanism(mecfoc, lon0, lat0)
 
     rect_params, _ = calculate_rectangle_parameters(l_km, w_km, lon0, lat0, az, dip)
     xo, yo = float(rect_params["xo"]), float(rect_params["yo"])
@@ -156,7 +130,7 @@ def run_fault_plane(working_dir: Path) -> None:
             f"Epicenter is outside the computational grid (xep={xep} < xa[0]={xa[0]})"
         )
 
-    xo_grid = _to_0_360(xo)
+    xo_grid = to_0_360(xo)
     i0, j0 = _grid_snap(xa, ya, xo_grid, yo)
     h_m = _recompute_depth(lon0, lat0, xo, yo, zep_km, az, dip)
 

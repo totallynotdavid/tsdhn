@@ -141,7 +141,7 @@ do J=1,JA
   dy(J) = abs(ya(J)-JDE)
 end do
 JDE = minloc(dy,1)
-WRITE(5,*) IDS,IDE,JDS,JDE, IA, JA
+WRITE(5,*) IDS,IDE,JDS,JDE
 close(5)
 
 ! Archivo de mecanismo focal para maxola.csh
