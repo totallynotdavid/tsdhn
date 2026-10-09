@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { EarthquakeInput } from "$lib/schema/earthquake";
-  import Button from "$lib/components/ui/Button.svelte";
+  import type { EarthquakeInput } from "#lib/schema/earthquake.js";
+  import Button from "#lib/components/ui/Button.svelte";
 
   let { data } = $props();
 

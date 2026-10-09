@@ -1,8 +1,8 @@
-import type { Handle } from "@sveltejs/kit";
-import { building } from "$app/environment";
-import { auth } from "$lib/server/auth";
-import { db } from "$lib/server/db";
-import { createSimulationRepository } from "$lib/server/simulation-repository";
+import type { Handle } from "@sveltejs/kit/hooks";
+import { building } from "$app/env";
+import { auth } from "#lib/server/auth.js";
+import { db } from "#lib/server/db/index.js";
+import { createSimulationRepository } from "#lib/server/simulation-repository.js";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 
 const simulationRepository = createSimulationRepository(db);

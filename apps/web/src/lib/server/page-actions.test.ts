@@ -12,11 +12,11 @@ const mocks = vi.hoisted(() => ({
   zod4: vi.fn(),
 }));
 
-vi.mock("$lib/server/compute-api", () => ({ computeClient: mocks.computeClient }));
-vi.mock("$lib/server/submit-simulation", () => ({
+vi.mock("#lib/server/compute-api.js", () => ({ computeClient: mocks.computeClient }));
+vi.mock("#lib/server/submit-simulation.js", () => ({
   submitSimulation: mocks.submitSimulation,
 }));
-vi.mock("$lib/schema/earthquake", () => ({
+vi.mock("#lib/schema/earthquake.js", () => ({
   defaultEarthquake: {},
   earthquakeSchema: {},
   toEarthquakeInput: mocks.toEarthquakeInput,

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   computeClient: vi.fn(),
 }));
 
-vi.mock("$lib/server/compute-api", () => ({ computeClient: mocks.computeClient }));
+vi.mock("#lib/server/compute-api.js", () => ({ computeClient: mocks.computeClient }));
 
 import { POST } from "../../routes/api/calculations/+server";
 

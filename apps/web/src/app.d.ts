@@ -1,6 +1,6 @@
 import type { User, Session } from "better-auth";
 
-import type { SimulationRepository } from "$lib/server/simulation-repository";
+import type { SimulationRepository } from "#lib/server/simulation-repository.js";
 
 declare global {
   namespace App {

@@ -2,11 +2,11 @@
   import { invalidateAll } from "$app/navigation";
   import type { components } from "@tsdhn/api-client";
 
-  import type { EarthquakeInput } from "$lib/schema/earthquake";
-  import SourceParams from "$lib/components/SourceParams.svelte";
-  import Map from "$lib/components/Map.svelte";
-  import Alert from "$lib/components/ui/Alert.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
+  import type { EarthquakeInput } from "#lib/schema/earthquake.js";
+  import SourceParams from "#lib/components/SourceParams.svelte";
+  import Map from "#lib/components/Map.svelte";
+  import Alert from "#lib/components/ui/Alert.svelte";
+  import Button from "#lib/components/ui/Button.svelte";
 
   let { data, form } = $props();
   type Calculation = components["schemas"]["CalculationResponse"];

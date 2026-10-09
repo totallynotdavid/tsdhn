@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
   import { page } from "$app/state";
-  import { authClient } from "$lib/auth-client";
+  import { authClient } from "#lib/auth-client.js";
 
   let { user }: { user: { name: string; email: string } } = $props();
   let signingOut = $state(false);

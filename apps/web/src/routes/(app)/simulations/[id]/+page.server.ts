@@ -1,7 +1,7 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 
-import { computeClient } from "$lib/server/compute-api";
-import { submitSimulation } from "$lib/server/submit-simulation";
+import { computeClient } from "#lib/server/compute-api.js";
+import { submitSimulation } from "#lib/server/submit-simulation.js";
 
 import type { Actions, PageServerLoad } from "./$types";
 

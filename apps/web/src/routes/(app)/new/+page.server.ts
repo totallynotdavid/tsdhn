@@ -2,9 +2,9 @@ import { fail, redirect } from "@sveltejs/kit";
 import { message, superValidate } from "sveltekit-superforms";
 import { zod4 } from "sveltekit-superforms/adapters";
 
-import { defaultEarthquake, earthquakeSchema, toEarthquakeInput } from "$lib/schema/earthquake";
-import { computeClient } from "$lib/server/compute-api";
-import { submitSimulation } from "$lib/server/submit-simulation";
+import { defaultEarthquake, earthquakeSchema, toEarthquakeInput } from "#lib/schema/earthquake.js";
+import { computeClient } from "#lib/server/compute-api.js";
+import { submitSimulation } from "#lib/server/submit-simulation.js";
 
 import type { Actions, PageServerLoad } from "./$types";
 

@@ -16,16 +16,9 @@ export default defineConfig({
         runes: ({ filename }) =>
           filename.split(/[/\\]/).includes("node_modules") ? undefined : true,
       },
-
       adapter,
       preprocess: [mdsvex({ extensions: [".svx", ".md"] })],
       extensions: [".svelte", ".svx", ".md"],
-      typescript: {
-        config: (config) => ({
-          ...config,
-          include: [...config.include, "../drizzle.config.ts"],
-        }),
-      },
     }),
   ],
 });

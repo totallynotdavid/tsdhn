@@ -4,11 +4,11 @@
   import { toast } from "svelte-sonner";
   import type { components } from "@tsdhn/api-client";
 
-  import { toEarthquakeInput } from "$lib/schema/earthquake";
-  import Map from "$lib/components/Map.svelte";
-  import SourceParams from "$lib/components/SourceParams.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
-  import Alert from "$lib/components/ui/Alert.svelte";
+  import { toEarthquakeInput } from "#lib/schema/earthquake.js";
+  import Map from "#lib/components/Map.svelte";
+  import SourceParams from "#lib/components/SourceParams.svelte";
+  import Button from "#lib/components/ui/Button.svelte";
+  import Alert from "#lib/components/ui/Alert.svelte";
 
   let { data } = $props();
   // Pass only the initial form value. superForm handles later server updates.

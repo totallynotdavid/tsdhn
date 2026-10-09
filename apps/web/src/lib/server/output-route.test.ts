@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   getSimulation: vi.fn(),
 }));
 
-vi.mock("$lib/server/compute-api", () => ({
+vi.mock("#lib/server/compute-api.js", () => ({
   computeRequestConfig: mocks.computeRequestConfig,
 }));
 import { GET } from "../../routes/(app)/simulations/[id]/outputs/[name]/+server";

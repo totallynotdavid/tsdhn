@@ -1,7 +1,7 @@
 import { error, redirect } from "@sveltejs/kit";
 
-import { computeRequestConfig } from "$lib/server/compute-api";
-import { assertOutputAccessible } from "$lib/server/outputs";
+import { computeRequestConfig } from "#lib/server/compute-api.js";
+import { assertOutputAccessible } from "#lib/server/outputs.js";
 
 import type { RequestHandler } from "./$types";
 
@@ -22,5 +22,5 @@ export const GET: RequestHandler = async ({ params, locals, fetch }) => {
     error(502, "No se pudo preparar la descarga.");
   }
 
-  redirect(302, location);
+  redirect(302, location, { external: true });
 };

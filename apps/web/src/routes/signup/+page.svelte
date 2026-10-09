@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
-  import Button from "$lib/components/ui/Button.svelte";
-  import Alert from "$lib/components/ui/Alert.svelte";
+  import Button from "#lib/components/ui/Button.svelte";
+  import Alert from "#lib/components/ui/Alert.svelte";
 
   let { form } = $props();
   let loading = $state(false);

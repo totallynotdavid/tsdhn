@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   getSimulation: vi.fn(),
 }));
 
-vi.mock("$lib/server/compute-api", () => ({ computeClient: mocks.computeClient }));
-vi.mock("$lib/server/submit-simulation", () => ({
+vi.mock("#lib/server/compute-api.js", () => ({ computeClient: mocks.computeClient }));
+vi.mock("#lib/server/submit-simulation.js", () => ({
   submitSimulation: mocks.submitSimulation,
 }));
 

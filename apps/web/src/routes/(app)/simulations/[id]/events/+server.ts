@@ -1,6 +1,6 @@
 import { error } from "@sveltejs/kit";
 
-import { computeRequestConfig } from "$lib/server/compute-api";
+import { computeRequestConfig } from "#lib/server/compute-api.js";
 
 import type { RequestHandler } from "./$types";
 

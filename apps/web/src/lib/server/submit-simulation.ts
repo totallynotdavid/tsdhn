@@ -1,7 +1,7 @@
 import type { TsdhnClient } from "@tsdhn/api-client";
 
-import type { EarthquakeInput } from "$lib/schema/earthquake";
-import type { SimulationRepository } from "$lib/server/simulation-repository";
+import type { EarthquakeInput } from "#lib/schema/earthquake.js";
+import type { SimulationRepository } from "#lib/server/simulation-repository.js";
 
 type SubmissionRepository = Pick<
   SimulationRepository,

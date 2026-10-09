@@ -1,6 +1,6 @@
 import { error } from "@sveltejs/kit";
 
-import type { SimulationDetails } from "$lib/server/simulation-details";
+import type { SimulationDetails } from "#lib/server/simulation-details.js";
 
 export function assertOutputAccessible(
   sim: SimulationDetails | undefined,

@@ -1,4 +1,4 @@
-import type { StoredOutput } from "$lib/server/db/compute";
+import type { StoredOutput } from "#lib/server/db/compute.js";
 
 export type SimulationDetails = {
   id: string;
