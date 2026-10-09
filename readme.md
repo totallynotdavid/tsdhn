@@ -53,11 +53,19 @@ maps. The web app and compute API run the same pipeline for many users.
 
 ## Install
 
-Install the pinned tools and the Python dependencies, then download the model
-data and check the toolchain:
+Install the pinned tools and start the local stack:
 
 ```sh
-mise install
+mise install && mise run dev
+```
+
+`mise run env-init` creates `.env` from `.env.example` with generated secrets.
+`mise run dev` runs it automatically when `.env` is missing. It refuses to
+overwrite an existing file.
+
+For the command-line model, download the model data and check the toolchain:
+
+```sh
 mise run install
 uv run tsdhn assets install
 uv run tsdhn doctor
@@ -87,7 +95,7 @@ dependencies with `mise run web-install`, and start the services as described in
 - The CLI installs versioned model data, checks external tools, previews a
   calculation and runs the pipeline.
 - The compute API queues simulations. The worker resumes interrupted work and
-  stores finished files in MinIO.
+  stores finished files in S3-compatible object storage.
 - The web app signs researchers in, tracks their simulations, streams progress
   and creates output downloads.
 - The parity package compares selected Python results with saved MATLAB and

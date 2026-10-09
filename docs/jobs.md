@@ -1,17 +1,17 @@
 # Jobs
 
 A simulation passes through the web app, the compute API, a queue, a worker and
-MinIO. This page follows it through those stages and states the rules that keep
-the stores consistent. [Architecture](architecture.md) says which component owns
-what. [Database](database.md) covers the roles.
+object storage. This page follows it through those stages and states the rules
+that keep the stores consistent. [Architecture](architecture.md) says which
+component owns what. [Database](database.md) covers the roles.
 
 ## Identifiers
 
 | Name              | Owner           | Purpose                                                       |
 | ----------------- | --------------- | ------------------------------------------------------------- |
 | `simulation_id`   | web app         | Public simulation ID, used again when a submission is retried |
-| internal job ID   | compute service | Database and queue ID. Not returned to the web app           |
-| output object key | compute service | Private MinIO location                                        |
+| internal job ID   | compute service | Database and queue ID. Not returned to the web app            |
+| output object key | compute service | Private object storage location                               |
 
 The public page is `/simulations/{simulation_id}`. The web app creates
 `simulation_id` before it calls the compute API and reuses it for every retry.
@@ -62,11 +62,11 @@ submission error. The researcher can retry with the same `simulation_id`.
 2. It takes the workspace lock and runs the engine in
    `TSDHN_JOBS_DIR/{simulation_id}`.
 3. Progress callbacks update the compute job and notify listeners.
-4. The worker uploads the output files and their metadata to MinIO.
+4. The worker uploads the output files and their metadata to object storage.
 5. It marks the job `completed` only after the upload succeeds, then removes the
    workspace.
 
-Output responses carry names and filenames, not MinIO object keys.
+Output responses carry names and filenames, not object storage keys.
 
 ### Show progress
 
@@ -80,20 +80,20 @@ closes the stream when the job finishes or after
 
 1. The browser asks the web app for an output name.
 2. The web app checks the session, simulation ownership and available names.
-3. The compute API returns a MinIO URL that is valid for
+3. The compute API returns an object storage URL that is valid for
    `TSDHN_OUTPUT_URL_TTL_SECONDS` (900). The compute API answers with a 307
    redirect and the web app passes it on as a 302.
-4. The browser downloads the file from MinIO.
+4. The browser downloads the file from object storage.
 
 Neither the web app nor the compute API relays output bytes.
 
 ## Failure and recovery
 
-The worker retries only `TransientInfraError`, which covers PostgreSQL, MinIO
-and a workspace still held by an earlier attempt. A job gets three attempts
-(`MAX_ATTEMPTS`), with a 15 second backoff that doubles. Invalid input, missing
-model files and failed scientific steps fail the job at once, because repeating
-them does not change the result.
+The worker retries only `TransientInfraError`, which covers PostgreSQL, object
+storage and a workspace still held by an earlier attempt. A job gets three
+attempts (`MAX_ATTEMPTS`), with a 15 second backoff that doubles. Invalid input,
+missing model files and failed scientific steps fail the job at once, because
+repeating them does not change the result.
 
 The engine records its progress in the workspace, so a retry resumes completed
 work. See [Pipeline](pipeline.md#resume-behavior).
@@ -202,4 +202,4 @@ database policy is the boundary.
 Deleting a queue row cascades to its attempt and occurrence rows. Rows whose
 compute counterpart is missing, malformed, recent or still running stay for
 reconciliation and inspection. Retention does not delete `compute.jobs`, output
-metadata or MinIO objects.
+metadata or object storage objects.

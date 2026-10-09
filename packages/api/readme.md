@@ -2,7 +2,8 @@
 
 `tsdhn-api` accepts requests from the web server, records compute jobs in
 PostgreSQL, queues work with `rqueue`, runs the shared `tsdhn` engine, and
-stores output files in MinIO. The browser calls the web app, not this service.
+stores output files in S3-compatible object storage. The browser calls the web
+app, not this service.
 
 [Architecture](../../docs/architecture.md) states the boundaries,
 [Jobs](../../docs/jobs.md) the job rules, and [Deploy](../../docs/deploy.md) the
@@ -10,15 +11,9 @@ configuration and startup.
 
 ## Run it
 
-From the repository root, apply all local database migrations, then run the API
-and the worker in separate terminals. What they need before they start is in
-[Deploy](../../docs/deploy.md#run-without-compose).
-
-```sh
-mise run db-migrate
-mise run api
-mise run worker
-```
+From the repository root, `mise run dev` starts PostgreSQL, object storage, the
+migrations, this API, the worker and the web app as containers.
+[Deploy](../../docs/deploy.md#start) states the first-run steps.
 
 The compute API's OpenAPI UI is at <http://127.0.0.1:8000/api-docs>. Health and
 version routes are public. Simulation and calculation routes require

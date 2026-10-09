@@ -18,7 +18,7 @@ SvelteKit web app
   v
 FastAPI compute service
   |-- compute.jobs and the rqueue task_queue schema
-  |-- worker -> tsdhn engine -> MinIO
+  |-- worker -> tsdhn engine -> object storage
 ```
 
 The browser talks to the web app. The web app checks the session and handles the
@@ -66,7 +66,7 @@ The compute service owns:
 - the internal compute job ID;
 - job progress, retry state and worker heartbeats;
 - simulation work directories and checkpoints;
-- output metadata and uploads to MinIO.
+- output metadata and uploads to object storage.
 
 It receives a `simulation_id` from the web app. It knows nothing about web
 sessions, users or passwords.
@@ -75,17 +75,17 @@ sessions, users or passwords.
 
 The `tsdhn` package owns the scientific calculation, the pipeline order, the run
 directory, checkpoints and output files. It does not depend on web users,
-PostgreSQL jobs, queues or MinIO. [Pipeline](pipeline.md) describes its stages.
-[Science](science.md) records its numerical rules.
+PostgreSQL jobs, queues or object storage. [Pipeline](pipeline.md) describes its
+stages. [Science](science.md) records its numerical rules.
 
 ### Output storage
 
 The worker uses local disk while a simulation runs. The work directory holds
 intermediate files and the checkpoints that recovery needs.
 
-MinIO stores completed output files. The compute database stores their names,
-media types, filenames and private object keys. Public API responses omit the
-object keys.
+Object storage stores completed output files. The compute database stores their
+names, media types, filenames and private object keys. Public API responses omit
+the object keys.
 
 ## Where the code is
 

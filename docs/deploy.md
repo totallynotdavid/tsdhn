@@ -1,27 +1,28 @@
 # Deploy
 
-The repository includes a Podman Compose stack for the API, the worker,
-PostgreSQL, MinIO and the web app. Named volumes hold PostgreSQL data, MinIO
-objects and worker workspaces.
+The repository includes a Docker Compose stack for the API, the worker,
+PostgreSQL, RustFS and the web app. Compose runs over the Podman socket. Named
+volumes hold PostgreSQL data, object storage data and worker workspaces.
+
+The stack pins RustFS `docker.io/rustfs/rustfs:1.0.1`.
 
 ## Configure
 
-Copy the example file and fill every blank secret before you start the stack:
+Create the local environment before you start the stack (also done by `dev`):
 
 ```sh
-cp .env.example .env
+mise run env-init
 ```
 
-Set `COMPUTE_API_TOKEN`, `BETTER_AUTH_SECRET`, `APP_DB_PASSWORD`,
-`COMPUTE_PRODUCER_PASSWORD`, `COMPUTE_WORKER_PASSWORD` and
-`COMPUTE_PURGER_PASSWORD`. `.env.example` shows the command that generates each
-value. The three queue-role passwords belong to the API producer, the worker and
-the retention purger. See [Database](database.md#compute-roles).
+`env-init` refuses to overwrite an existing `.env`, generates the six required
+secrets and writes the file with mode 600. The three queue-role passwords belong
+to the API producer, the worker and the retention purger. See
+[Database](database.md#compute-roles).
 
-The example uses queue `simulations` in schema `task_queue` and exposes MinIO at
-`localhost:9000` for browser downloads. Set `TSDHN_MINIO_PUBLIC_ENDPOINT` to the
+The example uses queue `simulations` in schema `task_queue` and exposes RustFS
+at `localhost:9000` for browser downloads. Set `TSDHN_S3_PUBLIC_ENDPOINT` to the
 host and port a browser can reach when it differs. Compose sets the runtime
-database endpoint and the MinIO endpoint for its containers itself.
+database endpoint and the internal S3 endpoint for its containers itself.
 
 ### Settings
 
@@ -44,10 +45,10 @@ variable is unset.
 | `TSDHN_WORKER_ID`                                                   | empty                                            | Worker name in queue records                           |
 | `TSDHN_NUMBA_THREADS`                                               | all visible CPUs                                 | Threads for the solver                                 |
 | `TSDHN_LOG_LEVEL`                                                   | `INFO`                                           | Log level                                              |
-| `TSDHN_MINIO_ENDPOINT`                                              | `localhost:9000`                                 | MinIO address the API uploads to                       |
-| `TSDHN_MINIO_PUBLIC_ENDPOINT`                                       | `TSDHN_MINIO_ENDPOINT`                           | MinIO address in download URLs                         |
-| `TSDHN_MINIO_ACCESS_KEY`, `TSDHN_MINIO_SECRET_KEY`                  | `minioadmin`, `minioadmin`                       | MinIO credentials                                      |
-| `TSDHN_MINIO_BUCKET`, `TSDHN_MINIO_SECURE`                          | `tsdhn-results`, `false`                         | Bucket name and TLS                                    |
+| `TSDHN_S3_ENDPOINT`                                                 | `localhost:9000`                                 | S3 address the API uploads to                          |
+| `TSDHN_S3_PUBLIC_ENDPOINT`                                          | `TSDHN_S3_ENDPOINT`                              | S3 address in download URLs                            |
+| `TSDHN_S3_ACCESS_KEY`, `TSDHN_S3_SECRET_KEY`                        | `tsdhn-local`, `tsdhn-local-secret`              | S3 credentials                                         |
+| `TSDHN_S3_BUCKET`, `TSDHN_S3_SECURE`                                | `tsdhn-results`, `false`                         | Bucket name and TLS                                    |
 | `TSDHN_OUTPUT_URL_TTL_SECONDS`                                      | `900`                                            | Lifetime of a download URL                             |
 | `TSDHN_SSE_MAX_DURATION_SECONDS`                                    | `1800`                                           | Longest progress stream                                |
 | `TSDHN_ALLOWED_ORIGINS`                                             | empty                                            | Comma-separated origins that may call the API directly |
@@ -58,31 +59,24 @@ are fixed in the code. [Jobs](jobs.md) states them.
 
 ## Start
 
-Install the pinned tools, then start the base services:
+Install the pinned tools, then start the complete local stack:
 
 ```sh
 mise install
-mise run dev-up
+mise run dev
 ```
 
-`dev-up` runs `podman compose up -d`. Compose starts PostgreSQL and MinIO, runs
-the compute and queue migrations, provisions the runtime roles, and then starts
-the API and the worker.
-
-Start the web profile in a second terminal:
-
-```sh
-mise run dev-web
-```
-
-This applies the web migrations, provisions the web role and runs the web app in
-the foreground. Open <http://localhost:3000>.
+`dev` creates `.env` when it is missing, checks the Podman socket, builds local
+images, starts every service in detached mode, applies migrations and waits for
+the API and web health checks. It prints the addresses when they are ready. Open
+`/signup` to create a local account with an email and a password of at least 8
+characters. Local accounts do not need email verification.
 
 | Address                          | Service                 |
 | -------------------------------- | ----------------------- |
 | <http://localhost:3000>          | Web app                 |
 | <http://localhost:8000/api-docs> | Compute API, OpenAPI UI |
-| <http://localhost:9001>          | MinIO console           |
+| <http://localhost:9001>          | RustFS storage console  |
 
 The compute API serves its routes under `/api/v1`. The health and version routes
 are public. The other routes need `COMPUTE_API_TOKEN`.
@@ -95,49 +89,22 @@ Follow the service logs:
 mise run dev-logs
 ```
 
+Show each container's state and configured health status:
+
+```sh
+mise run dev-status
+```
+
 Stop the containers and keep the named volumes:
 
 ```sh
 mise run dev-down
 ```
 
-To delete PostgreSQL data, MinIO objects and worker workspaces as well, run
-`podman compose down -v`.
-
-## Run without Compose
-
-The API and worker can run on the host against the PostgreSQL cluster that mise
-manages. They need the model data, which `tsdhn assets install` downloads, and
-they need MinIO, which Compose can provide:
+`dev-down` keeps the named volumes. The database and storage are disposable, so
+wipe the containers, network and volumes when resetting the stack. The command
+uses the same engine socket setup as the mise tasks:
 
 ```sh
-uv run tsdhn assets install
-podman compose up -d minio
+. scripts/dev-engine.sh && docker compose --profile web down -v
 ```
-
-Without MinIO the API starts and `/api/v1/health` reports
-`"storage_connected": false`.
-
-Apply every migration in order. The task starts PostgreSQL, migrates the compute
-schema and the queue, provisions the queue roles, migrates the web schema and
-provisions the web role:
-
-```sh
-mise run db-migrate
-```
-
-Run the API and the worker in separate terminals:
-
-```sh
-mise run api
-mise run worker
-```
-
-`db-migrate`, `api` and `worker` read `.env`, so the passwords and token you set
-for Compose apply here too. The API uses the producer role, the worker uses the
-worker role, and retention uses the purger role.
-
-Both processes exit at start with the missing paths when the model assets are
-not installed. Run `uv run tsdhn assets install`, or point `TSDHN_MODEL_DIR` at
-the repository's `model/` directory. `scripts/setup.sh` records that variable in
-`.tsdhn/env`, which mise loads.
