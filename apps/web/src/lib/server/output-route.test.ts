@@ -70,7 +70,7 @@ describe("output download route", () => {
     const fetch = vi.fn().mockResolvedValue(
       new Response(null, {
         status: 307,
-        headers: { location: "https://minio.example/result.pdf" },
+        headers: { location: "https://storage.example/result.pdf" },
       }),
     );
     const requestContext = context({ fetch });
@@ -81,7 +81,7 @@ describe("output download route", () => {
     } catch (redirect) {
       expect(redirect).toMatchObject({
         status: 302,
-        location: "https://minio.example/result.pdf",
+        location: "https://storage.example/result.pdf",
       });
     }
 

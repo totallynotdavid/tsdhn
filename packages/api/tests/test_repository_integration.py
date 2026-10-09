@@ -320,7 +320,8 @@ async def test_list_abandoned_work_dirs_returns_old_terminal_jobs(
     abandoned = await repository.list_abandoned_work_dirs(cutoff)
     assert simulation_id_text in abandoned
     # A completed job's workspace is dead weight too: the result is durable in
-    # MinIO, and the only thing left on disk is checkpoints nobody will resume.
+    # object storage, and the only thing left on disk is checkpoints nobody will
+    # resume.
     assert completed_simulation_id_text in abandoned
     assert fresh_simulation_id_text not in abandoned
 
@@ -338,7 +339,7 @@ async def test_record_failure_keeps_running_for_a_transient_retry(
             conn,
             compute_job_id,
             simulation_id,
-            TransientInfraError("minio down"),
+            TransientInfraError("object storage down"),
             step="maxola",
             will_retry=True,
             attempt=1,
@@ -546,7 +547,7 @@ async def test_complete_job_reports_a_result_it_could_not_record(
             recorded = await repository.complete_job(conn, row, result, 1)
 
     # The upload already happened, so a silent no-op here would leave objects
-    # in MinIO with nothing in compute.jobs pointing at them and no trace why.
+    # in object storage without a compute.jobs reference or diagnostic log.
     assert recorded is False
     assert "simulations/orphan/metadata.json" in caplog.text
     assert (await repository.get_job_status(simulation_id_text))["status"] == "running"

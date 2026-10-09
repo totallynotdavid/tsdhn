@@ -257,7 +257,7 @@ def test_output_download_redirects_to_a_presigned_url(
     monkeypatch.setattr(
         output_store,
         "presigned_url",
-        lambda key, *, filename: f"https://minio.example/{key}?sig=abc",
+        lambda key, *, filename: f"https://storage.example/{key}?sig=abc",
     )
 
     response = client.get(
@@ -266,7 +266,9 @@ def test_output_download_redirects_to_a_presigned_url(
         follow_redirects=False,
     )
     assert response.status_code == 307
-    assert response.headers["location"].startswith("https://minio.example/simulations/")
+    assert response.headers["location"].startswith(
+        "https://storage.example/simulations/"
+    )
 
 
 def test_unknown_output_name_is_404(

@@ -5,13 +5,12 @@ set -euo pipefail
 : "${CRASH_SIMULATION_ID:=b6e1f5a0-2c1b-4a7c-9c7a-3f7b6a5d9e11}"
 : "${TRANSIENT_SIMULATION_ID:=c1a2b3c4-5d6e-4f70-8a9b-0c1d2e3f4a5b}"
 : "${COMPUTE_API_TOKEN:=compose-e2e-token}"
-: "${TSDHN_MINIO_ACCESS_KEY:=minioadmin}"
-: "${TSDHN_MINIO_SECRET_KEY:=minioadmin}"
-: "${TSDHN_MINIO_BUCKET:=tsdhn-results}"
 : "${COMPUTE_API_URL:=http://localhost:8000}"
 : "${COMPUTE_QUEUE_SCHEMA:=task_queue}"
 # The crash must happen after the resumable step writes a checkpoint.
 : "${TSUNAMI_CHECKPOINT_WAIT_SECONDS:=120}"
+
+source "$(dirname "${BASH_SOURCE[0]}")/assert_storage_objects.sh"
 
 psql_c() {
     docker compose exec -T postgres psql -U tsdhn -d tsdhn -tAc "$1"
@@ -27,12 +26,6 @@ wait_for_api() {
     done
     echo "::error::API did not become reachable"
     return 1
-}
-
-create_results_bucket() {
-    docker compose exec -T minio \
-        mc alias set local http://127.0.0.1:9000 "$TSDHN_MINIO_ACCESS_KEY" "$TSDHN_MINIO_SECRET_KEY"
-    docker compose exec -T minio mc mb --ignore-existing "local/$TSDHN_MINIO_BUCKET"
 }
 
 submit_simulation() {
@@ -157,7 +150,7 @@ scenario_crash_and_requeue() {
     }
     echo "Confirmed: worker log shows checkpoint resume"
 
-    docker compose exec -T minio mc stat "local/$TSDHN_MINIO_BUCKET/simulations/$CRASH_SIMULATION_ID/metadata.json"
+    assert_storage_objects "$CRASH_SIMULATION_ID"
 }
 
 scenario_ttl_sweep() {
@@ -211,12 +204,12 @@ asyncio.run(main())
 }
 
 scenario_transient_retry() {
-    echo "--- Scenario 3: MinIO outage during finalize triggers TRANSIENT_RETRY, not a failure ---"
+    echo "--- Scenario 3: storage outage during finalize triggers TRANSIENT_RETRY, not a failure ---"
 
     submit_simulation "$TRANSIENT_SIMULATION_ID"
     wait_for_step "$TRANSIENT_SIMULATION_ID" "copy_ttt_pdf" 1800
-    echo "Reached the last pipeline step; stopping MinIO to force finalize's upload to fail"
-    docker compose stop minio
+    echo "Reached the last pipeline step; stopping storage to force finalize's upload to fail"
+    docker compose stop storage
 
     # Give the queue time to record the transient retry.
     sleep 30
@@ -227,18 +220,17 @@ scenario_transient_retry() {
         *"Retrying after transient error"*) ;;
         *)
             echo "::error::Expected an in-flight TRANSIENT_RETRY, got: $details"
-            docker compose start minio
+            docker compose start storage
             return 1
             ;;
     esac
     echo "Confirmed: TRANSIENT_RETRY recorded a retry instead of failing the job"
 
-    docker compose start minio
+    docker compose start storage
     poll_job_to_completion "$TRANSIENT_SIMULATION_ID" 300
 }
 
 wait_for_api
-create_results_bucket
 scenario_crash_and_requeue
 scenario_ttl_sweep
 scenario_transient_retry

@@ -2,27 +2,27 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from minio.error import MinioException
+from minio.error import MinioException as S3ClientError
 
 from api.core.errors import TransientInfraError
 from api.core.storage import OutputStore
 from tsdhn.engine import OutputFile, SimulationOutputs
 
 
-class _RaisingMinioClient:
+class _RaisingStorageClient:
     def bucket_exists(self, bucket_name: str) -> bool:
         return True
 
     def fput_object(self, **kwargs: object) -> None:
-        raise MinioException("simulated MinIO outage")
+        raise S3ClientError("simulated storage outage")
 
 
 class _RaisingPresignClient:
     def presigned_get_object(self, **kwargs: object) -> str:
-        raise MinioException("simulated MinIO outage")
+        raise S3ClientError("simulated storage outage")
 
 
-class _RecordingMinioClient:
+class _RecordingStorageClient:
     def __init__(self) -> None:
         self.created_bucket = False
         self.uploads: list[dict[str, Any]] = []
@@ -44,13 +44,13 @@ class _RecordingMinioClient:
 
     def presigned_get_object(self, **kwargs: Any) -> str:
         self.presign = kwargs
-        return "https://minio.example/signed"
+        return "https://storage.example/signed"
 
 
-def test_upload_simulation_result_wraps_minio_failure(tmp_path: Path) -> None:
+def test_upload_simulation_result_wraps_storage_failure(tmp_path: Path) -> None:
     store = OutputStore.__new__(OutputStore)
     store.bucket = "tsdhn-results"
-    store._client = _RaisingMinioClient()  # type: ignore[assignment]
+    store._client = _RaisingStorageClient()  # type: ignore[assignment]
 
     output_path = tmp_path / "maxola.pdf"
     output_path.write_bytes(b"%PDF-1.4\n")
@@ -68,7 +68,7 @@ def test_upload_simulation_result_wraps_minio_failure(tmp_path: Path) -> None:
         )
 
 
-def test_presigned_url_wraps_minio_failure() -> None:
+def test_presigned_url_wraps_storage_failure() -> None:
     store = OutputStore.__new__(OutputStore)
     store.bucket = "tsdhn-results"
     store._public_client = _RaisingPresignClient()  # type: ignore[assignment]
@@ -82,7 +82,7 @@ def test_upload_simulation_result_creates_bucket_and_persists_manifest(
 ) -> None:
     store = OutputStore.__new__(OutputStore)
     store.bucket = "tsdhn-results"
-    client = _RecordingMinioClient()
+    client = _RecordingStorageClient()
     store._client = client  # type: ignore[assignment]
 
     output_path = tmp_path / "maxola.pdf"
@@ -117,15 +117,29 @@ def test_upload_simulation_result_creates_bucket_and_persists_manifest(
 def test_presigned_url_uses_public_storage_and_download_filename() -> None:
     store = OutputStore.__new__(OutputStore)
     store.bucket = "tsdhn-results"
-    client = _RecordingMinioClient()
+    client = _RecordingStorageClient()
     store._public_client = client  # type: ignore[assignment]
 
     url = store.presigned_url("simulations/job-1/result.pdf", filename="result.pdf")
 
-    assert url == "https://minio.example/signed"
+    assert url == "https://storage.example/signed"
     assert client.presign is not None
     assert client.presign["bucket_name"] == "tsdhn-results"
     assert client.presign["object_name"] == "simulations/job-1/result.pdf"
     assert client.presign["response_headers"] == {
         "response-content-disposition": 'attachment; filename="result.pdf"'
     }
+
+
+def test_public_client_uses_fixed_s3_region(monkeypatch: pytest.MonkeyPatch) -> None:
+    clients: list[dict[str, Any]] = []
+
+    class _RecordingClient:
+        def __init__(self, *_args: object, **kwargs: object) -> None:
+            clients.append(kwargs)
+
+    monkeypatch.setattr("api.core.storage.S3Client", _RecordingClient)
+
+    OutputStore()
+
+    assert clients[1]["region"] == "us-east-1"

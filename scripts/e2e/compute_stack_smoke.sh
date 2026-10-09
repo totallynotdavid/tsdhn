@@ -3,12 +3,11 @@ set -euo pipefail
 
 : "${SIMULATION_ID:=4cfe522f-7e7d-46e0-96ca-7b98743fb9f5}"
 : "${COMPUTE_API_TOKEN:=compose-e2e-token}"
-: "${TSDHN_MINIO_ACCESS_KEY:=minioadmin}"
-: "${TSDHN_MINIO_SECRET_KEY:=minioadmin}"
-: "${TSDHN_MINIO_BUCKET:=tsdhn-results}"
 : "${COMPUTE_API_URL:=http://localhost:8000}"
 : "${COMPUTE_QUEUE_SCHEMA:=task_queue}"
 : "${COMPUTE_QUEUE:=simulations}"
+
+source "$(dirname "${BASH_SOURCE[0]}")/assert_storage_objects.sh"
 
 wait_for_api() {
     for _ in {1..60}; do
@@ -21,12 +20,6 @@ wait_for_api() {
 
     echo "::error::API did not become reachable"
     return 1
-}
-
-create_results_bucket() {
-    docker compose exec -T minio \
-        mc alias set local http://127.0.0.1:9000 "$TSDHN_MINIO_ACCESS_KEY" "$TSDHN_MINIO_SECRET_KEY"
-    docker compose exec -T minio mc mb --ignore-existing "local/$TSDHN_MINIO_BUCKET"
 }
 
 submit_idempotent_simulation() {
@@ -160,10 +153,6 @@ assert_completed_outputs() {
       and (.travel_times | type == "object")
     ' final-status.json
 
-    docker compose exec -T minio mc stat "local/$TSDHN_MINIO_BUCKET/simulations/$SIMULATION_ID/metadata.json"
-    docker compose exec -T minio mc stat "local/$TSDHN_MINIO_BUCKET/simulations/$SIMULATION_ID/outputs/calculation.json"
-    docker compose exec -T minio mc stat "local/$TSDHN_MINIO_BUCKET/simulations/$SIMULATION_ID/outputs/travel_times.csv"
-
     persisted="$(
         docker compose exec -T postgres psql -U tsdhn -d tsdhn -tAc \
             "SELECT status || '|' || result_key FROM compute.jobs WHERE simulation_id = '$SIMULATION_ID'::uuid"
@@ -172,7 +161,7 @@ assert_completed_outputs() {
 }
 
 assert_output_is_downloadable() {
-    local listed location bytes
+    local listed location bytes downloaded
 
     listed="$(
         curl -fsS "$COMPUTE_API_URL/api/v1/jobs/$SIMULATION_ID/outputs" \
@@ -189,7 +178,10 @@ assert_output_is_downloadable() {
     test -n "$location"
 
     # The URL must be usable from the browser-facing endpoint.
-    bytes="$(curl -fsS "$location" | head -c 4)"
+    downloaded="$(mktemp "${TMPDIR:-/tmp}/tsdhn-output.XXXXXX")"
+    curl -fsS "$location" -o "$downloaded"
+    bytes="$(head -c 4 "$downloaded")"
+    rm -f "$downloaded"
     test "$bytes" = "%PDF"
 }
 
@@ -203,10 +195,10 @@ assert_unauthenticated_output_is_refused() {
 }
 
 wait_for_api
-create_results_bucket
 submit_idempotent_simulation
 assert_queued_job
 poll_job_to_completion
 assert_completed_outputs
+assert_storage_objects "$SIMULATION_ID"
 assert_output_is_downloadable
 assert_unauthenticated_output_is_refused

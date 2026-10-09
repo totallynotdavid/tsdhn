@@ -30,9 +30,9 @@ jobs:
             COMPUTE_PURGER_PASSWORD: compose-e2e-purger-password
             BETTER_AUTH_SECRET: compose-e2e-better-auth-secret
             ORIGIN: http://localhost:3000
-            TSDHN_MINIO_ACCESS_KEY: minioadmin
-            TSDHN_MINIO_SECRET_KEY: minioadmin
-            TSDHN_MINIO_BUCKET: tsdhn-results
+            TSDHN_S3_ACCESS_KEY: tsdhn-local
+            TSDHN_S3_SECRET_KEY: tsdhn-local-secret
+            TSDHN_S3_BUCKET: tsdhn-results
         steps:
             - uses: actions/checkout@v7
 
@@ -71,7 +71,7 @@ jobs:
             - name: Start compute stack
               env:
                   API_IMAGE: localhost/tsdhn-api:crash-recovery-ci
-              run: docker compose up -d --no-build postgres minio compute-migrate api worker
+              run: docker compose up -d --no-build postgres storage compute-migrate api worker
 
             - name: Run crash-recovery e2e scenarios
               env:

@@ -8,7 +8,7 @@ REPO_ROOT = Path(__file__).parents[3]
 _PROBE = (
     "import json; from api.core import settings; "
     "print(json.dumps({"
-    "'bucket': settings.MINIO_BUCKET, 'pool': settings.DB_POOL_MAX_SIZE, "
+    "'bucket': settings.S3_BUCKET, 'pool': settings.DB_POOL_MAX_SIZE, "
     "'ttl': settings.OUTPUT_URL_TTL, 'sse': settings.SSE_MAX_DURATION, "
     "'origins': settings.ALLOWED_ORIGINS, 'port': settings.API_PORT}))"
 )
@@ -29,7 +29,7 @@ def _settings(env: dict[str, str]) -> dict[str, object]:
 def test_service_settings_read_tsdhn_prefixed_names() -> None:
     values = _settings(
         {
-            "TSDHN_MINIO_BUCKET": "b",
+            "TSDHN_S3_BUCKET": "b",
             "TSDHN_DB_POOL_MAX_SIZE": "3",
             "TSDHN_OUTPUT_URL_TTL_SECONDS": "7",
             "TSDHN_SSE_MAX_DURATION_SECONDS": "11",
@@ -51,7 +51,7 @@ def test_service_settings_read_tsdhn_prefixed_names() -> None:
 def test_unprefixed_names_are_ignored() -> None:
     values = _settings(
         {
-            "MINIO_BUCKET": "legacy",
+            "S3_BUCKET": "legacy",
             "DB_POOL_MAX_SIZE": "99",
             "OUTPUT_URL_TTL_SECONDS": "99",
             "SSE_MAX_DURATION_SECONDS": "99",

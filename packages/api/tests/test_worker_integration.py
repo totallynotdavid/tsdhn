@@ -383,10 +383,10 @@ async def test_a_transient_finalization_failure_is_reported_as_retrying(
         tasks, "run_simulation", lambda _data, work_dir, **_kwargs: _result(work_dir)
     )
 
-    def minio_is_down(**_kwargs: Any) -> tuple[str, str]:
+    def storage_is_down(**_kwargs: Any) -> tuple[str, str]:
         raise TransientInfraError("output upload failed")
 
-    monkeypatch.setattr(output_store, "upload_simulation_result", minio_is_down)
+    monkeypatch.setattr(output_store, "upload_simulation_result", storage_is_down)
 
     compute_job_id = await _submit(simulation_id)
     await _worker(queue).drain(timeout=60)
@@ -398,7 +398,7 @@ async def test_a_transient_finalization_failure_is_reported_as_retrying(
     # The kernel succeeded and the upload did not, so the failure lands in
     # complete_job -- outside the block that used to be the only caller of
     # _record_failure. crash_recovery_e2e.sh scenario 3 watches for exactly
-    # this text while MinIO is stopped.
+    # this text while object storage is stopped.
     status = await repository.get_job_status(simulation_id)
     assert status["status"] == "running"
     assert status["details"] == "Retrying after transient error (TransientInfraError)"
@@ -866,7 +866,7 @@ async def test_a_wedged_attempt_cannot_complete_a_reconciled_job(
     to `completed` under a queue row that says `failed`.
 
     Refusing costs a result that genuinely was computed, so the refusal is
-    loud: the objects are already in MinIO and the log has to say where.
+    loud: the objects are already in object storage and the log has to say where.
     """
     simulation_id = str(uuid.uuid4())
     monkeypatch.setattr(tasks, "JOBS_DIR", tmp_path / "jobs")
@@ -888,7 +888,7 @@ async def test_a_wedged_attempt_cannot_complete_a_reconciled_job(
 
     assert recorded is False
     # The upload already happened. A silent refusal would leave those objects
-    # in MinIO with nothing pointing at them and no trace of why.
+    # in object storage without a compute.jobs reference or diagnostic log.
     assert "simulations/wedged/metadata.json" in caplog.text
 
     status = await repository.get_job_status(simulation_id)
