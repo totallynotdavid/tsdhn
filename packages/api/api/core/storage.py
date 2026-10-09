@@ -4,18 +4,18 @@ from io import BytesIO
 from typing import Any
 
 import urllib3
-from minio import Minio
-from minio.error import MinioException
+from minio import Minio as S3Client
+from minio.error import MinioException as S3ClientError
 
 from api.core.errors import TransientInfraError
 from api.core.settings import (
-    MINIO_ACCESS_KEY,
-    MINIO_BUCKET,
-    MINIO_ENDPOINT,
-    MINIO_PUBLIC_ENDPOINT,
-    MINIO_SECRET_KEY,
-    MINIO_SECURE,
     OUTPUT_URL_TTL,
+    S3_ACCESS_KEY,
+    S3_BUCKET,
+    S3_ENDPOINT,
+    S3_PUBLIC_ENDPOINT,
+    S3_SECRET_KEY,
+    S3_SECURE,
 )
 from tsdhn.engine import SimulationOutputs
 
@@ -24,23 +24,27 @@ __all__ = ["OutputStore", "output_store"]
 
 class OutputStore:
     def __init__(self) -> None:
-        self.bucket = MINIO_BUCKET
-        self._client = Minio(
-            MINIO_ENDPOINT,
-            access_key=MINIO_ACCESS_KEY,
-            secret_key=MINIO_SECRET_KEY,
-            secure=MINIO_SECURE,
+        self.bucket = S3_BUCKET
+        self._client = S3Client(
+            S3_ENDPOINT,
+            access_key=S3_ACCESS_KEY,
+            secret_key=S3_SECRET_KEY,
+            secure=S3_SECURE,
             http_client=urllib3.PoolManager(
                 timeout=urllib3.Timeout(connect=2.0, read=2.0),
                 retries=False,
             ),
         )
-        # Browser downloads may use a different endpoint from MinIO uploads.
-        self._public_client = Minio(
-            MINIO_PUBLIC_ENDPOINT,
-            access_key=MINIO_ACCESS_KEY,
-            secret_key=MINIO_SECRET_KEY,
-            secure=MINIO_SECURE,
+        # Browser downloads may use a different endpoint from uploads.
+        self._public_client = S3Client(
+            S3_PUBLIC_ENDPOINT,
+            access_key=S3_ACCESS_KEY,
+            secret_key=S3_SECRET_KEY,
+            secure=S3_SECURE,
+            # Presigning is local arithmetic, but without a region the client
+            # asks the endpoint for the bucket region, and the browser-facing
+            # endpoint is not reachable from inside the API container.
+            region="us-east-1",
         )
 
     def is_connected(self) -> bool:
@@ -91,7 +95,7 @@ class OutputStore:
                 length=len(payload),
                 content_type="application/json",
             )
-        except (MinioException, urllib3.exceptions.HTTPError, OSError) as e:
+        except (S3ClientError, urllib3.exceptions.HTTPError, OSError) as e:
             # Storage outages are transient. Let the task retry the upload.
             raise TransientInfraError("output upload failed") from e
 
@@ -110,7 +114,7 @@ class OutputStore:
                     )
                 },
             )
-        except (MinioException, urllib3.exceptions.HTTPError, OSError) as e:
+        except (S3ClientError, urllib3.exceptions.HTTPError, OSError) as e:
             raise TransientInfraError("presigning output URL failed") from e
 
 

@@ -353,7 +353,7 @@ async def run_simulation_task(compute_job_id: uuid.UUID, context: TaskContext) -
         logger.warning("Standing down attempt %d: %s", context.attempt, e)
         raise CancelJob(str(e)) from e
     except Exception as e:
-        # This also covers `complete_job`. A MinIO outage is retryable.
+        # Finalization failures, including object storage outages, are retryable.
         await _record_failure(compute_job_id, simulation_id, e, context)
         raise
     finally:

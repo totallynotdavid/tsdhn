@@ -22,14 +22,14 @@ __all__ = [
     "DB_POOL_MIN_SIZE",
     "JOBS_DIR",
     "LOG_LEVEL",
-    "MINIO_ACCESS_KEY",
-    "MINIO_BUCKET",
-    "MINIO_ENDPOINT",
-    "MINIO_PUBLIC_ENDPOINT",
-    "MINIO_SECRET_KEY",
-    "MINIO_SECURE",
     "NUMBA_THREADS",
     "OUTPUT_URL_TTL",
+    "S3_ACCESS_KEY",
+    "S3_BUCKET",
+    "S3_ENDPOINT",
+    "S3_PUBLIC_ENDPOINT",
+    "S3_SECRET_KEY",
+    "S3_SECURE",
     "SSE_MAX_DURATION",
     "WORKER_CONCURRENCY",
     "WORKER_ID",
@@ -136,14 +136,14 @@ def role_database_url(role: str, password: str) -> str:
     return urlunsplit(parts._replace(netloc=f"{credentials}@{authority}"))
 
 
-MINIO_ENDPOINT = os.environ.get("TSDHN_MINIO_ENDPOINT", "localhost:9000")
+S3_ENDPOINT = os.environ.get("TSDHN_S3_ENDPOINT", "localhost:9000")
 # Browsers download from this endpoint, which can differ from the one the API
 # uploads to.
-MINIO_PUBLIC_ENDPOINT = os.environ.get("TSDHN_MINIO_PUBLIC_ENDPOINT", MINIO_ENDPOINT)
-MINIO_ACCESS_KEY = os.environ.get("TSDHN_MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY = os.environ.get("TSDHN_MINIO_SECRET_KEY", "minioadmin")
-MINIO_BUCKET = os.environ.get("TSDHN_MINIO_BUCKET", "tsdhn-results")
-MINIO_SECURE = os.environ.get("TSDHN_MINIO_SECURE", "false").lower() in {
+S3_PUBLIC_ENDPOINT = os.environ.get("TSDHN_S3_PUBLIC_ENDPOINT", S3_ENDPOINT)
+S3_ACCESS_KEY = os.environ.get("TSDHN_S3_ACCESS_KEY", "tsdhn-local")
+S3_SECRET_KEY = os.environ.get("TSDHN_S3_SECRET_KEY", "tsdhn-local-secret")
+S3_BUCKET = os.environ.get("TSDHN_S3_BUCKET", "tsdhn-results")
+S3_SECURE = os.environ.get("TSDHN_S3_SECURE", "false").lower() in {
     "1",
     "true",
     "yes",

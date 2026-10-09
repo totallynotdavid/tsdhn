@@ -40,10 +40,10 @@ RUN mkdir -p /var/tmp/jobs \
 
 ENV TSDHN_HOST=0.0.0.0 \
     TSDHN_PORT=8000 \
-    TSDHN_MINIO_ENDPOINT=minio:9000 \
-    TSDHN_MINIO_ACCESS_KEY=minioadmin \
-    TSDHN_MINIO_SECRET_KEY=minioadmin \
-    TSDHN_MINIO_BUCKET=tsdhn-results \
+    TSDHN_S3_ENDPOINT=storage:9000 \
+    TSDHN_S3_ACCESS_KEY=tsdhn-local \
+    TSDHN_S3_SECRET_KEY=tsdhn-local-secret \
+    TSDHN_S3_BUCKET=tsdhn-results \
     TSDHN_MODEL_DIR=/app/model \
     TSDHN_JOBS_DIR=/var/tmp/jobs \
     HOME=/var/tmp

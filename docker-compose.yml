@@ -14,32 +14,32 @@ services:
       timeout: 3s
       retries: 5
 
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+  storage:
+    image: docker.io/rustfs/rustfs:1.0.1
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
+    command: ["/data"]
     environment:
-      MINIO_ROOT_USER: ${TSDHN_MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${TSDHN_MINIO_SECRET_KEY:-minioadmin}
+      RUSTFS_ACCESS_KEY: ${TSDHN_S3_ACCESS_KEY:-tsdhn-local}
+      RUSTFS_SECRET_KEY: ${TSDHN_S3_SECRET_KEY:-tsdhn-local-secret}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio-data:/data
+      - storage-data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 6
+      start_period: 10s
 
   compute-migrate:
     image: ${API_IMAGE:-tsdhn-api:local}
-    build:
-      context: .
-      dockerfile: deploy/api.Dockerfile
-      args:
-        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:master}
-        UV_VERSION:
+    pull_policy: never
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +65,7 @@ services:
 
   api:
     image: ${API_IMAGE:-tsdhn-api:local}
+    pull_policy: missing
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
@@ -75,17 +76,17 @@ services:
     depends_on:
       compute-migrate:
         condition: service_completed_successfully
-      minio:
+      storage:
         condition: service_healthy
     environment:
       COMPUTE_RUNTIME_DATABASE_URL: postgresql://postgres:5432/tsdhn
       COMPUTE_QUEUE: ${COMPUTE_QUEUE:-simulations}
       COMPUTE_QUEUE_SCHEMA: ${COMPUTE_QUEUE_SCHEMA:-task_queue}
-      TSDHN_MINIO_ENDPOINT: minio:9000
-      TSDHN_MINIO_PUBLIC_ENDPOINT: ${TSDHN_MINIO_PUBLIC_ENDPOINT:-localhost:9000}
-      TSDHN_MINIO_ACCESS_KEY: ${TSDHN_MINIO_ACCESS_KEY:-minioadmin}
-      TSDHN_MINIO_SECRET_KEY: ${TSDHN_MINIO_SECRET_KEY:-minioadmin}
-      TSDHN_MINIO_BUCKET: ${TSDHN_MINIO_BUCKET:-tsdhn-results}
+      TSDHN_S3_ENDPOINT: storage:9000
+      TSDHN_S3_PUBLIC_ENDPOINT: ${TSDHN_S3_PUBLIC_ENDPOINT:-localhost:9000}
+      TSDHN_S3_ACCESS_KEY: ${TSDHN_S3_ACCESS_KEY:-tsdhn-local}
+      TSDHN_S3_SECRET_KEY: ${TSDHN_S3_SECRET_KEY:-tsdhn-local-secret}
+      TSDHN_S3_BUCKET: ${TSDHN_S3_BUCKET:-tsdhn-results}
       COMPUTE_API_TOKEN: ${COMPUTE_API_TOKEN:?set COMPUTE_API_TOKEN in .env}
       TSDHN_ALLOWED_ORIGINS: ${TSDHN_ALLOWED_ORIGINS:-}
       COMPUTE_PRODUCER_ROLE: ${COMPUTE_PRODUCER_ROLE:-tsdhn_producer}
@@ -95,26 +96,21 @@ services:
 
   worker:
     image: ${API_IMAGE:-tsdhn-api:local}
-    build:
-      context: .
-      dockerfile: deploy/api.Dockerfile
-      args:
-        TOOLCHAIN_IMAGE: ${TOOLCHAIN_IMAGE:-ghcr.io/totallynotdavid/tsdhn-toolchain:master}
-        UV_VERSION:
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       compute-migrate:
         condition: service_completed_successfully
-      minio:
+      storage:
         condition: service_healthy
     environment:
       COMPUTE_RUNTIME_DATABASE_URL: postgresql://postgres:5432/tsdhn
       COMPUTE_QUEUE: ${COMPUTE_QUEUE:-simulations}
       COMPUTE_QUEUE_SCHEMA: ${COMPUTE_QUEUE_SCHEMA:-task_queue}
-      TSDHN_MINIO_ENDPOINT: minio:9000
-      TSDHN_MINIO_ACCESS_KEY: ${TSDHN_MINIO_ACCESS_KEY:-minioadmin}
-      TSDHN_MINIO_SECRET_KEY: ${TSDHN_MINIO_SECRET_KEY:-minioadmin}
-      TSDHN_MINIO_BUCKET: ${TSDHN_MINIO_BUCKET:-tsdhn-results}
+      TSDHN_S3_ENDPOINT: storage:9000
+      TSDHN_S3_ACCESS_KEY: ${TSDHN_S3_ACCESS_KEY:-tsdhn-local}
+      TSDHN_S3_SECRET_KEY: ${TSDHN_S3_SECRET_KEY:-tsdhn-local-secret}
+      TSDHN_S3_BUCKET: ${TSDHN_S3_BUCKET:-tsdhn-results}
       TSDHN_MODEL_DIR: /app/model
       TSDHN_JOBS_DIR: /var/tmp/jobs
       COMPUTE_WORKER_ROLE: ${COMPUTE_WORKER_ROLE:-tsdhn_worker}
@@ -127,6 +123,7 @@ services:
 
   web-migrate:
     image: ${WEB_IMAGE:-tsdhn-web:local}
+    pull_policy: never
     profiles: ["web"]
     depends_on:
       compute-migrate:
@@ -138,6 +135,7 @@ services:
 
   web-grants:
     image: ${API_IMAGE:-tsdhn-api:local}
+    pull_policy: never
     profiles: ["web"]
     depends_on:
       web-migrate:
@@ -151,6 +149,7 @@ services:
 
   web:
     image: ${WEB_IMAGE:-tsdhn-web:local}
+    pull_policy: missing
     profiles: ["web"]
     build:
       context: .
@@ -174,5 +173,5 @@ services:
 
 volumes:
   postgres-data:
-  minio-data:
+  storage-data:
   jobs-data:

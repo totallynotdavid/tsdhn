@@ -544,7 +544,7 @@ async def complete_job(
     """Upload the result and commit its manifest with the terminal state.
 
     Returns whether the manifest landed. The upload has happened by the time
-    the UPDATE runs, so a refused write leaves objects in MinIO that
+    the UPDATE runs, so a refused write leaves objects in object storage that
     compute.jobs does not point at. The refusal is logged with the object
     location, and the caller must be able to tell.
 
@@ -583,7 +583,7 @@ async def complete_job(
         "travel_times": travel_times,
         "outputs": outputs,
     }
-    # MinIO's client is blocking. Uploading on the event loop would stall every
+    # The storage client is blocking. Uploading on the event loop would stall every
     # other coroutine in the worker, heartbeats included.
     bucket, metadata_key = await anyio.to_thread.run_sync(
         lambda: output_store.upload_simulation_result(
