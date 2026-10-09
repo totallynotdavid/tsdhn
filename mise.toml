@@ -79,10 +79,103 @@ diff-coverage-js = [
 # PostgreSQL is managed by mise. Compose runs the service stack.
 db = "mise run db:start"
 
-dev-up = "UV_VERSION=$(scripts/tool-version.sh uv) podman compose up -d"
-dev-web = "UV_VERSION=$(scripts/tool-version.sh uv) BUN_VERSION=$(scripts/tool-version.sh bun) podman compose --profile web up"
-dev-down = "podman compose down"
-dev-logs = "podman compose logs -f"
+dev-up = """
+. scripts/dev-engine.sh
+UV_VERSION="$(scripts/tool-version.sh uv)" docker compose up -d --build
+"""
+dev-web = """
+. scripts/dev-engine.sh
+UV_VERSION="$(scripts/tool-version.sh uv)" BUN_VERSION="$(scripts/tool-version.sh bun)" docker compose --profile web up -d --build
+"""
+dev-down = """
+. scripts/dev-engine.sh
+docker compose --profile web down
+"""
+dev-status = """
+. scripts/dev-engine.sh
+docker compose --profile web ps -a
+for container in $(docker compose --profile web ps -aq); do
+  name=$(docker inspect --format "$(printf '\\173\\173.Name\\175\\175')" "$container")
+  state=$(docker inspect --format "$(printf '\\173\\173.State.Status\\175\\175')" "$container")
+  health=$(docker inspect --format "$(printf '\\173\\173if .State.Health\\175\\175\\173\\173.State.Health.Status\\175\\175\\173\\173else\\175\\175not-configured\\173\\173end\\175\\175')" "$container")
+  printf '%s state=%s health=%s\\n' "$name" "$state" "$health"
+done
+"""
+dev-logs = """
+. scripts/dev-engine.sh
+docker compose --profile web logs -f
+"""
+
+env-init = """
+if [ -e .env ] || [ -L .env ]; then
+  echo "Refusing to overwrite existing .env" >&2
+  exit 1
+fi
+
+umask 077
+tmp_file="$(mktemp .env.XXXXXX)"
+trap 'rm -f "$tmp_file"' EXIT
+compute_api_token="$(openssl rand -hex 32)"
+better_auth_secret="$(openssl rand -hex 32)"
+app_db_password="$(openssl rand -hex 32)"
+compute_producer_password="$(openssl rand -hex 32)"
+compute_worker_password="$(openssl rand -hex 32)"
+compute_purger_password="$(openssl rand -hex 32)"
+awk \
+  -v compute_api_token="$compute_api_token" \
+  -v better_auth_secret="$better_auth_secret" \
+  -v app_db_password="$app_db_password" \
+  -v compute_producer_password="$compute_producer_password" \
+  -v compute_worker_password="$compute_worker_password" \
+  -v compute_purger_password="$compute_purger_password" '
+  /^COMPUTE_API_TOKEN=/ { print "COMPUTE_API_TOKEN=" compute_api_token; next }
+  /^BETTER_AUTH_SECRET=/ { print "BETTER_AUTH_SECRET=" better_auth_secret; next }
+  /^APP_DB_PASSWORD=/ { print "APP_DB_PASSWORD=" app_db_password; next }
+  /^COMPUTE_PRODUCER_PASSWORD=/ { print "COMPUTE_PRODUCER_PASSWORD=" compute_producer_password; next }
+  /^COMPUTE_WORKER_PASSWORD=/ { print "COMPUTE_WORKER_PASSWORD=" compute_worker_password; next }
+  /^COMPUTE_PURGER_PASSWORD=/ { print "COMPUTE_PURGER_PASSWORD=" compute_purger_password; next }
+  { print }
+' .env.example > "$tmp_file"
+chmod 600 "$tmp_file"
+mv "$tmp_file" .env
+trap - EXIT
+echo "Created .env with generated secrets (mode 600)."
+"""
+
+dev = """
+if [ ! -e .env ]; then
+  mise run env-init
+fi
+
+. scripts/dev-engine.sh
+config_dir="$(mktemp -d "${TMPDIR:-/tmp}/tsdhn-dev.XXXXXX")"
+docker_config="$config_dir/docker"
+buildx_config="$config_dir/buildx"
+trap 'rm -rf "$config_dir"' EXIT
+mkdir -p "$docker_config" "$buildx_config"
+UV_VERSION="$(scripts/tool-version.sh uv)" \
+BUN_VERSION="$(scripts/tool-version.sh bun)" \
+DOCKER_CONFIG="$docker_config" BUILDX_CONFIG="$buildx_config" \
+docker compose --profile web up -d --build
+
+for _ in $(seq 1 60); do
+  health="$(curl -fsS http://localhost:8000/api/v1/health 2>/dev/null || true)"
+  if echo "$health" | grep -q '"database_connected":true' \
+    && echo "$health" | grep -q '"storage_connected":true' \
+    && curl -fsS http://localhost:3000 >/dev/null; then
+    echo "Web: http://localhost:3000"
+    echo "API docs: http://localhost:8000/api-docs"
+    echo "Storage console: http://localhost:9001"
+    echo "Sign up at /signup to create a local account (email plus a password of at least 8 characters; no email verification)."
+    exit 0
+  fi
+  sleep 2
+done
+
+echo "The local stack did not become healthy within 120 seconds." >&2
+DOCKER_CONFIG="$docker_config" docker compose --profile web ps >&2 || true
+exit 1
+"""
 
 lint-all = ["mise run lint", "mise run lint-js", "mise run fmt-check-js"]
 fix-all = ["mise run fix", "mise run fmt-js"]
