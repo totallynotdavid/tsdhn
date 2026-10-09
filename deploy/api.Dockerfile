@@ -4,7 +4,7 @@
 # Build context is the repo root. The UV_VERSION default mirrors .tool-versions
 # (a test enforces it); builds that read .tool-versions pass it explicitly.
 ARG TOOLCHAIN_IMAGE=ghcr.io/totallynotdavid/tsdhn-toolchain:master
-ARG UV_VERSION=0.11.29
+ARG UV_VERSION=0.13.0
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 FROM ${TOOLCHAIN_IMAGE}

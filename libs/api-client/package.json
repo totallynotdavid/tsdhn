@@ -10,6 +10,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "openapi-fetch": "^0.15.0"
+    "openapi-fetch": "^0.17.0"
   }
 }

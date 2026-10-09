@@ -25,7 +25,7 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
-            - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # 10.2.0
+            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
               with:
                   version-file: ".tool-versions"
                   enable-cache: true
@@ -50,7 +50,7 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
-            - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # 10.2.0
+            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
               with:
                   version-file: ".tool-versions"
                   python-version: ${{ matrix.python-version }}
@@ -61,10 +61,10 @@ jobs:
               run: |
                   sudo apt-get update
                   sudo apt-get install -y --no-install-recommends gmt libgmt-dev ghostscript
-                  SO=$(ls /usr/lib/**/libgmt.so.* 2>/dev/null | head -n1)
+                  SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
                   if [ -z "$SO" ]; then
                       echo "::error::libgmt.so.* not found after apt install"
-                      ls -R /usr/lib | grep -i gmt || true
+                      find /usr/lib -iname '*gmt*' -print || true
                       exit 1
                   fi
                   sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
@@ -108,7 +108,7 @@ jobs:
             - name: Fetch master for the diff base
               run: git fetch origin master:refs/remotes/origin/master
 
-            - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # 10.2.0
+            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
               with:
                   version-file: ".tool-versions"
                   python-version: ${{ env.PYTHON_VERSION }}
@@ -187,7 +187,7 @@ jobs:
               with:
                   bun-version-file: ".tool-versions"
 
-            - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # 10.2.0
+            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
               with:
                   version-file: ".tool-versions"
                   python-version: ${{ env.PYTHON_VERSION }}
@@ -231,7 +231,7 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
-            - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # 10.2.0
+            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
               with:
                   version-file: ".tool-versions"
                   python-version: ${{ env.PYTHON_VERSION }}
@@ -275,7 +275,7 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
-            - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # 10.2.0
+            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
               with:
                   version-file: ".tool-versions"
                   python-version: ${{ env.PYTHON_VERSION }}
@@ -286,7 +286,7 @@ jobs:
               run: |
                   sudo apt-get update
                   sudo apt-get install -y --no-install-recommends gmt libgmt-dev
-                  SO=$(ls /usr/lib/**/libgmt.so.* 2>/dev/null | head -n1)
+                  SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
                   [ -n "$SO" ] && sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
 
             - run: uv sync --all-packages --group dev
