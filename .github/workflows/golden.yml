@@ -19,7 +19,7 @@ jobs:
             contents: read
         services:
             registry:
-                image: registry:2
+                image: public.ecr.aws/docker/library/registry:2
                 ports:
                     - 5000:5000
         steps:
