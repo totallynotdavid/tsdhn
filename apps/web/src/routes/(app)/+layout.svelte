@@ -1,14 +1,12 @@
 <script lang="ts">
-  import Navbar from "#lib/components/Navbar.svelte";
-  import Footer from "#lib/components/Footer.svelte";
+  import Header from "#lib/components/Header.svelte";
 
   let { data, children } = $props();
 </script>
 
-<div class="flex min-h-screen flex-col">
-  <Navbar user={data.user} />
-  <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+<div class="flex min-h-dvh flex-col">
+  <Header user={data.user} />
+  <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
     {@render children()}
   </main>
-  <Footer />
 </div>

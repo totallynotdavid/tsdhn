@@ -3,5 +3,5 @@ import { redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = ({ locals }) => {
-  redirect(303, locals.user ? "/dashboard" : "/login");
+  redirect(303, locals.user ? "/simulations" : "/login");
 };

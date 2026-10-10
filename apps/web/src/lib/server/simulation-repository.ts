@@ -29,6 +29,8 @@ const simulationDetailsSelection = {
   finishedAt: computeJob.finishedAt,
 };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function createSimulationRepository(database: SimulationDatabase) {
   return {
     async createSimulation(data: NewSimulation): Promise<void> {
@@ -57,6 +59,8 @@ export function createSimulationRepository(database: SimulationDatabase) {
     },
 
     async getSimulation(userId: string, id: string): Promise<SimulationDetails | undefined> {
+      // The id column is a UUID and Postgres rejects any other text with an error.
+      if (!UUID.test(id)) return undefined;
       const rows = await database
         .select(simulationDetailsSelection)
         .from(simulation)

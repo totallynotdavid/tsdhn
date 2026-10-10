@@ -4,7 +4,7 @@ import type { LayoutServerLoad } from "./$types";
 
 export const load: LayoutServerLoad = ({ locals, url }) => {
   if (!locals.user) {
-    redirect(303, `/login?redirectTo=${encodeURIComponent(url.pathname)}`);
+    redirect(303, `/login?redirectTo=${encodeURIComponent(url.pathname + url.search)}`);
   }
   return { user: { name: locals.user.name, email: locals.user.email } };
 };

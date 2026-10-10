@@ -1,7 +1,11 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
-  import Button from "#lib/components/ui/Button.svelte";
+  import { page } from "$app/state";
+
+  import favicon from "#lib/assets/favicon.svg";
   import Alert from "#lib/components/ui/Alert.svelte";
+  import Button from "#lib/components/ui/Button.svelte";
+  import Field from "#lib/components/ui/Field.svelte";
 
   let { form } = $props();
   let loading = $state(false);
@@ -9,72 +13,82 @@
 
 <svelte:head><title>Crear cuenta · TSDHN</title></svelte:head>
 
-<main class="flex min-h-screen items-center justify-center p-4">
-  <div class="w-full max-w-sm space-y-6 rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
-    <div class="space-y-1 text-center">
-      <h1 class="text-2xl font-bold text-neutral-900">Crear cuenta</h1>
-      <p class="text-sm text-neutral-500">Acceso al sistema TSDHN</p>
-    </div>
+<main class="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-4 py-10">
+  <img src={favicon} alt="" class="mb-6 size-8" />
+  <h1 class="text-xl font-semibold">Crear cuenta</h1>
+  <p class="text-muted mt-1 text-sm">Simulación de tsunamis a partir de un sismo.</p>
 
+  <form
+    method="POST"
+    class="mt-8 space-y-4"
+    use:enhance={() => {
+      loading = true;
+      return async ({ update }) => {
+        await update({ reset: false });
+        loading = false;
+      };
+    }}
+  >
     {#if form?.message}
-      <Alert tone="error">{form.message}</Alert>
+      <Alert tone="error">
+        {form.message}
+        {#if form.existing}
+          <a href="/login{page.url.search}" class="text-accent font-medium hover:underline">
+            Iniciar sesión
+          </a>
+        {/if}
+      </Alert>
     {/if}
 
-    <form
-      method="POST"
-      class="space-y-4"
-      use:enhance={() => {
-        loading = true;
-        return async ({ update }) => {
-          await update();
-          loading = false;
-        };
-      }}
-    >
-      <label class="block space-y-1">
-        <span class="text-sm font-medium text-neutral-700">Nombre</span>
+    <Field label="Nombre">
+      {#snippet children(props)}
         <input
+          {...props}
           name="name"
           type="text"
           required
           autocomplete="name"
           value={form?.name ?? ""}
-          class="w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+          class="control"
         />
-      </label>
+      {/snippet}
+    </Field>
 
-      <label class="block space-y-1">
-        <span class="text-sm font-medium text-neutral-700">Correo</span>
+    <Field label="Correo">
+      {#snippet children(props)}
         <input
+          {...props}
           name="email"
           type="email"
           required
           autocomplete="email"
           value={form?.email ?? ""}
-          class="w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+          class="control"
         />
-      </label>
+      {/snippet}
+    </Field>
 
-      <label class="block space-y-1">
-        <span class="text-sm font-medium text-neutral-700">Contraseña</span>
+    <Field label="Contraseña" hint="Al menos 8 caracteres.">
+      {#snippet children(props)}
         <input
+          {...props}
           name="password"
           type="password"
           required
           minlength={8}
           autocomplete="new-password"
-          class="w-full rounded-lg border-neutral-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+          class="control"
         />
-      </label>
+      {/snippet}
+    </Field>
 
-      <Button type="submit" class="w-full" disabled={loading}>
-        {loading ? "Creando…" : "Crear cuenta"}
-      </Button>
-    </form>
+    <Button type="submit" class="w-full" disabled={loading}>
+      {loading ? "Creando…" : "Crear cuenta"}
+    </Button>
+  </form>
 
-    <p class="text-center text-sm text-neutral-500">
-      ¿Ya tienes cuenta?
-      <a href="/login" class="font-medium text-brand-600 hover:underline">Iniciar sesión</a>
-    </p>
-  </div>
+  <p class="text-muted mt-6 text-sm">
+    ¿Ya tiene cuenta?
+    <a href="/login{page.url.search}" class="text-accent font-medium hover:underline">Iniciar sesión</a>
+  </p>
 </main>
