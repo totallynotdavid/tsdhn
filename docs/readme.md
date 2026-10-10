@@ -12,6 +12,8 @@
 7. [Testing](testing.md): which suite answers which question.
 8. [Parity](parity.md): the MATLAB and Fortran programs the Python stages are
    compared with.
+9. [Design](design.md): the web app's fonts, colour, type, layout, motion and
+   components.
 
 The root [README](../readme.md) covers installation and a first run.
 [Contributing](../.github/contributing.md) covers the contributor workflow.
