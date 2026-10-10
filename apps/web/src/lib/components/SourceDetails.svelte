@@ -1,9 +1,15 @@
 <script lang="ts">
   import type { components } from "@tsdhn/api-client";
+  import type { ComponentProps } from "svelte";
+
+  import Disclosure from "./ui/Disclosure.svelte";
 
   type Calculation = components["schemas"]["CalculationResponse"];
 
-  let { calculation }: { calculation: Calculation } = $props();
+  let {
+    calculation,
+    variant,
+  }: { calculation: Calculation; variant?: ComponentProps<typeof Disclosure>["variant"] } = $props();
 
   const rows = $derived([
     ["Longitud de ruptura", `${calculation.length.toFixed(1)} km`],
@@ -17,17 +23,31 @@
   ] as const);
 </script>
 
-<details class="group border-line border-t py-3">
-  <summary
-    class="text-muted hover:text-ink flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-medium md:min-h-9 [&::-webkit-details-marker]:hidden"
-  >
-    Parámetros de la fuente
-    <span aria-hidden="true" class="transition-transform group-open:rotate-90">›</span>
-  </summary>
-  <dl class="num mt-1 grid grid-cols-[1fr_auto] gap-x-6 gap-y-1.5 text-sm">
+<Disclosure summary="Parámetros de la fuente" {variant}>
+  <dl class="num t-body-md rows">
     {#each rows as [label, value] (label)}
-      <dt class="text-muted">{label}</dt>
-      <dd class="text-right first-letter:uppercase">{value}</dd>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     {/each}
   </dl>
-</details>
+</Disclosure>
+
+<style>
+  .rows {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 24px;
+  }
+
+  dt {
+    color: var(--ink-alpha-64);
+  }
+
+  dd {
+    text-align: right;
+  }
+
+  dd::first-letter {
+    text-transform: uppercase;
+  }
+</style>

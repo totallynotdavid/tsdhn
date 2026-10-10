@@ -4,16 +4,34 @@
   let { data, children } = $props();
 </script>
 
-<a
-  href="#contenido"
-  class="bg-surface text-ink border-line-strong fixed top-2 left-2 z-50 -translate-y-16 rounded-md border px-3 py-2 text-sm font-medium focus:translate-y-0"
->
-  Saltar al contenido
-</a>
+<a href="#contenido" class="skip t-label-md">Saltar al contenido</a>
 
-<div class="flex min-h-dvh flex-col">
-  <Header user={data.user} />
-  <main id="contenido" class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
-    {@render children()}
-  </main>
-</div>
+<Header user={data.user} />
+<main id="contenido" class="column">
+  {@render children()}
+</main>
+
+<style>
+  .skip {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 130;
+    padding: 8px 12px;
+    border: 1px solid var(--control-border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink);
+    transform: translateY(-64px);
+  }
+
+  .skip:focus {
+    transform: none;
+  }
+
+  main {
+    position: relative;
+    min-height: calc(100dvh - var(--header-height));
+    padding-bottom: 80px;
+  }
+</style>

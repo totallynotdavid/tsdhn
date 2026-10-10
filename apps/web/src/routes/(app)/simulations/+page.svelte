@@ -1,6 +1,8 @@
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
 
+  import PageHeader from "#lib/components/PageHeader.svelte";
+  import ArrowIcon from "#lib/components/ui/ArrowIcon.svelte";
   import Status from "#lib/components/ui/Status.svelte";
   import { formatCoordinates, formatMagnitude, formatWhen } from "#lib/format.js";
   import { isInFlight } from "#lib/simulation-status.js";
@@ -27,21 +29,20 @@
 <svelte:head><title>Simulaciones · TSDHN</title></svelte:head>
 <svelte:window onkeydown={onKeydown} />
 
-<h1 class="mb-4 text-xl font-semibold">Simulaciones</h1>
+<PageHeader>
+  {#snippet title()}Simulaciones{/snippet}
+</PageHeader>
 
-<ul class="border-line bg-surface divide-line divide-y rounded-lg border">
+<ul>
   {#each data.simulations as sim (sim.id)}
     <li>
-      <a
-        href="/simulations/{sim.id}"
-        class="hover:bg-canvas flex min-h-14 items-center justify-between gap-4 px-4 py-3 first:rounded-t-lg last:rounded-b-lg"
-      >
-        <div class="min-w-0">
-          <p class="num truncate font-medium">
+      <a href="/simulations/{sim.id}" class="row gutter">
+        <div class="main">
+          <p class="t-label-lg num title">
             Mw {formatMagnitude(sim.magnitude)}
-            <span class="text-muted font-normal">· {formatCoordinates(sim.latitude, sim.longitude)}</span>
+            <span class="muted coords">· {formatCoordinates(sim.latitude, sim.longitude)}</span>
           </p>
-          <p class="text-muted truncate text-xs">
+          <p class="t-body-sm muted detail">
             {#if sim.progress}
               {sim.progress.label}{sim.progress.position ? ` · ${sim.progress.position}` : ""}
             {:else}
@@ -49,21 +50,112 @@
             {/if}
           </p>
         </div>
-        <div class="flex shrink-0 flex-col items-end gap-0.5">
+        <div class="side">
           <Status status={sim.status} />
           <time
-            class="text-muted text-xs"
+            class="t-body-sm muted"
             datetime={sim.createdAt.toISOString()}
             title={sim.createdAt.toLocaleString("es-PE")}
           >
             {formatWhen(sim.createdAt)}
           </time>
         </div>
+        <ArrowIcon class="arrow" />
       </a>
     </li>
   {/each}
 </ul>
 
-<p class="text-muted mt-3 hidden text-xs md:block">
-  Pulse <kbd class="border-line-strong bg-surface rounded border px-1.5 py-0.5 font-sans">N</kbd> para una nueva simulación.
+<p class="t-body-sm muted shortcut gutter">
+  Pulse <kbd class="t-mono-xs">N</kbd> para una nueva simulación.
 </p>
+
+<style>
+  li + li {
+    border-top: 1px solid var(--border-faint);
+  }
+
+  li:last-child {
+    border-bottom: 1px solid var(--border-faint);
+  }
+
+  .row {
+    display: flex;
+    min-height: 72px;
+    align-items: center;
+    gap: 16px;
+    padding-block: 14px;
+    transition: background-color 0.15s;
+  }
+
+  .row:hover {
+    background: var(--ink-alpha-2);
+  }
+
+  .main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .title,
+  .detail {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .coords {
+    font-weight: 400;
+  }
+
+  .muted {
+    color: var(--ink-alpha-64);
+  }
+
+  .side {
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .row :global(.arrow) {
+    display: none;
+    flex-shrink: 0;
+    color: var(--ink-alpha-48);
+    transition:
+      transform 0.2s,
+      color 0.2s;
+  }
+
+  .row:hover :global(.arrow) {
+    color: var(--ink);
+    transform: translateX(2px);
+  }
+
+  .shortcut {
+    display: none;
+    margin-top: 16px;
+  }
+
+  kbd {
+    padding: 2px 6px;
+    border: 1px solid var(--border-muted);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  @media (min-width: 640px) {
+    .row :global(.arrow) {
+      display: block;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .shortcut {
+      display: block;
+    }
+  }
+</style>

@@ -6,6 +6,8 @@
   import "maplibre-gl/dist/maplibre-gl.css";
   import type { FeatureCollection } from "geojson";
 
+  import DotSpinner from "./ui/DotSpinner.svelte";
+
   export interface Corner {
     lat: number;
     lon: number;
@@ -34,7 +36,7 @@
   let ready = $state(false);
   let failed = $state(false);
 
-  const ACCENT = "#1f5fae";
+  const ACCENT = "#fa5d19";
   const empty: FeatureCollection = { type: "FeatureCollection", features: [] };
 
   function faultData(): FeatureCollection {
@@ -106,14 +108,51 @@
   });
 </script>
 
-<div class="border-line bg-line/40 relative overflow-hidden rounded-lg border {klass}">
+<div class="frame {klass}">
   <!-- maplibre-gl.css is unlayered and sets position on its element, so size it from a wrapper. -->
-  <div class="absolute inset-0">
-    <div bind:this={container} class="size-full" role="application" aria-label="Mapa del epicentro"></div>
+  <div class="wrapper">
+    <div bind:this={container} class="canvas" role="application" aria-label="Mapa del epicentro"></div>
   </div>
   {#if !ready}
-    <p class="text-muted pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-sm">
-      {failed ? "No se pudo cargar el mapa. Las coordenadas se pueden escribir en el formulario." : "Cargando mapa…"}
-    </p>
+    <div class="overlay t-body-md">
+      {#if !failed}<DotSpinner />{/if}
+      <p>
+        {failed ? "No se pudo cargar el mapa. Las coordenadas se pueden escribir en el formulario." : "Cargando mapa…"}
+      </p>
+    </div>
   {/if}
 </div>
+
+<style>
+  .frame {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-faint);
+    border-radius: 12px;
+    background: var(--ink-alpha-4);
+  }
+
+  .wrapper {
+    position: absolute;
+    inset: 0;
+  }
+
+  .canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding-inline: 24px;
+    color: var(--ink-alpha-64);
+    text-align: center;
+    pointer-events: none;
+  }
+</style>

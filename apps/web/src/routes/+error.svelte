@@ -4,6 +4,16 @@
   import ErrorState from "#lib/components/ErrorState.svelte";
 </script>
 
-<main class="mx-auto min-h-dvh max-w-6xl px-4 sm:px-6">
+<main class="column">
   <ErrorState status={page.status} message={page.error?.message} />
 </main>
+
+<style>
+  main {
+    position: relative;
+    display: flex;
+    min-height: 100dvh;
+    flex-direction: column;
+    justify-content: center;
+  }
+</style>
