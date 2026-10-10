@@ -6,10 +6,14 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig } from "vite";
 
 const adapter = process.env.ADAPTER === "node" ? adapterNode() : adapterAuto();
+const previewing = process.env.TSDHN_PREVIEW === "1";
 
 export default defineConfig({
+  // Preview takes variables from the launcher, not from `.env` files.
+  // SvelteKit reads `env.dir`, so preview points it to an empty directory.
+  envDir: previewing ? false : undefined,
   // Preview requests may use any host name on the network.
-  server: process.env.TSDHN_PREVIEW === "1" ? { allowedHosts: true } : {},
+  server: previewing ? { allowedHosts: true } : {},
   plugins: [
     tailwindcss(),
     sveltekit({
@@ -19,6 +23,7 @@ export default defineConfig({
           filename.split(/[/\\]/).includes("node_modules") ? undefined : true,
       },
       adapter,
+      env: previewing ? { dir: ".svelte-kit/no-env" } : {},
       preprocess: [mdsvex({ extensions: [".svx", ".md"] })],
       extensions: [".svelte", ".svx", ".md"],
     }),

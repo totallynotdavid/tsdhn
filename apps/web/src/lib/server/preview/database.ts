@@ -10,7 +10,6 @@ import type { NewSimulation } from "#lib/server/db/schema.js";
 import type { SimulationDatabase } from "#lib/server/simulation-repository.js";
 
 import { calculationFor, DEMO_USER, STEPS, storedOutputs, travelTimesFor } from "./canned.js";
-import { previewRefusal } from "./guard.js";
 import { jobInput } from "./job-input.js";
 
 const MIGRATIONS = new URL("../../../../drizzle", import.meta.url).pathname;
@@ -196,13 +195,7 @@ async function seed(db: SimulationDatabase): Promise<void> {
   await db.insert(jobInput).values(rows.flatMap((row) => (row.input ? [row.input] : [])));
 }
 
-export async function createPreviewDatabase(env: {
-  NODE_ENV?: string;
-  DATABASE_URL?: string;
-}): Promise<SimulationDatabase> {
-  const refusal = previewRefusal(env);
-  if (refusal) throw new Error(refusal);
-
+export async function createPreviewDatabase(): Promise<SimulationDatabase> {
   const client = new PGlite();
   const db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder: MIGRATIONS });

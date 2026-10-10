@@ -9,7 +9,7 @@ import * as schema from "./schema";
 async function connect(): Promise<SimulationDatabase> {
   if (TSDHN_PREVIEW === "1") {
     const { createPreviewDatabase } = await import("#lib/server/preview/database.js");
-    return createPreviewDatabase({ NODE_ENV: process.env.NODE_ENV, DATABASE_URL });
+    return createPreviewDatabase();
   }
   if (!DATABASE_URL?.trim()) throw new Error("DATABASE_URL is not set");
   return drizzle(postgres(DATABASE_URL, { max: 10 }), { schema });

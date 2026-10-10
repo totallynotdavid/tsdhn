@@ -11,7 +11,7 @@ const schema = (fallback: string) =>
 export const variables = defineEnvVars({
   ORIGIN: { schema: schema("http://localhost:3000") },
   BETTER_AUTH_SECRET: { schema: schema("tsdhn-build-secret") },
-  // Preview mode has no database URL. It refuses to start when one is set.
+  // The preview launcher passes no database URL.
   DATABASE_URL: {
     schema: previewing ? z.string().optional() : schema("postgres://localhost/test"),
   },

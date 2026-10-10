@@ -11,7 +11,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "serve:preview": "bun scripts/preview.ts",
+    "serve:preview": "bun --no-env-file scripts/preview.ts",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

@@ -1,7 +1,6 @@
 import { parseArgs } from "node:util";
 
 import { DEMO_USER } from "../src/lib/server/preview/canned.ts";
-import { previewRefusal } from "../src/lib/server/preview/guard.ts";
 
 const { values } = parseArgs({
   options: {
@@ -16,18 +15,42 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   process.exit(1);
 }
 
-const refusal = previewRefusal(process.env);
-if (refusal) {
-  console.error(refusal);
+// The package script disables Bun's `.env` loading. These checks inspect the
+// caller's shell environment, so a DATABASE_URL here is the caller's value.
+if (process.env.NODE_ENV === "production") {
+  console.error("Preview mode refuses to run with NODE_ENV=production.");
+  process.exit(1);
+}
+if (process.env.DATABASE_URL?.trim()) {
+  console.error(
+    "Preview mode refuses to run with DATABASE_URL set; it uses its own embedded database.",
+  );
   process.exit(1);
 }
 
+// Pass only these shell variables to the app. The launcher generates the
+// remaining secrets, so caller credentials do not cross the boundary.
+const INHERITED = ["PATH", "HOME", "USER", "TMPDIR", "TERM", "LANG", "LC_ALL", "NO_COLOR"];
+const inherited = Object.fromEntries(
+  INHERITED.flatMap((name) => (process.env[name] === undefined ? [] : [[name, process.env[name]]])),
+);
+
 const randomHex = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex");
 const child = Bun.spawn(
-  ["bun", "run", "dev", "--host", values.host, "--port", String(port), "--strictPort"],
+  [
+    "bun",
+    "--no-env-file",
+    "run",
+    "dev",
+    "--host",
+    values.host,
+    "--port",
+    String(port),
+    "--strictPort",
+  ],
   {
     env: {
-      ...process.env,
+      ...inherited,
       TSDHN_PREVIEW: "1",
       ORIGIN: `http://localhost:${port}`,
       COMPUTE_API_URL: `http://127.0.0.1:${port}/_preview/compute`,
