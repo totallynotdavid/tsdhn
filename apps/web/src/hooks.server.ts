@@ -1,7 +1,10 @@
 import type { Handle } from "@sveltejs/kit/hooks";
+import { sequence } from "@sveltejs/kit/hooks";
 import { building } from "$app/env";
+import { COMPUTE_API_TOKEN, TSDHN_PREVIEW } from "$app/env/private";
 import { auth } from "#lib/server/auth.js";
 import { db } from "#lib/server/db/index.js";
+import { createPreviewHandle } from "#lib/server/preview/hook.js";
 import { createSimulationRepository } from "#lib/server/simulation-repository.js";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 
@@ -20,4 +23,10 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
   return svelteKitHandler({ event, resolve, auth, building });
 };
 
-export const handle: Handle = handleBetterAuth;
+export const handle: Handle =
+  TSDHN_PREVIEW === "1"
+    ? sequence(
+        createPreviewHandle({ auth, db, computeApiToken: COMPUTE_API_TOKEN }),
+        handleBetterAuth,
+      )
+    : handleBetterAuth;

@@ -8,6 +8,8 @@ import { defineConfig } from "vite";
 const adapter = process.env.ADAPTER === "node" ? adapterNode() : adapterAuto();
 
 export default defineConfig({
+  // Preview requests may use any host name on the network.
+  server: process.env.TSDHN_PREVIEW === "1" ? { allowedHosts: true } : {},
   plugins: [
     tailwindcss(),
     sveltekit({

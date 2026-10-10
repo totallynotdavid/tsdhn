@@ -11,6 +11,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
+    "serve:preview": "bun scripts/preview.ts",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@better-auth/drizzle-adapter": "~1.7.7",
+    "@electric-sql/pglite": "^0.5.8",
     "@sveltejs/adapter-auto": "^8.0.0",
     "@sveltejs/adapter-node": "^6.0.0",
     "@sveltejs/kit": "^3.0.1",

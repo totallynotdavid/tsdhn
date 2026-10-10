@@ -1,12 +1,12 @@
 import { and, desc, eq } from "drizzle-orm";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 
 import { computeJob } from "#lib/server/db/compute.js";
 import * as schema from "#lib/server/db/schema.js";
 import { type NewSimulation, simulation } from "#lib/server/db/schema.js";
 import { type SimulationDetails, toSimulationDetails } from "#lib/server/simulation-details.js";
 
-export type SimulationDatabase = PostgresJsDatabase<typeof schema>;
+export type SimulationDatabase = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 export type SimulationRepository = ReturnType<typeof createSimulationRepository>;
 
