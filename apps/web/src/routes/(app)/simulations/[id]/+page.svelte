@@ -186,9 +186,9 @@
           aria-valuenow={progress.percent ?? undefined}
         >
           <div
-            class="bg-accent h-full rounded-full transition-[width] duration-500 {progress.percent === null
-              ? 'w-1/4 motion-safe:animate-pulse'
-              : ''}"
+            class="h-full rounded-full transition-[width] duration-500 {progress.percent === null
+              ? 'bg-accent/30 w-full motion-safe:animate-pulse'
+              : 'bg-accent'}"
             style:width={progress.percent === null ? undefined : `${progress.percent}%`}
           ></div>
         </div>
@@ -278,5 +278,8 @@
       zoom={5}
       class="h-60 lg:h-96"
     />
+    <p class="text-muted mt-2 text-xs">
+      {faultCorners ? "Epicentro y plano de falla (rectángulo azul)." : "Epicentro."}
+    </p>
   </div>
 </div>
