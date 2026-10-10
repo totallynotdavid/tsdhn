@@ -1,72 +1,109 @@
-@import "@fontsource-variable/inter";
+@import "../lib/styles/fonts.css";
 @import "tailwindcss";
+@import "../lib/styles/tokens.css";
+@import "../lib/styles/base.css";
+@import "../lib/styles/typography.css";
 
-@theme {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-
-  --color-canvas: oklch(0.985 0.002 250);
-  --color-surface: #fff;
-  --color-line: oklch(0.915 0.006 250);
-  --color-line-strong: oklch(0.82 0.01 250);
-  --color-ink: oklch(0.22 0.02 250);
-  --color-muted: oklch(0.5 0.02 250);
-
-  --color-accent: oklch(0.5 0.14 245);
-  --color-accent-strong: oklch(0.43 0.14 245);
-  --color-accent-soft: oklch(0.96 0.02 245);
-
-  --color-ok: oklch(0.58 0.14 150);
-  --color-danger: oklch(0.55 0.2 27);
-  --color-danger-soft: oklch(0.97 0.02 27);
-  --color-warn-soft: oklch(0.97 0.04 85);
-  --color-warn-line: oklch(0.85 0.1 85);
-  --color-warn-ink: oklch(0.4 0.09 70);
+@theme static {
+  --font-sans:
+    "Inter Variable", "Inter Fallback", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "Geist Mono Variable", ui-monospace, SFMono-Regular, "Roboto Mono", Menlo, Monaco,
+    "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
+  --breakpoint-lg: 62.25rem;
 }
 
-@layer base {
-  html {
-    font-family: var(--font-sans);
-    color-scheme: light;
-    -webkit-text-size-adjust: 100%;
-  }
-
-  body {
-    @apply bg-canvas text-ink text-sm antialiased;
-    font-feature-settings: "cv11", "ss03";
-  }
-
-  :focus-visible {
-    @apply outline-accent outline-2 outline-offset-2;
-  }
+@theme inline {
+  --color-canvas: var(--background-base);
+  --color-surface: var(--surface);
+  --color-line: var(--border-faint);
+  --color-ink: var(--ink);
+  --color-muted: var(--ink-alpha-64);
+  --color-hover: var(--ink-alpha-4);
+  --color-heat: var(--heat-ink);
+  --color-mark: var(--heat-100);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-line: var(--warn-line);
 }
 
 @layer components {
-  /* 44 px hit targets on touch, 36 px on pointer devices. */
   .control {
-    @apply bg-surface border-line-strong text-ink block min-h-11 w-full rounded-md border px-3 py-2 text-sm md:min-h-9;
-    @apply placeholder:text-muted/70;
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--control-border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 24px;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .control::placeholder {
+    color: var(--ink-alpha-64);
   }
 
   .control:hover {
-    @apply border-muted/60;
+    border-color: var(--control-border-hover);
+  }
+
+  .control:focus-visible {
+    box-shadow: 0 0 0 4px var(--heat-12);
   }
 
   .control[aria-invalid="true"] {
-    @apply border-danger;
+    border-color: var(--danger);
+  }
+
+  @media (min-width: 768px) {
+    .control {
+      min-height: 36px;
+    }
+  }
+
+  @media (min-width: 996px) {
+    .control {
+      font-size: 15px;
+    }
   }
 
   .num {
     font-variant-numeric: tabular-nums;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .column {
+    width: min(100% - 32px, var(--container-width));
+    margin-inline: auto;
+  }
+
+  .gutter {
+    padding-inline: 16px;
+  }
+
+  @media (min-width: 640px) {
+    .gutter {
+      padding-inline: 32px;
+    }
+  }
+
+  @media (min-width: 996px) {
+    .gutter {
+      padding-inline: 56px;
+    }
+  }
+
+  .band {
+    position: relative;
+    margin-top: -1px;
+    border-block: 1px solid var(--border-faint);
   }
 }

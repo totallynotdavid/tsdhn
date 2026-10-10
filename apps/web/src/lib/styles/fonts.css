@@ -1,0 +1,13 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist-mono";
+
+/* Metrics derived from Inter against Arial, so the swap to Inter moves no line.
+   Liberation Sans and Arimo are Arial-metric clones for hosts without Arial. */
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial"), local("Liberation Sans"), local("Arimo");
+  ascent-override: 90.5%;
+  descent-override: 22.53%;
+  line-gap-override: 0%;
+  size-adjust: 107.05%;
+}

@@ -1,0 +1,131 @@
+:root {
+  color-scheme: light dark;
+
+  --heat-100: #fa5d19;
+  --heat-12: #fa5d191f;
+  --heat-20: #fa5d1933;
+  --heat-24: #fa5d193d;
+  /* Text, links and focus rings: --heat-100 is 3.0:1 on the canvas. */
+  --heat-ink: #c93700;
+
+  --ink: #262626;
+  --surface: #fff;
+  --background-base: #f9f9f9;
+
+  --ink-alpha-2: #00000005;
+  --ink-alpha-4: #0000000a;
+  --ink-alpha-5: #0000000d;
+  --ink-alpha-6: #0000000f;
+  --ink-alpha-7: #00000012;
+  --ink-alpha-48: #2626267a;
+  --ink-alpha-56: #2626268f;
+  --ink-alpha-64: #262626a3;
+  --ink-alpha-72: #262626b8;
+
+  --border-faint: #ededed;
+  --border-muted: #e8e8e8;
+  /* Input borders must reach 3:1 against the surface. */
+  --control-border: var(--ink-alpha-56);
+  --control-border-hover: var(--ink-alpha-72);
+
+  --ok: #00803a;
+  --danger: #c4281c;
+  --danger-soft: #c4281c14;
+  --warn: #8a5300;
+  --warn-soft: #fff6e0;
+  --warn-line: #e3be6e;
+
+  --surface-shadow:
+    var(--ink-alpha-2) 0 0 44px, var(--ink-alpha-4) 0 88px 56px -20px,
+    var(--ink-alpha-2) 0 56px 56px -20px, var(--ink-alpha-4) 0 32px 32px -20px,
+    var(--ink-alpha-4) 0 16px 24px -12px, var(--ink-alpha-5) 0 0 0 1px,
+    var(--background-base) 0 0 0 10px;
+  --menu-shadow: 0 4px 6px -1px #0000001a, 0 2px 4px -2px #0000001a;
+
+  /* White on #ff4c00 is 3.3:1. The darker fill keeps 4.5:1 for the label. */
+  --button-primary-fill: #d93d00;
+  --button-primary-shadow:
+    inset 0 -6px 12px #f003, 0 2px 4px #ff4d001f, 0 1px 1px #ff4d001f, 0 0.5px 0.5px #ff4d0029,
+    0 0.25px 0.25px #ff4d0033;
+  --button-primary-shadow-hover:
+    inset 0 -6px 12px #f003, 0 4px 8px #ff4d0029, 0 1px 1px #ff4d001f, 0 0.5px 0.5px #ff4d0029,
+    0 0.25px 0.25px #ff4d0033;
+
+  /* The 200-stiffness, 23-damping spring: 1.2% overshoot. */
+  --ease-spring-snap: linear(
+    0,
+    0.0515,
+    0.1698,
+    0.3144,
+    0.4603,
+    0.5932,
+    0.7062,
+    0.7975,
+    0.8679,
+    0.9199,
+    0.9567,
+    0.9815,
+    0.9972,
+    1.0063,
+    1.0108,
+    1.0124,
+    1.012,
+    1.0107,
+    1.009,
+    1.0072,
+    1.0055,
+    1.004,
+    1.0028,
+    1.0018,
+    1
+  );
+  --duration-spring-snap: 0.6s;
+  --ease-disclosure: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-panel: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --container-width: 1112px;
+  --header-height: 100px;
+  --header-offset: 90px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f2f2f2;
+    --surface: #1a1a1a;
+    --background-base: #111;
+
+    --ink-alpha-2: #f2f2f205;
+    --ink-alpha-4: #f2f2f20a;
+    --ink-alpha-5: #f2f2f20d;
+    --ink-alpha-6: #f2f2f20f;
+    --ink-alpha-7: #f2f2f212;
+    --ink-alpha-48: #f2f2f27a;
+    --ink-alpha-56: #f2f2f28f;
+    --ink-alpha-64: #f2f2f2a3;
+    --ink-alpha-72: #f2f2f2b8;
+
+    --border-faint: #222;
+    --border-muted: #2a2a2a;
+    --control-border: var(--ink-alpha-48);
+    --control-border-hover: var(--ink-alpha-64);
+
+    --heat-ink: #fa5d19;
+    --ok: #3ddc84;
+    --danger: #ff7a70;
+    --danger-soft: #ff7a7026;
+    --warn: #f0c35c;
+    --warn-soft: #2a2211;
+    --warn-line: #5c4818;
+
+    --surface-shadow:
+      #00000066 0 24px 48px -16px, var(--ink-alpha-6) 0 0 0 1px, var(--background-base) 0 0 0 10px;
+    --menu-shadow: 0 8px 24px -4px #0009;
+  }
+}
+
+@media (max-width: 995px) {
+  :root {
+    --header-height: 72px;
+    --header-offset: 72px;
+  }
+}

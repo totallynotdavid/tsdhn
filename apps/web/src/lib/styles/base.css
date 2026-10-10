@@ -1,0 +1,45 @@
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+    scroll-padding-top: var(--header-offset);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    overflow-x: clip;
+    background: var(--background-base);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 24px;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--heat-20);
+    color: var(--heat-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--heat-ink);
+    outline-offset: 2px;
+  }
+
+  /* One rule stops every transition and animation. A component that must show
+     a still frame instead (the spinner) says so in its own reduced-motion block. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
