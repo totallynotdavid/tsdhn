@@ -51,8 +51,11 @@ Downloads return small canned files. The data resets on every start.
 
 The map tiles load from the internet, so the map needs a network connection.
 
-The preview refuses to start when `NODE_ENV` is `production` or `DATABASE_URL`
-is set. [Architecture](../../docs/architecture.md#preview-mode) describes how it
+The preview ignores `.env` files, so a checkout with a `DATABASE_URL` in
+`apps/web/.env` starts normally. It passes the app only a few shell variables
+such as `PATH` and `HOME`. It refuses to start when your shell sets
+`NODE_ENV=production` or `DATABASE_URL`.
+[Architecture](../../docs/architecture.md#preview-mode) describes how it
 replaces the database and the compute service.
 
 ## Database
