@@ -63,7 +63,11 @@
 
 <svelte:head><title>Nueva simulación · TSDHN</title></svelte:head>
 
-<h1 class="mb-4 text-xl font-semibold">Nueva simulación</h1>
+<h1 class="text-xl font-semibold">Nueva simulación</h1>
+<p class="text-muted mt-1 mb-4 max-w-2xl text-sm">
+  Indique el sismo o toque el mapa. El estimado muestra al instante cuándo llegaría la ola a cada
+  puerto; al iniciar la simulación se generan además los mapas y mareogramas.
+</p>
 
 <div class="grid gap-6 lg:grid-cols-[24rem_minmax(0,1fr)]">
   <!-- The handler only reacts to keys pressed inside the form's own inputs. -->
@@ -76,7 +80,7 @@
     class="order-2 flex min-w-0 flex-col gap-6 lg:order-1"
   >
     <div class="grid grid-cols-2 gap-x-4 gap-y-4">
-      <Field label="Magnitud (Mw)" error={$errors.magnitude}>
+      <Field label="Magnitud (Mw)" hint="De 6.5 a 9.5" error={$errors.magnitude}>
         {#snippet children(props)}
           <input
             {...props}
@@ -89,7 +93,7 @@
           />
         {/snippet}
       </Field>
-      <Field label="Profundidad (km)" error={$errors.depth}>
+      <Field label="Profundidad (km)" hint="Del foco, hasta 700" error={$errors.depth}>
         {#snippet children(props)}
           <input
             {...props}
@@ -102,7 +106,7 @@
           />
         {/snippet}
       </Field>
-      <Field label="Latitud" error={$errors.latitude}>
+      <Field label="Latitud" hint="Sur es negativo" error={$errors.latitude}>
         {#snippet children(props)}
           <input
             {...props}
@@ -115,7 +119,7 @@
           />
         {/snippet}
       </Field>
-      <Field label="Longitud" error={$errors.longitude}>
+      <Field label="Longitud" hint="Oeste es negativo" error={$errors.longitude}>
         {#snippet children(props)}
           <input
             {...props}
@@ -191,6 +195,10 @@
       {/if}
     </section>
 
+    <p class="text-muted -mb-3 text-xs">
+      Tarda cerca de una hora. Puede cerrar la página; el progreso queda en Simulaciones.
+      <span class="hidden md:inline">Ctrl + Enter inicia la simulación desde un campo.</span>
+    </p>
     <div class="border-line bg-canvas sticky bottom-0 -mx-4 space-y-2 border-t px-4 py-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
       {#if $message}
         <Alert tone="error">{$message}</Alert>
@@ -198,9 +206,6 @@
       <Button type="submit" class="w-full" disabled={$submitting}>
         {$submitting ? "Iniciando…" : "Iniciar simulación"}
       </Button>
-      <p class="text-muted text-xs">
-        Tarda cerca de una hora. Puede cerrar la página; el progreso queda en Simulaciones.
-      </p>
     </div>
   </form>
 
