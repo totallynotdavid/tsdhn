@@ -33,8 +33,9 @@ web simulation. It is unique, so a repeated submission returns the same job.
 `tsdhn-compute-migrate` applies the numbered files in
 `packages/api/api/migrations/` in name order. It records each applied file in
 `compute.schema_migrations` and rolls a failing file back. To change the schema,
-add the next numbered file. `mise run db:reset` deletes the local PostgreSQL
-cluster, which a database built from an earlier schema needs.
+add the next numbered file. To rebuild a local database from scratch, run
+`mise run db:reset`, which deletes the project-local PostgreSQL cluster under
+`.data/postgres`.
 
 ## Compute roles
 

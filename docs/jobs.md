@@ -74,15 +74,16 @@ The web app checks ownership, then reads the simulation and its compute row. For
 live progress it relays the compute API event stream to the browser. The compute
 service sends the current state, listens for PostgreSQL notifications, and
 closes the stream when the job finishes or after
-`TSDHN_SSE_MAX_DURATION_SECONDS` (1800).
+`TSDHN_SSE_MAX_DURATION_SECONDS` (default 1800). [Deploy](deploy.md#settings)
+lists the setting.
 
 ### Download
 
 1. The browser asks the web app for an output name.
 2. The web app checks the session, simulation ownership and available names.
 3. The compute API returns an object storage URL that is valid for
-   `TSDHN_OUTPUT_URL_TTL_SECONDS` (900). The compute API answers with a 307
-   redirect and the web app passes it on as a 302.
+   `TSDHN_OUTPUT_URL_TTL_SECONDS` (default 900). The compute API answers with a
+   307 redirect and the web app passes it on as a 302.
 4. The browser downloads the file from object storage.
 
 Neither the web app nor the compute API relays output bytes.

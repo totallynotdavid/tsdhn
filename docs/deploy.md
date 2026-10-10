@@ -15,9 +15,9 @@ mise run env-init
 ```
 
 `env-init` refuses to overwrite an existing `.env`, generates the six required
-secrets and writes the file with mode 600. The three queue-role passwords belong
-to the API producer, the worker and the retention purger. See
-[Database](database.md#compute-roles).
+secrets and writes the file with mode 600: the compute API token, the Better
+Auth secret, the web role password and the three queue-role passwords. See
+[Database](database.md#compute-roles) for the roles.
 
 The example uses queue `simulations` in schema `task_queue` and exposes RustFS
 at `localhost:9000` for browser downloads. Set `TSDHN_S3_PUBLIC_ENDPOINT` to the
@@ -51,6 +51,7 @@ variable is unset.
 | `TSDHN_S3_BUCKET`, `TSDHN_S3_SECURE`                                | `tsdhn-results`, `false`                         | Bucket name and TLS                                    |
 | `TSDHN_OUTPUT_URL_TTL_SECONDS`                                      | `900`                                            | Lifetime of a download URL                             |
 | `TSDHN_SSE_MAX_DURATION_SECONDS`                                    | `1800`                                           | Longest progress stream                                |
+| `COMPUTE_API_TOKEN`                                                 | none (required)                                  | Bearer token for every route except health and version |
 | `TSDHN_ALLOWED_ORIGINS`                                             | empty                                            | Comma-separated origins that may call the API directly |
 | `TSDHN_HOST`, `TSDHN_PORT`                                          | `127.0.0.1`, `8000`                              | Address `tsdhn-api` listens on                         |
 

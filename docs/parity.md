@@ -31,8 +31,9 @@ The Python stages keep these details of the references:
 - fixed grid, time-step, sampling and update-order constants;
 - fixed-width output fields and decimal quantization.
 
-[Science](science.md#legacy-substitutions) lists the rules that replace a
-computed value with a fixed one.
+[Science](science.md) states the numerical rules and [Pipeline](pipeline.md) the
+file formats. [Science](science.md#legacy-substitutions) lists the rules that
+replace a computed value with a fixed one.
 
 Checkpoint state is Python's own and has no Fortran counterpart.
 

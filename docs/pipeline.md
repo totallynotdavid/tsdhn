@@ -106,7 +106,8 @@ The active Python writer emits one seven-column time field followed by one
 seven-column elevation field per actual gauge. With the current 17 gauges, each
 row has the layout `(F7.1, 17F7.3)`. Time is minutes from the origin with one
 decimal place, and each virtual-gauge elevation is in meters with three decimal
-places. The solver writes a row every 20 solver steps (`20 * 3 s = 60 s`).
+places. The solver writes a row every 20 solver steps, or 60 seconds.
+[Science](science.md#propagation) lists the step and sampling constants.
 
 The legacy Fortran declaration is `(F7.1, 100F7.3)`. It reserves capacity for
 100 elevation fields, but it is not the active Python-written layout.

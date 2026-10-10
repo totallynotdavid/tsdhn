@@ -6,6 +6,20 @@ the Pacific Ocean from the command line or a web app. The model grid covers the
 Pacific from 76°S to 61°N, and the 17 report ports are on the coast of Peru and
 at Arica.
 
+## Install
+
+Install the pinned tools and the Python packages, then download the model data:
+
+```sh
+mise install
+mise run install
+uv run tsdhn assets install
+```
+
+`uv run tsdhn doctor` reports the model data and the external tools.
+
+## Example
+
 ```sh
 uv run tsdhn calc --mw 8.0 --lat -20.5 --lon -70.5
 ```
@@ -51,42 +65,32 @@ uv run tsdhn calc --mw 8.0 --lat -20.5 --lon -70.5
 pipeline: fault plane, seafloor deformation, wave propagation and the report
 maps. The web app and compute API run the same pipeline for many users.
 
-## Install
+## Full pipeline
 
-Install the pinned tools and start the local stack:
-
-```sh
-mise install && mise run dev
-```
-
-`mise run env-init` creates `.env` from `.env.example` with generated secrets.
-`mise run dev` runs it automatically when `.env` is missing. It refuses to
-overwrite an existing file.
-
-For the command-line model, download the model data and check the toolchain:
-
-```sh
-mise run install
-uv run tsdhn assets install
-uv run tsdhn doctor
-```
-
-`tsdhn run` also needs GMT (6.5.0 or newer) and `ttt_client` on `PATH`.
-`tsdhn doctor` reports which of them are missing. `calc` needs neither. On an
-apt-based system, `scripts/setup.sh` installs both with `sudo`. It prints its
-plan and asks before it changes anything. It also installs Intel Fortran and
-compiles the parity tools unless you pass `--skip-ifx` or `--skip-tools`.
-`--help` lists every option.
-
-Run the full pipeline with the same inputs:
+`tsdhn run` also needs GMT and `ttt_client` on `PATH`. `tsdhn doctor` reports
+which of them are missing. On an apt-based system, `scripts/setup.sh` installs
+GMT 6.5.0 or newer and `ttt_client` with `sudo`. It prints its plan and asks
+before it changes anything. It also installs Intel Fortran and compiles the
+parity tools unless you pass `--skip-ifx` or `--skip-tools`. `--help` lists
+every option.
 
 ```sh
 uv run tsdhn run --mw 8.0 --lat -20.5 --lon -70.5
 ```
 
-The run directory defaults to `jobs/<timestamp>`. Install the web app
-dependencies with `mise run web-install`, and start the services as described in
-[Deploy](docs/deploy.md).
+The run directory defaults to `jobs/<timestamp>`.
+
+## Services
+
+Start the compute API, the worker, PostgreSQL, object storage and the web app as
+containers:
+
+```sh
+mise run dev
+```
+
+[Deploy](docs/deploy.md) covers the configuration, the addresses and how to stop
+the stack.
 
 ## Features
 

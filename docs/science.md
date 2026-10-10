@@ -61,16 +61,21 @@ The engine converts between degrees and distance with several different values.
 They are not one model of the Earth. Each row is a value the code uses today.
 Names are in `packages/tsdhn/tsdhn/constants.py` unless the row says otherwise.
 
-| Value                  | Name and location                                                                           | Used for                                                                                                                           | Origin                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `111.0` km per degree  | `FAULT_PLANE_KILOMETERS_PER_DEGREE`; `model/physical_constants.inc:3` has the same constant | `fault_plane.py` (`_grid_window`, `_recompute_depth`) and the fault origin `xo`, `yo` in `calculator.py`                           | Origin not recorded                                                                          |
-| `6371.0` km            | `MEAN_EARTH_RADIUS_KM`, which gives `MEAN_EARTH_KILOMETERS_PER_DEGREE` (111.1949)           | `calculate_distance_to_coast` in `utils/geo.py`: coast distance from the degree distance                                           | Named the mean Earth radius in the code; the choice of value is not recorded                 |
-| `6370.8` km            | `TSUNAMI_MODEL_EARTH_RADIUS_KM`; no counterpart in `model/`                                 | `TsunamiCalculator._calculate_travel_time` in `calculator.py`: spherical distance to each port                                     | Origin not recorded                                                                          |
-| `6.37e6` m             | `TSUNAMI_SOLVER_EARTH_RADIUS_M`; `model/physical_constants.inc:2` has the same constant     | `tsunami.py` (`_RT`): the solver's step coefficients                                                                               | Origin not recorded                                                                          |
-| `111.1994` km          | `MAXOLA_GRID_KILOMETERS_PER_DEGREE`                                                         | `GridConfig.cellsize` in `render/maxola.py`: `7412.9951096 / 1000 / 111.1994` = 0.066664 degrees, where the solver spacing is 1/15 | Origin not recorded. The code does not say why this value differs from the solver's spacing. |
-| `110` km per degree    | literal in `calculator.py` (`_calculate_travel_time`)                                       | Scales the path direction in the integrated arrival-time estimate                                                                  | Origin not recorded                                                                          |
-| `7412.9951096` m       | `_DX` in `deform.py`; `GridConfig.dx` in `render/maxola.py`; `DX` at `model/def_oka.f:38`   | Grid spacing of the deformation grid and the maximum-height grid                                                                   | Origin not recorded. `model/deform.for:34` computes `240 * 1853 / 60`, which is 7412.0.      |
-| `60 * 1853` m / degree | `NM_CONVERSION` in `calculator.py`                                                          | Converts fault-corner offsets to degrees in the displayed fault outline                                                            | Sixty nautical miles of 1853 m; the choice of 1853 is not recorded                           |
+| Value                  | Name and location                                                                           | Used for                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `111.0` km per degree  | `FAULT_PLANE_KILOMETERS_PER_DEGREE`; `model/physical_constants.inc:3` has the same constant | `fault_plane.py` (`_grid_window`, `_recompute_depth`) and the fault origin `xo`, `yo` in `calculator.py`                           |
+| `6371.0` km            | `MEAN_EARTH_RADIUS_KM`, which gives `MEAN_EARTH_KILOMETERS_PER_DEGREE` (111.1949)           | `calculate_distance_to_coast` in `utils/geo.py`: coast distance from the degree distance                                           |
+| `6370.8` km            | `TSUNAMI_MODEL_EARTH_RADIUS_KM`; no counterpart in `model/`                                 | `TsunamiCalculator._calculate_travel_time` in `calculator.py`: spherical distance to each port                                     |
+| `6.37e6` m             | `TSUNAMI_SOLVER_EARTH_RADIUS_M`; `model/physical_constants.inc:2` has the same constant     | `tsunami.py` (`_RT`): the solver's step coefficients                                                                               |
+| `111.1994` km          | `MAXOLA_GRID_KILOMETERS_PER_DEGREE`                                                         | `GridConfig.cellsize` in `render/maxola.py`: `7412.9951096 / 1000 / 111.1994` = 0.066664 degrees, where the solver spacing is 1/15 |
+| `110` km per degree    | literal in `calculator.py` (`_calculate_travel_time`)                                       | Scales the path direction in the integrated arrival-time estimate                                                                  |
+| `7412.9951096` m       | `_DX` in `deform.py`; `GridConfig.dx` in `render/maxola.py`; `DX` at `model/def_oka.f:38`   | Grid spacing of the deformation grid and the maximum-height grid                                                                   |
+| `60 * 1853` m / degree | `NM_CONVERSION` in `calculator.py`                                                          | Converts fault-corner offsets to degrees in the displayed fault outline: sixty nautical miles of 1853 m                            |
+
+The code and the Fortran sources record no origin for these values. Two
+differences stand out. `MAXOLA_GRID_KILOMETERS_PER_DEGREE` differs from the
+solver spacing, and the code does not say why. `model/deform.for:34` computes
+`240 * 1853 / 60`, which is 7412.0, not 7412.9951096.
 
 ## Fault plane and deformation
 
@@ -91,11 +96,14 @@ an epsilon of `1e-8`. The exact `deform_a.grd` field layout is documented in
 Three rules replace a computed value with a fixed one. All three come from the
 Fortran programs, and the Python code reproduces them.
 
-| Rule                                                            | Fortran                                                      | Python                                                                | Effect                                                                                                               | Rationale    |
-| --------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------ |
-| A negative upper-edge depth becomes 5000 m                      | `model/fault_plane.f90:108-110`                              | `_recompute_depth` in `fault_plane.py`                                | A fault whose upper edge would lie above the surface is placed at 5 km depth. The computed depth is discarded.       | Not recorded |
-| Strike 0 or 360 degrees gets 0.001 degrees added                | `model/def_oka.f:77-78`                                      | `compute_deform_grid` in `deform.py`                                  | A strike of exactly 0 or 360 is computed as 0.001 or 360.001. The code comment says it avoids a singular transform.  | Not recorded |
-| A grid value with an absolute value of 20 m or more is set to 0 | `model/def_oka.f:150-153` (the Fortran also prints the cell) | `clip_anomalous_values` in `deform.py`, which logs a warning per call | The deformation grid never holds a vertical displacement of 20 m or more. The cell becomes 0, not a clamped maximum. | Not recorded |
+| Rule                                                            | Fortran                                                      | Python                                                                | Effect                                                                                                               |
+| --------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| A negative upper-edge depth becomes 5000 m                      | `model/fault_plane.f90:108-110`                              | `_recompute_depth` in `fault_plane.py`                                | A fault whose upper edge would lie above the surface is placed at 5 km depth. The computed depth is discarded.       |
+| Strike 0 or 360 degrees gets 0.001 degrees added                | `model/def_oka.f:77-78`                                      | `compute_deform_grid` in `deform.py`                                  | A strike of exactly 0 or 360 is computed as 0.001 or 360.001. The code comment says it avoids a singular transform.  |
+| A grid value with an absolute value of 20 m or more is set to 0 | `model/def_oka.f:150-153` (the Fortran also prints the cell) | `clip_anomalous_values` in `deform.py`, which logs a warning per call | The deformation grid never holds a vertical displacement of 20 m or more. The cell becomes 0, not a clamped maximum. |
+
+The sources record no reason for these rules. The strike rule is the only one
+with an explanation in the code.
 
 ## Propagation
 
@@ -133,11 +141,11 @@ The CLI's port arrival times are separate from the propagation solver. The
    `([port_lon - lon0, port_lat - lat0] / distance) * 110`, where 110 is the
    km-per-degree path factor. Add the 101 values of
    `index * (degrees(alpha) / 100) * direction` to `[lon0, lat0]`, then sample
-   bathymetry at each `(lat, lon)` point. Take the absolute depth, convert
-   `sqrt(STANDARD_GRAVITY_M_PER_S2 * depth)` from
-   `packages/tsdhn/tsdhn/constants.py`, convert it to km/h by multiplying by
-   3.6, and integrate reciprocal speed with Simpson's rule. The travel time is
-   half of that integral.
+   bathymetry at each `(lat, lon)` point. Take the depth as the absolute
+   bathymetry value. The speed in km/h is `sqrt(g * depth) * 3.6`, where `g` is
+   `STANDARD_GRAVITY_M_PER_S2` from `packages/tsdhn/tsdhn/constants.py`.
+   Integrate reciprocal speed with Simpson's rule. The travel time is half of
+   that integral.
 5. For the integrated result, replace times above 3.0 hours with
    `distance / 733 + 0.25`, and times strictly between 1.4 and 3.0 hours with
    `distance / 690 + 0.2`. Times at or below 1.4 hours remain integrated.
