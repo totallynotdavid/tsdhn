@@ -26,6 +26,35 @@ The Vitest suite is service-free. Database-backed tests use:
 mise run test-integration
 ```
 
+## Preview
+
+`mise run web:preview` serves the app without Postgres, the compute service or a
+login step:
+
+```sh
+mise run web:preview
+mise run web:preview --host 100.64.0.1 --port 8080
+```
+
+The host defaults to `0.0.0.0` and the port to `5174`, so another machine on the
+network, such as a Tailscale peer, reaches the app at `http://<host>:5174`.
+
+The preview signs in the demo user on the first request to any page except
+`/login` and `/signup`. Those two pages show the signed-out forms, and
+`demo@tsdhn.test` with password `demo-preview` signs in through them.
+
+It holds six simulations: two completed, one running, one queued, one failed,
+and one that was never sent to the compute service. A simulation you submit
+queues, advances through the eight engine steps every 2.5 seconds, and
+completes. One whose source is deeper than 300 km fails at the third step.
+Downloads return small canned files. The data resets on every start.
+
+The map tiles load from the internet, so the map needs a network connection.
+
+The preview refuses to start when `NODE_ENV` is `production` or `DATABASE_URL`
+is set. [Architecture](../../docs/architecture.md#preview-mode) describes how it
+replaces the database and the compute service.
+
 ## Database
 
 Web tables are declared in `src/lib/server/db/schema.ts`. Better Auth tables are

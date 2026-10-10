@@ -79,6 +79,31 @@ directory, checkpoints and output files. It does not depend on web users,
 PostgreSQL jobs, queues or object storage. [Pipeline](pipeline.md) describes its
 stages. [Science](science.md) records its numerical rules.
 
+### Preview mode
+
+`mise run web:preview` replaces both Postgres and the compute service so the web
+app runs on one machine. The web process then holds both sides of the contract
+above:
+
+- an in-memory database holds the web tables and `compute.jobs`;
+- a compute stub, served by the web process under `/_preview/compute`, stands in
+  for the compute API;
+- one demo user is signed in.
+
+Two writers own `compute.jobs`, one after the other. The database module creates
+the table and seeds the six demo jobs before the server accepts a request. From
+the first request on, the stub is the only writer. The rest of the web app only
+reads the table.
+
+The stub keeps the rules of [Jobs](jobs.md#states):
+
+- A job moves only forward, `queued` to `running` to `completed` or `failed`. A
+  write to a finished job changes nothing.
+- A `simulation_id` runs once. Submitting it again with the same input returns
+  the existing job and starts no second run. Submitting it with different input
+  is rejected with 400.
+- The progress stream ends when its job finishes or its client leaves.
+
 ### Output storage
 
 The worker uses local disk while a simulation runs. The work directory holds
@@ -133,6 +158,10 @@ the object keys.
 | Join of simulation and compute state  | `apps/web/src/lib/server/simulation-details.ts`    |
 | Output name validation                | `apps/web/src/lib/server/outputs.ts`               |
 | Generated compute client              | `libs/api-client/`                                 |
+| Preview launcher and refusal rules    | `apps/web/scripts/preview.ts`                      |
+| Preview database and seed data        | `apps/web/src/lib/server/preview/database.ts`      |
+| Preview compute API stub              | `apps/web/src/lib/server/preview/compute-stub.ts`  |
+| Preview demo sign-in                  | `apps/web/src/lib/server/preview/hook.ts`          |
 
 ### Parity
 
