@@ -20,12 +20,33 @@
   const describedBy = $derived(message ? `${id}-error` : hint ? `${id}-hint` : undefined);
 </script>
 
-<div class="space-y-1.5">
-  <label for={id} class="text-ink block text-sm font-medium">{label}</label>
+<div class="field">
+  <label for={id} class="t-label-md">{label}</label>
   {@render children({ id, "aria-describedby": describedBy, "aria-invalid": !!message })}
   {#if message}
-    <p id="{id}-error" class="text-danger text-xs">{message}</p>
+    <p id="{id}-error" class="t-body-sm error">{message}</p>
   {:else if hint}
-    <p id="{id}-hint" class="text-muted text-xs">{hint}</p>
+    <p id="{id}-hint" class="t-body-sm hint">{hint}</p>
   {/if}
 </div>
+
+<style>
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  label {
+    display: block;
+    color: var(--ink);
+  }
+
+  .error {
+    color: var(--danger);
+  }
+
+  .hint {
+    color: var(--ink-alpha-64);
+  }
+</style>

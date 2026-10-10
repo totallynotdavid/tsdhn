@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { waveShape } from "#lib/ascii.js";
+  import AsciiField from "#lib/components/AsciiField.svelte";
   import Button from "#lib/components/ui/Button.svelte";
 
   let { status, message }: { status: number; message?: string } = $props();
@@ -19,12 +21,51 @@
 
 <svelte:head><title>{copy.title} · TSDHN</title></svelte:head>
 
-<section class="mx-auto max-w-md py-12 text-center sm:py-20">
-  <p class="num text-muted text-sm font-medium">Error {status}</p>
-  <h1 class="mt-2 text-xl font-semibold">{copy.title}</h1>
-  <p class="text-muted mt-2 text-sm">{detail ? `${detail}. ` : ""}{copy.hint}</p>
-  <div class="mt-6 flex flex-wrap justify-center gap-3">
+<section class="error-state">
+  <div class="art"><AsciiField shape={waveShape} columns={72} rows={12} /></div>
+  <p class="t-mono-sm code">Error {status}</p>
+  <h1 class="t-h4">{copy.title}</h1>
+  <p class="t-body-lg hint">{detail ? `${detail}. ` : ""}{copy.hint}</p>
+  <div class="buttons">
     <Button href="/simulations">Ir a Simulaciones</Button>
     <Button href="/new" variant="secondary">Nueva simulación</Button>
   </div>
 </section>
+
+<style>
+  .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 16px 24px;
+    text-align: center;
+  }
+
+  .art {
+    max-width: 100%;
+    margin-bottom: 32px;
+    overflow: hidden;
+  }
+
+  .code {
+    color: var(--heat-ink);
+  }
+
+  h1 {
+    margin-top: 8px;
+  }
+
+  .hint {
+    max-width: 440px;
+    margin-top: 8px;
+    color: var(--ink-alpha-64);
+  }
+
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 28px;
+  }
+</style>
