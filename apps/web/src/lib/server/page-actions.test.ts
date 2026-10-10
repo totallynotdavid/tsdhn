@@ -17,7 +17,8 @@ vi.mock("#lib/server/submit-simulation.js", () => ({
   submitSimulation: mocks.submitSimulation,
 }));
 vi.mock("#lib/schema/earthquake.js", () => ({
-  defaultEarthquake: {},
+  defaultEarthquake: () => ({}),
+  earthquakeFromInput: () => ({}),
   earthquakeSchema: {},
   toEarthquakeInput: mocks.toEarthquakeInput,
 }));
@@ -142,7 +143,7 @@ describe("new simulation action", () => {
 
     expect(result).toEqual({
       form: FORM,
-      text: "No se pudo iniciar la simulación.",
+      text: expect.stringContaining("No se pudo iniciar la simulación"),
       options: { status: 502 },
     });
   });

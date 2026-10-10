@@ -61,6 +61,11 @@ describe("simulation repository", () => {
     await expect(repository.listSimulations(ownerId)).resolves.toHaveLength(1);
   });
 
+  it("finds nothing, instead of failing, for an id that is not a UUID", async () => {
+    await expect(repository.getSimulation(randomUUID(), "garbage")).resolves.toBeUndefined();
+    await expect(repository.getSimulation(randomUUID(), "")).resolves.toBeUndefined();
+  });
+
   it("records and clears submission failures", async () => {
     const userId = randomUUID();
     const simulationId = randomUUID();
