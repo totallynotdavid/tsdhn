@@ -15,11 +15,8 @@ them. Build the `deform` executable from `model/def_oka.f`.
 
 ## Layout
 
-- `tsdhn_parity/cases.py`: input-case generation.
-- `tsdhn_parity/trace.py`: checkpoint and trace types.
-- `tsdhn_parity/compare.py`: comparisons and tolerances.
-- `tsdhn_parity/adapters/`: Python, Fortran, and saved-trace runners.
-- `packages/tsdhn/tests/parity/<unit>/`: cases, readers, tolerances, and data.
+[Architecture](../../docs/architecture.md#where-the-code-is) lists the modules
+and the per-unit parity directories under `packages/tsdhn/tests/parity/`.
 
 Fixed-width readers use the declared field width instead of whitespace parsing.
 

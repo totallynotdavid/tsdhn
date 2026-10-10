@@ -9,6 +9,7 @@ installation and a first run.
 | Command                | Purpose                                          |
 | ---------------------- | ------------------------------------------------ |
 | `tsdhn assets install` | Download and install the versioned model data    |
+| `tsdhn assets status`  | Print the install state of a model version       |
 | `tsdhn doctor`         | Report the model data and external tools         |
 | `tsdhn calc`           | Preview source parameters and port arrival times |
 | `tsdhn run`            | Run the complete pipeline                        |
@@ -29,37 +30,31 @@ Model files resolve in this order:
 
 `tsdhn assets install` stores a versioned archive under
 `$XDG_DATA_HOME/tsdhn/models`, or `$HOME/.local/share/tsdhn/models` when
-`XDG_DATA_HOME` is unset. `TSDHN_DATA_HOME` selects another data root.
+`XDG_DATA_HOME` is unset. `TSDHN_DATA_HOME` takes precedence over both and
+selects the data root itself.
 
-The report stages use GMT and `ttt_client`. The comparison tests use the older
-Fortran programs.
+The report stages use GMT and `ttt_client`. [Parity](../../docs/parity.md)
+covers the Fortran programs used for comparison.
 
 ## Outputs
 
 | File                 | Meaning                                         |
 | -------------------- | ----------------------------------------------- |
+| `input.json`         | The parameters of the run                       |
+| `runtime.json`       | Model version, model directory and tool status  |
 | `calculation.json`   | Source parameters and fault rectangle           |
 | `travel_times.json`  | Port arrival times and distances                |
+| `travel_times.csv`   | The same arrival times as CSV                   |
 | `zfolder/green.dat`  | Sampled solver elevations at virtual gauges     |
 | `zfolder/zmax_a.grd` | Sampled maximum positive solver elevation       |
 | `maxola.pdf`         | Display map made from the maximum grid          |
 | `ttt.pdf`            | Arrival-time map made with `ttt_client` and GMT |
 | `mareograma.svg`     | Selected station series after report scaling    |
 
+The run collects `maxola.pdf`, `ttt.pdf` and `mareograma.svg` only when the
+report stages produced them.
+
 [Pipeline](../../docs/pipeline.md) describes the raw solver files and the report
 transformations. [Science](../../docs/science.md) states the numerical rules.
-
-## Code map
-
-- `tsdhn/calculator.py`: source parameters and port arrival times.
-- `tsdhn/fault_plane.py`: fault placement and stage input files.
-- `tsdhn/deform.py`: Okada-based deformation calculation.
-- `tsdhn/tsunami.py`: shallow-water solver and checkpoints.
-- `tsdhn/pipeline/`: stage definitions and order.
-- `tsdhn/render/`: maps, station summaries, and report transformations.
-- `tsdhn/engine.py`: run setup, stage execution, resume, and output collection.
-- `tsdhn/runtime.py`: model validation and external-program checks.
-- `tsdhn/assets.py`: versioned model installation.
-- `tsdhn/cli/`: researcher commands.
-
-[Architecture](../../docs/architecture.md) states the system boundaries.
+[Architecture](../../docs/architecture.md#where-the-code-is) lists where each
+part of the engine lives.

@@ -27,8 +27,9 @@ golden pipeline test and the comparisons with the MATLAB and Fortran programs.
 ## Change a component
 
 Read [Architecture](../docs/architecture.md) before you change a boundary
-between components, and the manual page for the behavior you change. Each
-package readme has its code map and commands.
+between components, and the manual page for the behavior you change.
+[Where the code is](../docs/architecture.md#where-the-code-is) maps behavior to
+files. Each package readme has its commands.
 
 After you change an API route or schema, regenerate the client as described in
 [`libs/api-client`](../libs/api-client/readme.md#regenerate).

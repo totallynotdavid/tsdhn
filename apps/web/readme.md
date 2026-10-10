@@ -47,9 +47,6 @@ It is not part of the web migration schema.
 
 ## Server modules
 
-- `src/lib/server/compute-api.ts`: server-only typed compute API client.
-- `src/lib/server/submit-simulation.ts`: submission and retry handling.
-- `src/lib/server/simulation-repository.ts`: simulation queries.
-- `src/lib/server/simulation-details.ts`: simulation and compute-state join.
-- `src/lib/server/outputs.ts`: output-name validation.
-- Route handlers: session and ownership checks before compute API calls.
+[Architecture](../../docs/architecture.md#where-the-code-is) lists the modules
+under `src/lib/server/`. Route handlers check the session and ownership before
+they call the compute API.

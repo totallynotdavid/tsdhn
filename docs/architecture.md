@@ -23,17 +23,18 @@ FastAPI compute service
 
 The browser talks to the web app. The web app checks the session and handles the
 researcher-facing flow. Its server code calls the compute API at
-`COMPUTE_API_URL` with `COMPUTE_API_TOKEN`. The browser never receives the token
-and never calls the compute API directly.
+`COMPUTE_API_URL` with `COMPUTE_API_TOKEN`. The token never reaches the browser,
+and no browser code in the web app calls the compute API.
 
 ## Repository layout
 
 ```text
+.github/                  Contributing guide and workflows
 apps/web/                 SvelteKit web app
 deploy/                   Container images
 docs/                     Project manual
 libs/api-client/          Generated TypeScript client
-model/                    Model inputs and older reference programs
+model/                    Model inputs and Fortran reference programs
 packages/tsdhn/           Simulation engine and researcher CLI
 packages/api/             FastAPI service and worker
 packages/tsdhn-parity/    Comparison with MATLAB and Fortran output
@@ -89,6 +90,8 @@ the object keys.
 
 ## Where the code is
 
+### Engine
+
 | Behavior                                | Code                                        |
 | --------------------------------------- | ------------------------------------------- |
 | Source parameters and arrival estimates | `packages/tsdhn/tsdhn/calculator.py`        |
@@ -98,11 +101,45 @@ the object keys.
 | Report transformations                  | `packages/tsdhn/tsdhn/render/`              |
 | Stage order                             | `packages/tsdhn/tsdhn/pipeline/registry.py` |
 | Run setup and output collection         | `packages/tsdhn/tsdhn/engine.py`            |
-| Compute routes                          | `packages/api/api/routes.py`                |
-| Job reads and updates                   | `packages/api/api/core/repository.py`       |
-| Queue tasks, workspace lock, retention  | `packages/api/api/core/tasks.py`            |
-| Worker process                          | `packages/api/api/worker.py`                |
-| Queue roles                             | `packages/api/api/queue_grants.py`          |
-| Output uploads and download URLs        | `packages/api/api/core/storage.py`          |
-| Web server code                         | `apps/web/src/lib/server/`                  |
-| Generated compute client                | `libs/api-client/`                          |
+| Model validation, external tool checks  | `packages/tsdhn/tsdhn/runtime.py`           |
+| Versioned model installation            | `packages/tsdhn/tsdhn/assets.py`            |
+| Researcher commands                     | `packages/tsdhn/tsdhn/cli/`                 |
+
+### Compute service
+
+| Behavior                               | Code                                    |
+| -------------------------------------- | --------------------------------------- |
+| Compute routes                         | `packages/api/api/routes.py`            |
+| Request and response models            | `packages/api/api/schemas.py`           |
+| API token check                        | `packages/api/api/security.py`          |
+| Job reads and updates                  | `packages/api/api/core/repository.py`   |
+| Queue tasks, workspace lock, retention | `packages/api/api/core/tasks.py`        |
+| Shared rqueue instance                 | `packages/api/api/core/queue.py`        |
+| Terminal statuses, retention, job ID   | `packages/api/api/core/lifecycle.py`    |
+| Start-time check for model data        | `packages/api/api/core/model_assets.py` |
+| Worker process                         | `packages/api/api/worker.py`            |
+| Compute schema migrations              | `packages/api/api/migrate.py`           |
+| Queue roles                            | `packages/api/api/queue_grants.py`      |
+| Web role grants                        | `packages/api/api/web_grants.py`        |
+| Output uploads and download URLs       | `packages/api/api/core/storage.py`      |
+
+### Web app and client
+
+| Behavior                              | Code                                               |
+| ------------------------------------- | -------------------------------------------------- |
+| Compute API client for the web server | `apps/web/src/lib/server/compute-api.ts`           |
+| Submission and retry                  | `apps/web/src/lib/server/submit-simulation.ts`     |
+| Simulation queries                    | `apps/web/src/lib/server/simulation-repository.ts` |
+| Join of simulation and compute state  | `apps/web/src/lib/server/simulation-details.ts`    |
+| Output name validation                | `apps/web/src/lib/server/outputs.ts`               |
+| Generated compute client              | `libs/api-client/`                                 |
+
+### Parity
+
+| Behavior                                | Code                                            |
+| --------------------------------------- | ----------------------------------------------- |
+| Input-case generation                   | `packages/tsdhn-parity/tsdhn_parity/cases.py`   |
+| Checkpoint and trace types              | `packages/tsdhn-parity/tsdhn_parity/trace.py`   |
+| Comparisons and tolerances              | `packages/tsdhn-parity/tsdhn_parity/compare.py` |
+| Python, Fortran and saved-trace runners | `packages/tsdhn-parity/tsdhn_parity/adapters/`  |
+| Cases, readers, tolerances and data     | `packages/tsdhn/tests/parity/<unit>/`           |

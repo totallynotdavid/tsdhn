@@ -19,21 +19,8 @@ The compute API's OpenAPI UI is at <http://127.0.0.1:8000/api-docs>. Health and
 version routes are public. Simulation and calculation routes require
 `COMPUTE_API_TOKEN`.
 
-## Package map
-
-- `api/routes.py`: health, calculation, submission, progress, and output routes.
-- `api/schemas.py`: public request and response models.
-- `api/security.py`: API token checks.
-- `api/core/repository.py`: compute-job reads and updates.
-- `api/core/tasks.py`: queued simulation task.
-- `api/core/storage.py`: output uploads and download URLs.
-- `api/core/queue.py`: shared rqueue instance.
-- `api/migrate.py`: applies the numbered files in `api/migrations/`.
-- `api/core/lifecycle.py`: retention, terminal statuses, and the job id pattern.
-- `api/core/model_assets.py`: start-time check for the installed model data.
-- `api/queue_grants.py`: least-privilege queue roles.
-- `api/web_grants.py`: web role grants.
-- `api/worker.py`: queue worker, workspace sweep, and retention.
+[Architecture](../../docs/architecture.md#where-the-code-is) lists where each
+module lives. `api/migrate.py` applies the numbered files in `api/migrations/`.
 
 ## Tests
 
