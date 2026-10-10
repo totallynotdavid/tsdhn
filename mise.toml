@@ -178,6 +178,13 @@ exit 1
 """
 
 lint-all = ["mise run lint", "mise run lint-js", "mise run fmt-check-js"]
+
+check = [
+  "mise run lint-all",
+  "mise run test",
+  "mise run web-check",
+  "mise run web-test",
+]
 fix-all = ["mise run fix", "mise run fmt-js"]
 
 doctor = [
@@ -191,6 +198,14 @@ doctor = [
 # setup.sh creates this file when the scientific toolchain is installed.
 [env]
 _.file = ".tsdhn/env"
+
+[tasks."web:preview"]
+description = "Serve the web app on an embedded database and a stub compute API"
+usage = '''
+flag "--host <host>" default="0.0.0.0" help="Address to listen on"
+flag "--port <port>" default="5174" help="Port to listen on"
+'''
+run = 'bun --filter web serve:preview --host "$usage_host" --port "$usage_port"'
 
 [tasks."db:init"]
 description = "Initialize the project-local PostgreSQL cluster"
