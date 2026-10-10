@@ -1,5 +1,7 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -13,8 +15,9 @@ function env(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   return { ...rest, ...extra };
 }
 
+/** Start preview through the package script used by `mise run web:preview`. */
 function launch(port: number, extra: Record<string, string> = {}) {
-  return spawn("bun", ["scripts/preview.ts", "--host", "127.0.0.1", "--port", String(port)], {
+  return spawn("bun", ["run", "serve:preview", "--host", "127.0.0.1", "--port", String(port)], {
     cwd: WEB_ROOT,
     env: env(extra),
     stdio: ["ignore", "pipe", "pipe"],
@@ -52,6 +55,37 @@ describe.skipIf(!hasBun)("preview mode refuses to start", () => {
     expect(code).toBe(1);
     expect(output).toMatch(/DATABASE_URL/);
   });
+});
+
+describe.skipIf(!hasBun)("preview mode in a checkout with a .env file", () => {
+  const dotenv = join(WEB_ROOT, ".env.local");
+  const saved = existsSync(dotenv) ? readFileSync(dotenv) : null;
+  let server: ChildProcess;
+
+  beforeAll(() => {
+    writeFileSync(dotenv, "DATABASE_URL=postgres://app:secret@127.0.0.1:1/tsdhn\n");
+  });
+
+  afterAll(async () => {
+    if (saved) writeFileSync(dotenv, saved);
+    else rmSync(dotenv, { force: true });
+    if (!server) return;
+    const done = exited(server);
+    server.kill("SIGTERM");
+    await done;
+  });
+
+  it("ignores the file's DATABASE_URL and serves /login", async () => {
+    const port = await freePort();
+    server = launch(port);
+    await vi.waitFor(
+      async () => {
+        const response = await fetch(`http://127.0.0.1:${port}/login`, { redirect: "manual" });
+        expect(response.status).toBe(200);
+      },
+      { timeout: 90_000, interval: 500 },
+    );
+  }, 120_000);
 });
 
 describe.skipIf(!hasBun)("preview mode served", () => {

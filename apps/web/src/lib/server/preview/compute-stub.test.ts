@@ -14,7 +14,7 @@ let db: SimulationDatabase;
 let stub: ReturnType<typeof createComputeStub>;
 
 beforeAll(async () => {
-  db = await createPreviewDatabase({});
+  db = await createPreviewDatabase();
   stub = createComputeStub({ db, token: TOKEN, stepMs: 2 });
 });
 

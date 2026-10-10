@@ -21,12 +21,6 @@ describe("database configuration", () => {
     vi.resetModules();
   });
 
-  it("refuses preview mode when a database URL is set", async () => {
-    env.TSDHN_PREVIEW = "1";
-
-    await expect(import("./index")).rejects.toThrow("DATABASE_URL");
-  });
-
   it("opens an embedded database in preview mode without a database URL", async () => {
     env.TSDHN_PREVIEW = "1";
     env.DATABASE_URL = undefined;
