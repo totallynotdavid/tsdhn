@@ -225,13 +225,13 @@
     display: flex;
     min-width: 0;
     flex-direction: column;
-    order: 2;
+    order: 1;
   }
 
   .mapcol {
-    order: 1;
+    order: 2;
     padding: 16px;
-    border-bottom: 1px solid var(--border-faint);
+    border-top: 1px solid var(--border-faint);
   }
 
   .caption {
@@ -239,7 +239,7 @@
   }
 
   .block {
-    padding: 24px 16px;
+    padding: 32px 16px;
   }
 
   .fields {
@@ -395,6 +395,7 @@
 
     .mapcol {
       padding: 24px 32px;
+      border-top: 0;
     }
   }
 
@@ -424,6 +425,7 @@
     }
 
     .block {
+      padding-block: 40px;
       padding-inline: 32px;
     }
   }

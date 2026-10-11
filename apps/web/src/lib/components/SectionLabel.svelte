@@ -19,8 +19,8 @@
   .label {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 16px;
+    gap: 16px;
+    padding: 24px 16px;
     font-weight: 400;
     user-select: none;
   }
@@ -47,7 +47,14 @@
 
   @media (min-width: 640px) {
     .label {
-      padding: 20px 32px;
+      gap: 40px;
+      padding: 32px;
+    }
+  }
+
+  @media (min-width: 996px) {
+    .label {
+      padding-block: 40px;
     }
   }
 </style>

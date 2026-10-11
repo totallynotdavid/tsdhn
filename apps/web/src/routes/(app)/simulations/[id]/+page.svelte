@@ -131,7 +131,7 @@
   <title>Mw {formatMagnitude(params.Mw)} · Simulaciones · TSDHN</title>
 </svelte:head>
 
-<PageHeader back={{ href: "/simulations", label: "Simulaciones" }}>
+<PageHeader titleClass="t-h2" back={{ href: "/simulations", label: "Simulaciones" }}>
   {#snippet title()}
     Mw {formatMagnitude(params.Mw)}
     <span class="muted coords">· {formatCoordinates(params.lat0, params.lon0)}</span>
@@ -256,7 +256,7 @@
         id="arrivals-title"
       />
       <section aria-labelledby="arrivals-title" class="block">
-        <p class="t-body-lg first">
+        <p class="t-h3 first">
           {arrivals[0].port} en {formatDuration(arrivals[0].minutes)}
         </p>
         <ArrivalTable travelTimes={live.travelTimes} event={when} />
@@ -290,13 +290,13 @@
 
   .main {
     min-width: 0;
-    order: 2;
+    order: 1;
   }
 
   .mapcol {
-    order: 1;
+    order: 2;
     padding: 16px;
-    border-bottom: 1px solid var(--border-faint);
+    border-top: 1px solid var(--border-faint);
   }
 
   .caption {
@@ -312,7 +312,7 @@
   }
 
   .block {
-    padding: 24px 16px;
+    padding: 32px 16px;
   }
 
   .stack {
@@ -431,7 +431,7 @@
   }
 
   .first {
-    margin-bottom: 8px;
+    margin-bottom: 16px;
     font-weight: 450;
   }
 
@@ -467,6 +467,7 @@
 
     .mapcol {
       padding: 24px 32px;
+      border-top: 0;
     }
   }
 
@@ -487,6 +488,10 @@
       align-self: start;
       padding: 24px;
       border-bottom: 0;
+    }
+
+    .block {
+      padding-block: 40px;
     }
   }
 </style>

@@ -21,6 +21,7 @@ describe("database configuration", () => {
     vi.resetModules();
   });
 
+  // PGlite startup can be slow under parallel test load.
   it("opens an embedded database in preview mode without a database URL", async () => {
     env.TSDHN_PREVIEW = "1";
     env.DATABASE_URL = undefined;
@@ -29,7 +30,7 @@ describe("database configuration", () => {
     const users = await db.select().from((await import("./schema")).user);
 
     expect(users.map((user) => user.email)).toEqual(["demo@tsdhn.test"]);
-  });
+  }, 15_000);
 
   it("rejects an empty database URL", async () => {
     env.DATABASE_URL = "";

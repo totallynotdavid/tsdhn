@@ -33,42 +33,44 @@
   {#snippet title()}Simulaciones{/snippet}
 </PageHeader>
 
-<ul>
-  {#each data.simulations as sim (sim.id)}
-    <li>
-      <a href="/simulations/{sim.id}" class="row gutter">
-        <div class="main">
-          <p class="t-label-lg num title">
-            Mw {formatMagnitude(sim.magnitude)}
-            <span class="muted coords">· {formatCoordinates(sim.latitude, sim.longitude)}</span>
-          </p>
-          <p class="t-body-sm muted detail">
-            {#if sim.progress}
-              {sim.progress.label}{sim.progress.position ? ` · ${sim.progress.position}` : ""}
-            {:else}
-              {sim.warning ?? "Sin estimado"}
-            {/if}
-          </p>
-        </div>
-        <div class="side">
-          <Status status={sim.status} />
-          <time
-            class="t-body-sm muted"
-            datetime={sim.createdAt.toISOString()}
-            title={sim.createdAt.toLocaleString("es-PE")}
-          >
-            {formatWhen(sim.createdAt)}
-          </time>
-        </div>
-        <ArrowIcon class="arrow" />
-      </a>
-    </li>
-  {/each}
-</ul>
+<div class="page-content">
+  <ul>
+    {#each data.simulations as sim (sim.id)}
+      <li>
+        <a href="/simulations/{sim.id}" class="row gutter">
+          <div class="main">
+            <p class="t-label-lg num title">
+              Mw {formatMagnitude(sim.magnitude)}
+              <span class="muted coords">· {formatCoordinates(sim.latitude, sim.longitude)}</span>
+            </p>
+            <p class="t-body-sm muted detail">
+              {#if sim.progress}
+                {sim.progress.label}{sim.progress.position ? ` · ${sim.progress.position}` : ""}
+              {:else}
+                {sim.warning ?? "Sin estimado"}
+              {/if}
+            </p>
+          </div>
+          <div class="side">
+            <Status status={sim.status} />
+            <time
+              class="t-body-sm muted"
+              datetime={sim.createdAt.toISOString()}
+              title={sim.createdAt.toLocaleString("es-PE")}
+            >
+              {formatWhen(sim.createdAt)}
+            </time>
+          </div>
+          <ArrowIcon class="arrow" />
+        </a>
+      </li>
+    {/each}
+  </ul>
 
-<p class="t-body-sm muted shortcut gutter">
-  Pulse <kbd class="t-mono-xs">N</kbd> para una nueva simulación.
-</p>
+  <p class="t-body-sm muted shortcut gutter">
+    Pulse <kbd class="t-mono-xs">N</kbd> para una nueva simulación.
+  </p>
+</div>
 
 <style>
   li + li {
@@ -81,7 +83,7 @@
 
   .row {
     display: flex;
-    min-height: 72px;
+    min-height: 88px;
     align-items: center;
     gap: 16px;
     padding-block: 14px;

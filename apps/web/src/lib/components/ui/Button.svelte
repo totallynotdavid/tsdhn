@@ -37,7 +37,8 @@
     border-radius: 10px;
     white-space: nowrap;
     transition:
-      all 0.2s,
+      background-color 0.2s var(--ease-panel),
+      color 0.2s var(--ease-panel),
       scale 0.1s,
       box-shadow 0.1s;
   }
@@ -52,7 +53,8 @@
 
   .button:active {
     transition:
-      all 0.2s,
+      background-color 0.2s var(--ease-panel),
+      color 0.2s var(--ease-panel),
       scale 50ms,
       box-shadow 50ms;
     scale: 0.99;
@@ -67,7 +69,7 @@
   .primary {
     background: var(--button-primary-fill);
     box-shadow: var(--button-primary-shadow);
-    color: #fff;
+    color: var(--button-primary-ink);
   }
 
   .primary:hover {
@@ -108,7 +110,7 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(#fff, transparent);
+    background: linear-gradient(var(--button-primary-ink), transparent);
     opacity: 0.06;
     pointer-events: none;
     transition: opacity 0.2s;

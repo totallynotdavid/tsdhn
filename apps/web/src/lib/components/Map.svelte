@@ -36,7 +36,6 @@
   let ready = $state(false);
   let failed = $state(false);
 
-  const ACCENT = "#fa5d19";
   const empty: FeatureCollection = { type: "FeatureCollection", features: [] };
 
   function faultData(): FeatureCollection {
@@ -52,6 +51,7 @@
 
   onMount(() => {
     setWorkerUrl(workerUrl);
+    const accent = getComputedStyle(document.documentElement).getPropertyValue("--heat-100").trim();
     const start: [number, number] = [lon ?? -70.5, lat ?? -20.5];
 
     map = new MapLibre({
@@ -62,7 +62,7 @@
       cooperativeGestures: true,
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
-    marker = new Marker({ color: ACCENT, draggable: interactive }).setLngLat(start).addTo(map);
+    marker = new Marker({ color: accent, draggable: interactive }).setLngLat(start).addTo(map);
 
     function moveTo(point: { lng: number; lat: number }) {
       lon = Number(point.lng.toFixed(2));
@@ -84,13 +84,13 @@
         id: "fault-fill",
         type: "fill",
         source: "fault",
-        paint: { "fill-color": ACCENT, "fill-opacity": 0.2 },
+        paint: { "fill-color": accent, "fill-opacity": 0.2 },
       });
       map!.addLayer({
         id: "fault-line",
         type: "line",
         source: "fault",
-        paint: { "line-color": ACCENT, "line-width": 2 },
+        paint: { "line-color": accent, "line-width": 2 },
       });
       ready = true;
     });

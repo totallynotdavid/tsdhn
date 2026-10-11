@@ -8,12 +8,14 @@
     description,
     back,
     actions,
+    titleClass = "t-h1",
   }: {
     title: Snippet;
     description?: Snippet;
     /** A link above the title, for pages reached from a list. */
     back?: { href: string; label: string };
     actions?: Snippet;
+    titleClass?: "t-h1" | "t-h2";
   } = $props();
 </script>
 
@@ -23,9 +25,9 @@
       {#if back}
         <a href={back.href} class="back t-label-md">← {back.label}</a>
       {/if}
-      <h1 class="t-h4 num">{@render title()}</h1>
+      <h1 class={`${titleClass} num`}>{@render title()}</h1>
       {#if description}
-        <p class="t-body-lg description">{@render description()}</p>
+        <p class="t-body-xl description">{@render description()}</p>
       {/if}
     </div>
     {#if actions}
@@ -50,7 +52,7 @@
     align-items: flex-end;
     justify-content: space-between;
     gap: 16px 24px;
-    padding-block: 28px;
+    padding-block: 48px;
   }
 
   .text {
@@ -119,7 +121,7 @@
 
   @media (min-width: 996px) {
     .inner {
-      padding-block: 40px;
+      padding-block: 72px;
     }
   }
 </style>

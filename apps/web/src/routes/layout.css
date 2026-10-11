@@ -44,8 +44,8 @@
     font-size: 16px;
     line-height: 24px;
     transition:
-      border-color 0.2s,
-      box-shadow 0.2s;
+      border-color 0.2s var(--ease-panel),
+      box-shadow 0.2s var(--ease-panel);
   }
 
   .control::placeholder {
@@ -105,5 +105,32 @@
     position: relative;
     margin-top: -1px;
     border-block: 1px solid var(--border-faint);
+  }
+
+  .page-header,
+  .page-content,
+  .layout {
+    animation: page-enter 420ms var(--ease-panel) both;
+  }
+
+  .page-content,
+  .layout {
+    animation-delay: 70ms;
+  }
+
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      filter: blur(1px);
+      transform: translateY(10px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .page-header,
+    .page-content,
+    .layout {
+      animation: none;
+    }
   }
 }

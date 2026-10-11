@@ -84,7 +84,7 @@
     gap: 4px;
     margin-inline: auto;
     padding-inline: 16px;
-    transition: height 0.2s;
+    transition: height 0.2s var(--ease-panel);
   }
 
   /* Keep labels at 14px so the row fits a 390px screen. */
@@ -164,6 +164,10 @@
   .actions :global(.avatar:hover) {
     background: var(--ink-alpha-4);
     color: var(--ink);
+  }
+
+  .brand:hover {
+    color: var(--heat-ink);
   }
 
   .link:active,
