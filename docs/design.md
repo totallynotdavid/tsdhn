@@ -1,8 +1,8 @@
 # Design system
 
-The web app (`apps/web`) is one orange accent on a near-white page, 1px
-hairlines at the column edges, mono numbered section tags and small, quick
-motion. Light and dark follow the system setting.
+The web app uses a warm orange accent, quiet hairline rules, a centered column,
+mono numbered section tags and small, quick motion. Light and dark follow the
+system setting.
 
 Values live in the files below. This document names the token or class, says
 what it is for and points at the file for the number.
@@ -34,27 +34,27 @@ Weights are 400 for body, 450 for labels and 500 for titles and mono emphasis.
 
 ## Colour
 
-All colour is a CSS variable on `:root` in `tokens.css`. The dark values sit
+All UI colour is a CSS variable on `:root` in `tokens.css`. The dark values sit
 under `@media (prefers-color-scheme: dark)`. There is no manual switch.
 
-| Token                                  | Role                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------- |
-| `--background-base`                    | Page canvas                                                               |
-| `--surface`                            | Cards, inputs, menus                                                      |
-| `--ink`                                | Text                                                                      |
-| `--ink-alpha-N`                        | Ink at N percent: secondary text, fills, hover and press states           |
-| `--border-faint`                       | Rails, rules, row separators                                              |
-| `--border-muted`                       | Avatar and key cap borders                                                |
-| `--control-border`, `-hover`           | Input borders, strong enough to be a 3:1 edge                             |
-| `--heat-100`                           | Accent fills and marks. Never text: it does not reach 4.5:1 on the canvas |
-| `--heat-12`, `-20`, `-24`              | Focus halo, selection, progress track                                     |
-| `--heat-ink`                           | Accent text, links, focus ring                                            |
-| `--button-primary-fill`, `-shadow`     | Primary button                                                            |
-| `--ok`                                 | Success mark                                                              |
-| `--danger`, `--danger-soft`            | Error mark, text and tint                                                 |
-| `--warn`, `--warn-soft`, `--warn-line` | Warning text, tint and edge                                               |
-| `--surface-shadow`                     | The sign-in card                                                          |
-| `--menu-shadow`                        | The account menu                                                          |
+| Token                                      | Role                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| `--background-base`                        | Page canvas                                                               |
+| `--surface`                                | Cards, inputs, menus                                                      |
+| `--ink`                                    | Text                                                                      |
+| `--ink-alpha-N`                            | Ink at N percent: secondary text, fills, hover and press states           |
+| `--border-faint`                           | Rails, rules, row separators                                              |
+| `--border-muted`                           | Avatar and key cap borders                                                |
+| `--control-border`, `-hover`               | Input borders, strong enough to be a 3:1 edge                             |
+| `--heat-100`                               | Accent fills and marks. Never text: it does not reach 4.5:1 on the canvas |
+| `--heat-12`, `-20`, `-24`                  | Focus halo, selection, progress track                                     |
+| `--heat-ink`                               | Accent text, links, focus ring                                            |
+| `--button-primary-fill`, `-ink`, `-shadow` | Primary button                                                            |
+| `--ok`                                     | Success mark                                                              |
+| `--danger`, `--danger-soft`                | Error mark, text and tint                                                 |
+| `--warn`, `--warn-soft`, `--warn-line`     | Warning text, tint and edge                                               |
+| `--surface-shadow`                         | The sign-in card                                                          |
+| `--menu-shadow`                            | The account menu                                                          |
 
 Secondary text is `--ink-alpha-64`. Selection is `--heat-20` with `--heat-ink`
 text. The map keeps its light tile style in dark mode.
@@ -83,14 +83,18 @@ background:
 The `t-*` classes in `typography.css` are the whole scale. Each sets size, line
 height, tracking and weight, and the larger ones step down below 996px.
 
-| Class                      | Use                                       |
-| -------------------------- | ----------------------------------------- |
-| `t-h4`                     | Page titles                               |
-| `t-h5`                     | Section and card titles                   |
-| `t-body-lg`                | Descriptions                              |
-| `t-body-md`, `t-body-sm`   | Body copy, hints, table text              |
-| `t-label-lg`, `-md`, `-xs` | Buttons, links, field labels, brand       |
-| `t-mono-sm`, `t-mono-xs`   | Section tags, codes, figures (Geist Mono) |
+| Class                      | Size, weight and use                                |
+| -------------------------- | --------------------------------------------------- |
+| `t-h1`                     | 60/64, 500; 44/48 below 996px: home and form titles |
+| `t-h2`                     | 52/56, 500; 36/40 below 996px: result title         |
+| `t-h3`                     | 40/44, 500; 32/36 below 996px: first-arrival result |
+| `t-h4`                     | 32/36, 500; 22/26 below 996px: page titles          |
+| `t-h5`                     | 24/32, 500: section and card titles                 |
+| `t-body-xl`                | 20/28, 400; 22/30 below 996px: page descriptions    |
+| `t-body-lg`                | 16/24, 400; 18/26 below 996px: descriptions         |
+| `t-body-md`, `t-body-sm`   | Body copy, hints and table text                     |
+| `t-label-lg`, `-md`, `-xs` | Buttons, links, field labels and brand              |
+| `t-mono-sm`, `t-mono-xs`   | Section tags, codes and figures (Geist Mono)        |
 
 `body` sets the default size and line height, antialiased smoothing and
 `optimizeLegibility`. Numbers use `.num` (tabular figures) so columns and
@@ -100,7 +104,7 @@ below 996px so the row fits a 390px screen.
 ## Layout
 
 - **Column.** `.column` is `min(100% - 32px, var(--container-width))`, centred.
-  The width is fluid at every breakpoint.
+  It stays fluid below 996px and is capped at 1112px on desktop.
 - **Gutters.** `.gutter` pads content; the amount grows at 640px and 996px
   (`layout.css`).
 - **Rails.** `PageRails` draws two fixed, viewport-tall `--border-faint` lines
@@ -117,12 +121,13 @@ below 996px so the row fits a 390px screen.
   fixed height, so the bar is the same height with or without the "Nueva
   simulación" button. The bottom rule spans the viewport. The spacer is
   constant, so compacting moves nothing below it.
-- **Page header.** `PageHeader` holds an optional back link, the `t-h4` title,
-  an optional `t-body-lg` description and optional actions. It ends in a
-  full-width rule with two connectors.
+- **Page header.** `PageHeader` holds an optional back link, a display title
+  (`t-h1` on the home and new-simulation pages, `t-h2` on a result), an optional
+  `t-body-xl` description and optional actions. Its inner rhythm is 48px on
+  mobile and 72px on desktop. It ends in a full-width rule with two connectors.
 - **Section tag.** `SectionLabel` is an `h2` band in mono: a `--heat-100`
   marker, `[ 01 / 02 ] ·` with the index in `--heat-ink`, then the title in
-  uppercase.
+  uppercase. It uses 24px vertical padding on mobile and 40px on desktop.
 - **Scroll.** `html` has `scroll-padding-top: var(--header-offset)` and smooth
   scrolling, so anchors land below the header.
 
@@ -143,11 +148,12 @@ pads the hit area and keeps its look.
 ## Motion
 
 Triggers fire on input (hover, press, open, navigation) or on a state change.
-Nothing animates on page load, and nothing is driven by scroll position except
-the header's height. Animations use `opacity`, `transform` and `filter`, with
-three exceptions: the progress fill's `width` (inside a fixed-size track), the
-disclosure's `grid-template-rows` (it opens on a click, which the user caused)
-and the fixed header's `height` (out of flow).
+The three app pages enter with a single 420ms opacity, blur and 10px lift; the
+content follows the page header by 70ms. Nothing else is driven by scroll
+position except the header's height. Animations use `opacity`, `transform` and
+`filter`, with three exceptions: the progress fill's `width` (inside a
+fixed-size track), the disclosure's `grid-template-rows` (it opens on a click,
+which the user caused) and the fixed header's `height` (out of flow).
 
 Hover and press feedback is quick (a fraction of a second); opening a panel is
 slower. The owning component sets each duration. Easing curves are the
@@ -160,6 +166,7 @@ slower. The owning component sets each duration. Easing curves are the
 | Link and row hover | Hover                                            | Colour and background                            | pages, `Header`      |
 | Row arrow          | Row hover                                        | Arrow shifts 2px                                 | `ui/ArrowIcon`, list |
 | Header compact     | Scroll past 8px (996px and up)                   | Header height                                    | `Header`             |
+| Page entrance      | Navigation to home, new or result                | Opacity, blur and a 10px lift                    | app page shell       |
 | Header item        | Hover, press                                     | Background, colour, slight scale on press        | `Header`             |
 | Menu               | Open                                             | Opacity and a short slide down                   | `Header`             |
 | Disclosure         | Click                                            | Panel height (`--ease-disclosure`), chevron turn | `ui/Disclosure`      |
