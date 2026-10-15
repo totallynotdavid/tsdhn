@@ -10,9 +10,9 @@ authors = [
 ]
 dependencies = [
     "tsdhn",
-    "fastapi==0.143.0",
+    "fastapi==0.143.2",
     "uvicorn==0.54.0",
-    "pydantic==2.14.0",
+    "pydantic==2.14.1",
     "anyio==4.15.1",
     "psycopg[binary]>=3.3.6",
     "minio>=7.2.20",

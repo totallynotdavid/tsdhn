@@ -30,23 +30,23 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@tsdhn/api-client": "workspace:*",
     "bits-ui": "^2.19.5",
-    "maplibre-gl": "^6.13.0",
+    "maplibre-gl": "^6.14.0",
     "sveltekit-superforms": "^3.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@better-auth/drizzle-adapter": "~1.7.7",
-    "@electric-sql/pglite": "^0.5.8",
+    "@better-auth/drizzle-adapter": "~1.7.10",
+    "@electric-sql/pglite": "^0.5.10",
     "@sveltejs/adapter-auto": "^8.0.0",
     "@sveltejs/adapter-node": "^6.0.0",
-    "@sveltejs/kit": "^3.0.1",
+    "@sveltejs/kit": "^3.1.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^26.6.5",
-    "@vitest/coverage-v8": "^5.0.3",
-    "auth": "~1.7.7",
-    "better-auth": "~1.7.7",
+    "@vitest/coverage-v8": "^5.0.4",
+    "auth": "~1.7.10",
+    "better-auth": "~1.7.10",
     "drizzle-kit": "^0.31.11",
     "drizzle-orm": "^0.45.4",
     "mdsvex": "^0.12.8",
@@ -56,6 +56,6 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.4"
   }
 }
