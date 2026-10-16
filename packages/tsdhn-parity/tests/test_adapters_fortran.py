@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tsdhn.utils.file_utils import make_executable
 from tsdhn_parity.adapters.fortran import FortranBinaryAdapter, read_fixed_width_grid
 from tsdhn_parity.cases import Case
 
@@ -20,7 +19,7 @@ def tools_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     program = directory / "double"
     program.write_text(FIXTURE_PROGRAM)
-    make_executable(program)
+    program.chmod(0o755)
     return directory
 
 

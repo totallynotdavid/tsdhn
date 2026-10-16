@@ -19,10 +19,6 @@ WORKSPACE_INPUTS: tuple[str, ...] = (
 )
 
 
-def make_executable(file_path: Path) -> None:
-    file_path.chmod(file_path.stat().st_mode | 0o111)
-
-
 @contextlib.contextmanager
 def atomic_write(path: Path) -> Iterator[Path]:
     """Yield a sibling temp path; rename it onto `path` only on clean exit.
