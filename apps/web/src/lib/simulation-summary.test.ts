@@ -22,6 +22,7 @@ function sim(overrides: Partial<SimulationDetails>): SimulationDetails {
     outputs: [],
     startedAt: null,
     finishedAt: null,
+    outputsExpiredAt: null,
     ...overrides,
   };
 }

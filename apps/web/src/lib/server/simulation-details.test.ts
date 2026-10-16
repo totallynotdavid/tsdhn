@@ -19,6 +19,7 @@ const BASE = {
   outputs: null,
   startedAt: null,
   finishedAt: null,
+  outputsExpiredAt: null,
 };
 
 describe("toSimulationDetails", () => {
@@ -78,6 +79,19 @@ describe("toSimulationDetails", () => {
     });
 
     expect(details.outputs).toEqual(["max_height_map", "mareogram"]);
+  });
+
+  it("reports when retention deleted the files", () => {
+    const expiredAt = new Date("2026-10-01T00:00:00Z");
+    const details = toSimulationDetails({
+      ...BASE,
+      computeStatus: "completed",
+      outputs: [],
+      outputsExpiredAt: expiredAt,
+    });
+
+    expect(details.status).toBe("completed");
+    expect(details.outputsExpiredAt).toEqual(expiredAt);
   });
 
   it("defaults outputs to an empty list when the compute row has none", () => {

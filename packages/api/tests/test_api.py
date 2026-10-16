@@ -1,6 +1,7 @@
 import asyncio
 import json
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -11,6 +12,7 @@ from fastapi.testclient import TestClient
 from api import main as main_module
 from api import routes
 from api.core import db, repository
+from api.core.errors import OutputsExpiredError
 from api.core.storage import output_store
 from api.main import app
 
@@ -293,6 +295,25 @@ def test_unknown_output_name_is_404(
         follow_redirects=False,
     )
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize("suffix", ["outputs", "outputs/max_height_map"])
+def test_expired_outputs_are_gone(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, suffix: str
+) -> None:
+    async def expired(_simulation_id: str) -> list[dict[str, str]]:
+        raise OutputsExpiredError(datetime(2026, 10, 1, 8, 30, tzinfo=UTC))
+
+    monkeypatch.setattr(repository, "get_outputs", expired)
+
+    response = client.get(
+        f"/api/v1/jobs/{SIMULATION_ID}/{suffix}",
+        headers=_auth(),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 410
+    assert response.json()["detail"] == "Output files expired on 2026-10-01"
 
 
 def test_output_download_maps_an_unknown_job_to_not_found(

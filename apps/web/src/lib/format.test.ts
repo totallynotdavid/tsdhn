@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatCoordinates, formatWhen } from "./format";
+import { formatCoordinates, formatDate, formatWhen } from "./format";
 
 describe("formatting", () => {
   it("writes coordinates with hemispheres", () => {
@@ -14,5 +14,9 @@ describe("formatting", () => {
     expect(formatWhen(new Date("2026-10-09T15:00:00Z"), now)).toBe("hace 5 h");
     expect(formatWhen(new Date("2026-10-09T19:59:40Z"), now)).toBe("ahora");
     expect(formatWhen(new Date("2026-09-01T12:00:00Z"), now)).toMatch(/2026/);
+  });
+
+  it("writes a date in UTC without a time", () => {
+    expect(formatDate(new Date("2026-10-01T23:30:00Z"))).toMatch(/^1 oct\.? 2026$/);
   });
 });

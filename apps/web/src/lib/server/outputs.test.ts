@@ -21,6 +21,7 @@ const SIM: SimulationDetails = {
   outputs: ["max_height_map"],
   startedAt: null,
   finishedAt: null,
+  outputsExpiredAt: null,
 };
 
 describe("assertOutputAccessible", () => {
@@ -35,6 +36,17 @@ describe("assertOutputAccessible", () => {
     } catch (err) {
       expect(isHttpError(err)).toBe(true);
       if (isHttpError(err)) expect(err.status).toBe(404);
+    }
+  });
+
+  it("rejects with 410 once retention has deleted the files", () => {
+    const expired = { ...SIM, outputs: [], outputsExpiredAt: new Date("2026-10-01") };
+    try {
+      assertOutputAccessible(expired, "max_height_map");
+      throw new Error("expected assertOutputAccessible to throw");
+    } catch (err) {
+      expect(isHttpError(err)).toBe(true);
+      if (isHttpError(err)) expect(err.status).toBe(410);
     }
   });
 

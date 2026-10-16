@@ -29,6 +29,7 @@ def _row(**overrides: Any) -> dict[str, Any]:
         "updated_at": CREATED,
         "started_at": None,
         "finished_at": None,
+        "outputs_expired_at": None,
     }
     return row | overrides
 
@@ -50,6 +51,17 @@ def test_status_exposes_output_names_only() -> None:
 
     assert status["outputs"] == ["max_height_map"]
     assert "simulations/abc" not in str(status)
+
+
+def test_status_reports_when_the_outputs_expired() -> None:
+    status = status_from_row(
+        _row(status=JobStatus.COMPLETED.value, outputs_expired_at=CREATED)
+    )
+
+    assert status["status"] == "completed"
+    assert status["outputs"] == []
+    assert status["outputs_expired_at"] == CREATED.isoformat()
+    assert status_from_row(_row())["outputs_expired_at"] is None
 
 
 def test_status_has_no_outputs_before_completion() -> None:
