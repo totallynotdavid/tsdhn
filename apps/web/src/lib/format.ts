@@ -28,6 +28,13 @@ export function formatWhen(date: Date, now = new Date()): string {
   return "ahora";
 }
 
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat("es-PE", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 export function formatDateTimeUtc(date: Date): string {
   const text = new Intl.DateTimeFormat("es-PE", {
     dateStyle: "medium",

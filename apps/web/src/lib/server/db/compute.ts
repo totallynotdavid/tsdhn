@@ -23,6 +23,7 @@ export const computeJob = computeSchema.table("jobs", {
   error: text("error"),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
+  outputsExpiredAt: timestamp("outputs_expired_at", { withTimezone: true }),
 });
 
 export type ComputeJob = typeof computeJob.$inferSelect;

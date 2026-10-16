@@ -27,6 +27,7 @@ const simulationDetailsSelection = {
   outputs: computeJob.outputs,
   startedAt: computeJob.startedAt,
   finishedAt: computeJob.finishedAt,
+  outputsExpiredAt: computeJob.outputsExpiredAt,
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

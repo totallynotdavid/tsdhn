@@ -20,6 +20,8 @@ export const GET: RequestHandler = async ({ params, locals, fetch }) => {
     { headers, redirect: "manual" },
   );
 
+  if (upstream.status === 410) error(410, "Los archivos de esta simulación se eliminaron.");
+
   const location = upstream.headers.get("location");
   if (upstream.status !== 307 || !location) {
     error(502, "No se pudo preparar la descarga.");

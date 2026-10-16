@@ -30,7 +30,8 @@ const COMPUTE_JOBS = `
     outputs jsonb NOT NULL DEFAULT '[]'::jsonb,
     error text,
     started_at timestamptz,
-    finished_at timestamptz
+    finished_at timestamptz,
+    outputs_expired_at timestamptz
   );
   CREATE TABLE compute.job_inputs (
     simulation_id uuid PRIMARY KEY,

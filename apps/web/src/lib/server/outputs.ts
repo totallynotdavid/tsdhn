@@ -7,6 +7,9 @@ export function assertOutputAccessible(
   name: string,
 ): asserts sim is SimulationDetails {
   if (!sim) error(404);
+  if (sim.outputsExpiredAt) {
+    error(410, "Los archivos de esta simulación se eliminaron.");
+  }
   if (!sim.outputs.includes(name)) {
     error(404, "Este resultado no está disponible.");
   }

@@ -17,6 +17,8 @@ export type SimulationDetails = {
   outputs: string[];
   startedAt: Date | null;
   finishedAt: Date | null;
+  /** Set after retention deletes the job's files. Null while they exist. */
+  outputsExpiredAt: Date | null;
 };
 
 type SimulationDetailsRow = {
@@ -36,6 +38,7 @@ type SimulationDetailsRow = {
   outputs: unknown;
   startedAt: unknown;
   finishedAt: unknown;
+  outputsExpiredAt: unknown;
 };
 
 export function toSimulationDetails(row: SimulationDetailsRow): SimulationDetails {
@@ -60,5 +63,6 @@ export function toSimulationDetails(row: SimulationDetailsRow): SimulationDetail
     outputs: outputs.map((output) => output.name),
     startedAt: row.startedAt as Date | null,
     finishedAt: row.finishedAt as Date | null,
+    outputsExpiredAt: row.outputsExpiredAt as Date | null,
   };
 }

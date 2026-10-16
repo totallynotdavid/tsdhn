@@ -14,7 +14,7 @@
   import Disclosure from "#lib/components/ui/Disclosure.svelte";
   import Status from "#lib/components/ui/Status.svelte";
   import { formatDuration, portArrivals } from "#lib/arrivals.js";
-  import { formatCoordinates, formatMagnitude, formatWhen } from "#lib/format.js";
+  import { formatCoordinates, formatDate, formatMagnitude, formatWhen } from "#lib/format.js";
   import { followJob } from "#lib/job-stream.js";
   import type { EarthquakeInput } from "#lib/schema/earthquake.js";
   import { canResubmit, isFinished, progressOf } from "#lib/simulation-status.js";
@@ -214,7 +214,13 @@
     {:else if live.status === "completed"}
       <SectionLabel index={1} total={sectionCount} title="Resultados" id="files-title" />
       <section aria-labelledby="files-title">
-        {#if mainFiles.length === 0 && otherFiles.length === 0}
+        {#if data.sim.outputsExpiredAt}
+          <p class="t-body-md muted block">
+            Los archivos de esta simulación se eliminaron el
+            {formatDate(data.sim.outputsExpiredAt)}. Los parámetros y los tiempos de
+            arribo se conservan.
+          </p>
+        {:else if mainFiles.length === 0 && otherFiles.length === 0}
           <p class="t-body-md muted block">La simulación terminó, pero no dejó archivos.</p>
         {:else}
           <ul class="files">
