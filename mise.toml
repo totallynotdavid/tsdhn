@@ -65,6 +65,8 @@ web-dev = "bun --filter web dev"
 web-build = "bun --filter web build"
 web-check = "bun --filter web check"
 web-test = "bun --filter web test"
+edge-check = "bun --filter edge check"
+edge-test = "bun --filter edge test"
 lint-js = "bun run lint"
 fmt-js = "bun run fmt"
 fmt-check-js = "bun run fmt:check"
@@ -148,6 +150,8 @@ check = [
   "mise run test",
   "mise run web-check",
   "mise run web-test",
+  "mise run edge-check",
+  "mise run edge-test",
 ]
 fix-all = ["mise run fix", "mise run fmt-js"]
 
