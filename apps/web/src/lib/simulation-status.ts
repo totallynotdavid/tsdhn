@@ -1,4 +1,4 @@
-export type Tone = "neutral" | "active" | "success" | "danger";
+type Tone = "neutral" | "active" | "success" | "danger";
 
 export interface StatusMeta {
   label: string;

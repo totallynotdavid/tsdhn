@@ -4,13 +4,13 @@ import { z } from "zod";
  * The model bathymetry spans these bounds. Outside them the compute service
  * still answers, by extrapolating, so the form rejects such points instead.
  */
-export const MODEL_DOMAIN = {
+const MODEL_DOMAIN = {
   latitude: { min: -60, max: 61 },
   /** Longitudes between these limits fall outside the Pacific grid. */
   longitude: { westMax: -62, eastMin: 130 },
 } as const;
 
-export function isInModelLongitude(longitude: number): boolean {
+function isInModelLongitude(longitude: number): boolean {
   return longitude <= MODEL_DOMAIN.longitude.westMax || longitude >= MODEL_DOMAIN.longitude.eastMin;
 }
 

@@ -34,13 +34,3 @@ export function formatDate(date: Date): string {
     timeZone: "UTC",
   }).format(date);
 }
-
-export function formatDateTimeUtc(date: Date): string {
-  const text = new Intl.DateTimeFormat("es-PE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-    hour12: false,
-  }).format(date);
-  return `${text} UTC`;
-}
