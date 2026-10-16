@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import anyio
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import RedirectResponse, StreamingResponse
 
 from api import __version__
@@ -55,12 +55,20 @@ router = APIRouter(
 )
 
 
-@ops_router.get("/health", response_model=HealthStatus)
-async def health() -> HealthStatus:
+@ops_router.get(
+    "/health",
+    response_model=HealthStatus,
+    responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": HealthStatus}},
+)
+async def health(response: Response) -> HealthStatus:
+    """Answer 200 when the database and storage answer, 503 when either does not."""
     database_connected = await repository.is_database_connected()
     storage_connected = await anyio.to_thread.run_sync(output_store.is_connected)
+    healthy = database_connected and storage_connected
+    if not healthy:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return HealthStatus(
-        status="healthy" if database_connected and storage_connected else "degraded",
+        status="healthy" if healthy else "degraded",
         timestamp=datetime.now(UTC).isoformat(),
         database_connected=database_connected,
         storage_connected=storage_connected,

@@ -82,13 +82,24 @@ def test_health_is_unauthenticated(
     }
 
 
-def test_health_reports_degraded_when_a_dependency_is_down(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("database_up", "storage_up"), [(True, False), (False, True), (False, False)]
+)
+def test_health_answers_503_when_a_dependency_is_down(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    database_up: bool,
+    storage_up: bool,
 ) -> None:
-    monkeypatch.setattr(repository, "is_database_connected", _async(True))
-    monkeypatch.setattr(output_store, "is_connected", lambda: False)
+    monkeypatch.setattr(repository, "is_database_connected", _async(database_up))
+    monkeypatch.setattr(output_store, "is_connected", lambda: storage_up)
 
-    assert client.get("/api/v1/health").json()["status"] == "degraded"
+    response = client.get("/api/v1/health")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "degraded"
+    assert response.json()["database_connected"] is database_up
+    assert response.json()["storage_connected"] is storage_up
 
 
 def test_version(client: TestClient) -> None:

@@ -11,10 +11,21 @@
           "ops"
         ],
         "summary": "Health",
+        "description": "Answer 200 when the database and storage answer, 503 when either does not.",
         "operationId": "health_api_v1_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
