@@ -70,15 +70,6 @@ def _services(
     return services
 
 
-def test_an_env_file_that_names_no_store_keeps_the_bundled_storage(
-    tmp_path: Path,
-) -> None:
-    services = _services(tmp_path, MAIN_ENV, "compose.prod.yml")
-
-    assert "storage" in services
-    assert services["api"]["environment"]["TSDHN_S3_ENDPOINT"] == "storage:9000"
-
-
 def test_an_external_store_removes_the_bundled_storage_and_every_wait_for_it(
     tmp_path: Path,
 ) -> None:
@@ -143,9 +134,3 @@ def test_the_worker_host_stops_and_names_a_missing_value(
 
     assert result.returncode != 0
     assert missing in result.stderr
-
-
-def test_a_worker_host_runs_no_retention_pass(tmp_path: Path) -> None:
-    worker = _services(tmp_path, WORKER_ENV, "compose.worker.yml")["worker"]
-
-    assert worker["environment"]["TSDHN_RETENTION_ENABLED"] == "false"

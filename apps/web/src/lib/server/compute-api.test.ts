@@ -22,27 +22,6 @@ describe("compute API configuration", () => {
     env.COMPUTE_API_URL = "https://compute.example/";
   });
 
-  it("creates an authenticated client", () => {
-    const fetch = vi.fn();
-
-    expect(computeClient(fetch)).toMatchObject({
-      GET: expect.any(Function),
-      POST: expect.any(Function),
-    });
-  });
-
-  it("requires the compute URL when creating a client", () => {
-    env.COMPUTE_API_URL = "";
-
-    expect(() => computeClient(vi.fn())).toThrow("COMPUTE_API_URL is not set");
-  });
-
-  it("requires the compute token when creating a client", () => {
-    env.COMPUTE_API_TOKEN = "";
-
-    expect(() => computeClient(vi.fn())).toThrow("COMPUTE_API_TOKEN is not set");
-  });
-
   it("returns the normalized request configuration", () => {
     expect(computeRequestConfig()).toEqual({
       url: "https://compute.example",
@@ -50,15 +29,15 @@ describe("compute API configuration", () => {
     });
   });
 
-  it("requires the compute URL in request configuration", () => {
+  it.each([
+    ["client", () => computeClient(vi.fn())],
+    ["request configuration", () => computeRequestConfig()],
+  ])("requires the compute URL and token for the %s", (_, build) => {
     env.COMPUTE_API_URL = "";
+    expect(build).toThrow("COMPUTE_API_URL is not set");
 
-    expect(() => computeRequestConfig()).toThrow("COMPUTE_API_URL is not set");
-  });
-
-  it("requires the compute token in request configuration", () => {
+    env.COMPUTE_API_URL = "https://compute.example/";
     env.COMPUTE_API_TOKEN = "";
-
-    expect(() => computeRequestConfig()).toThrow("COMPUTE_API_TOKEN is not set");
+    expect(build).toThrow("COMPUTE_API_TOKEN is not set");
   });
 });

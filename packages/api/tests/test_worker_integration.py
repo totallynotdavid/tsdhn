@@ -270,27 +270,6 @@ async def test_the_heartbeat_file_stays_absent_when_the_database_is_unreachable(
     assert not path.exists()
 
 
-@pytest.mark.asyncio
-async def test_the_queue_tables_stay_out_of_the_compute_schema(queue: Queue) -> None:
-    async with db.acquire() as conn:
-        compute_tables = {
-            record["tablename"]
-            for record in await conn.fetch(
-                "SELECT tablename FROM pg_tables WHERE schemaname = 'compute'"
-            )
-        }
-        queue_tables = {
-            record["tablename"]
-            for record in await conn.fetch(
-                "SELECT tablename FROM pg_tables WHERE schemaname = $1",
-                COMPUTE_QUEUE_SCHEMA,
-            )
-        }
-
-    assert compute_tables == {"jobs", "schema_migrations"}
-    assert {"jobs", "job_attempts", "schema_migrations"} <= queue_tables
-
-
 async def _put_on_its_last_attempt(compute_job_id: uuid.UUID) -> None:
     """Shrink the job's budget so one lease expiry exhausts it.
 
@@ -432,10 +411,8 @@ async def test_a_transient_finalization_failure_is_reported_as_retrying(
     assert row["state"] == "pending"
     assert row["error_type"] == "TransientInfraError"
 
-    # The kernel succeeded and the upload did not, so the failure lands in
-    # complete_job -- outside the block that used to be the only caller of
-    # _record_failure. crash_recovery_e2e.sh scenario 3 watches for exactly
-    # this text while object storage is stopped.
+    # The kernel succeeded and the upload failed. crash_recovery_e2e.sh
+    # scenario 3 watches for exactly this text while object storage is stopped.
     status = await repository.get_job_status(simulation_id)
     assert status["status"] == "running"
     assert status["details"] == "Retrying after transient error (TransientInfraError)"

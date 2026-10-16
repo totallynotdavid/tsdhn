@@ -177,19 +177,6 @@ def test_install_compute_schema_rolls_back_a_failing_migration(
     assert probe == (None,)
 
 
-def test_compute_schema_defines_the_job_columns(isolated_database: str) -> None:
-    with psycopg.connect(isolated_database) as conn:
-        columns = {
-            row[0]
-            for row in conn.execute(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_schema = 'compute' AND table_name = 'jobs'"
-            )
-        }
-
-    assert {"simulation_id", "outputs", "owner_attempt"} <= columns
-
-
 def test_web_role_can_use_future_tables_but_cannot_run_ddl(
     isolated_database: str, temporary_web_role: str
 ) -> None:

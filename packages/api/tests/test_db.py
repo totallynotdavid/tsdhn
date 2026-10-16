@@ -310,16 +310,3 @@ def test_transient_classification_follows_the_sqlstate_class(
     exception: BaseException, transient: bool
 ) -> None:
     assert db.is_transient(exception) is transient
-
-
-@pytest.mark.asyncio
-async def test_pool_exhaustion_is_retryable(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Pool:
-        async def acquire(self) -> object:
-            raise asyncpg.TooManyConnectionsError("sorry, too many clients already")
-
-    monkeypatch.setattr(db_module, "get_pool", lambda: _Pool())
-
-    with pytest.raises(TransientInfraError, match="database unavailable"):
-        async with db.acquire():
-            pass

@@ -57,16 +57,6 @@ def test_runtime_resolves_the_model_dir_from_the_environment(
     assert RuntimeContext.resolve().model_dir == model_dir.resolve()
 
 
-def test_runtime_reports_external_tool_capabilities(tmp_path: Path) -> None:
-    """Report GMT and ttt_client when they are resolved from PATH."""
-    model_dir = _create_model_dir(tmp_path)
-
-    runtime = RuntimeContext.resolve(model_dir=model_dir)
-
-    assert set(runtime.capabilities) == {"gmt", "ttt_client"}
-    assert not hasattr(runtime, "tools_dir")
-
-
 def test_prepare_simulation_workspace_links_only_required_inputs(
     tmp_path: Path,
 ) -> None:

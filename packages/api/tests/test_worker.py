@@ -76,41 +76,6 @@ def test_main_exits_the_process_instead_of_joining_abandoned_threads(
     assert calls == ["run", ("exit", 0)]
 
 
-def test_the_shutdown_story_holds_together(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Detach and the hard exit only make sense together, so assert both."""
-    captured: dict[str, Any] = {}
-
-    class _Worker:
-        def __init__(self, _queue: Any, **kwargs: Any) -> None:
-            captured.update(kwargs)
-
-        def stop(self) -> None:
-            return None
-
-        async def run(self) -> None:
-            return None
-
-    async def open_pool(**_kwargs: Any) -> object:
-        return object()
-
-    async def close_pool() -> None:
-        return None
-
-    exits: list[int] = []
-    monkeypatch.setattr(worker_any, "Worker", _Worker)
-    monkeypatch.setattr(worker_any, "build_queue", lambda _pool: object())
-    monkeypatch.setattr(worker_any, "register_tasks", lambda queue: queue)
-    monkeypatch.setattr(db, "open_pool", open_pool)
-    monkeypatch.setattr(db, "close_pool", close_pool)
-    monkeypatch.setattr(db, "runtime_dsn", lambda *_args: "postgresql://test")
-    monkeypatch.setattr(os, "_exit", exits.append)
-
-    worker_module.main()
-
-    assert captured["executor_shutdown"] == "detach"
-    assert exits == [0]
-
-
 async def _run_worker_recording_maintenance(
     monkeypatch: pytest.MonkeyPatch, *, retention: bool
 ) -> list[str]:

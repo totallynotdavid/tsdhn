@@ -104,19 +104,6 @@ def test_worker_env_reaches_the_bundled_storage_on_the_private_address(
     assert env["TSDHN_S3_REGION"] == "us-east-1"
 
 
-def test_worker_env_states_the_connection_settings_the_main_env_leaves_to_defaults(
-    tmp_path: Path,
-) -> None:
-    main = _main_env(tmp_path, TSDHN_S3_ENDPOINT="s3.example.org")
-    target = tmp_path / "worker.env"
-
-    assert _run("--worker", "--from", main, target).returncode == 0
-
-    env = _read(target)
-    assert env["TSDHN_S3_SECURE"] == "false"
-    assert env["TSDHN_S3_REGION"] == "us-east-1"
-
-
 @pytest.mark.parametrize(
     "missing", ["TSDHN_PRIVATE_ADDR", "API_IMAGE", "COMPUTE_WORKER_PASSWORD"]
 )

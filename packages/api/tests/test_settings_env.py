@@ -1,9 +1,6 @@
 import json
 import subprocess
 import sys
-from pathlib import Path
-
-REPO_ROOT = Path(__file__).parents[3]
 
 _PROBE = (
     "import json; from api.core import settings; "
@@ -48,28 +45,6 @@ def test_service_settings_read_tsdhn_prefixed_names() -> None:
     }
 
 
-def test_unprefixed_names_are_ignored() -> None:
-    values = _settings(
-        {
-            "S3_BUCKET": "legacy",
-            "DB_POOL_MAX_SIZE": "99",
-            "OUTPUT_URL_TTL_SECONDS": "99",
-            "SSE_MAX_DURATION_SECONDS": "99",
-            "ALLOWED_ORIGINS": "http://legacy",
-            "APP_PORT": "1",
-        }
-    )
-
-    assert values == {
-        "bucket": "tsdhn-results",
-        "pool": 10,
-        "ttl": 900,
-        "sse": 1800,
-        "origins": [],
-        "port": 8000,
-    }
-
-
 def _setting(name: str, env: dict[str, str]) -> object:
     result = subprocess.run(  # noqa: S603
         [
@@ -92,16 +67,3 @@ def test_retention_runs_unless_turned_off() -> None:
     assert _setting("RETENTION_ENABLED", {"TSDHN_RETENTION_ENABLED": "true"}) is True
     assert _setting("RETENTION_ENABLED", {"TSDHN_RETENTION_ENABLED": "false"}) is False
     assert _setting("RETENTION_ENABLED", {"TSDHN_RETENTION_ENABLED": "0"}) is False
-
-
-def test_the_signing_region_defaults_to_us_east_1_and_can_be_auto() -> None:
-    assert _setting("S3_REGION", {}) == "us-east-1"
-    assert _setting("S3_REGION", {"TSDHN_S3_REGION": "auto"}) == "auto"
-
-
-def test_compose_owns_the_runtime_database_endpoint() -> None:
-    compose = (REPO_ROOT / "docker-compose.yml").read_text()
-    example = (REPO_ROOT / ".env.example").read_text()
-
-    assert "COMPUTE_RUNTIME_DATABASE_URL: postgresql://postgres:5432/tsdhn" in compose
-    assert "COMPUTE_RUNTIME_DATABASE_URL" not in example

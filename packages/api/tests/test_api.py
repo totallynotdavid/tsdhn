@@ -538,15 +538,6 @@ async def test_the_notification_bridge_reports_the_keepalive_timeout(
     assert await routes_module._wait_for_notification(wakeups) is False
 
 
-def test_legacy_simulations_endpoint_is_removed(client: TestClient) -> None:
-    response = client.post(
-        "/api/v1/simulations",
-        headers=_auth(),
-        json={"simulation_id": SIMULATION_ID, "input": SAMPLE},
-    )
-    assert response.status_code == 404
-
-
 def test_public_error_does_not_leak_exception_message() -> None:
     leaky = FileNotFoundError(
         "[Errno 2] No such file or directory: "

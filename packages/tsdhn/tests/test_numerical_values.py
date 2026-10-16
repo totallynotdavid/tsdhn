@@ -128,7 +128,3 @@ def test_travel_time_uses_standard_gravity(
     _, lower_gravity_time = calculator._calculate_travel_time(*args)
 
     assert lower_gravity_time > standard_time
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
