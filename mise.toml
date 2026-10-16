@@ -143,7 +143,12 @@ DOCKER_CONFIG="$docker_config" docker compose --profile web ps >&2 || true
 exit 1
 """
 
-lint-all = ["mise run lint", "mise run lint-js", "mise run fmt-check-js"]
+lint-all = [
+  "mise run lint",
+  "mise run lint-js",
+  "mise run fmt-check-js",
+  "bash scripts/check-tool-versions.sh",
+]
 
 check = [
   "mise run lint-all",

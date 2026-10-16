@@ -2,8 +2,8 @@
 # Edge deployments use adapter-auto and these runtime variables.
 #
 # Build context is the repo root. The BUN_VERSION default mirrors
-# .tool-versions (a test enforces it); builds that read .tool-versions pass it
-# explicitly.
+# .tool-versions. `mise run lint-all` enforces it. Builds that read
+# .tool-versions pass it explicitly.
 ARG BUN_VERSION=1.4.2
 FROM oven/bun:${BUN_VERSION}
 
