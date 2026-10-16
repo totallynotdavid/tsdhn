@@ -5,6 +5,7 @@ import signal
 import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 import asyncpg
 import numba
@@ -22,6 +23,7 @@ from api.core.settings import (
     COMPUTE_WORKER_ROLE,
     LOG_LEVEL,
     NUMBA_THREADS,
+    OUTPUT_RETENTION_DAYS,
     WORKER_CONCURRENCY,
     WORKER_HEARTBEAT_FILE,
     WORKER_ID,
@@ -29,8 +31,10 @@ from api.core.settings import (
     worker_pool_size,
 )
 from api.core.tasks import (
+    ensure_output_bucket,
     register_tasks,
     run_heartbeat,
+    run_periodic_expiry,
     run_periodic_purge,
     run_periodic_reconcile,
     run_periodic_sweep,
@@ -97,6 +101,7 @@ async def run() -> None:
             # cancelled and the next worker resumes from the checkpoints.
             loop.add_signal_handler(received, worker.stop)
 
+        await ensure_output_bucket()
         stop_maintenance = asyncio.Event()
         logger.info("simulation worker serving queue %s", COMPUTE_QUEUE)
         async with purge_pool() as retention_pool:
@@ -111,6 +116,15 @@ async def run() -> None:
                     )
                 ),
             ]
+            if OUTPUT_RETENTION_DAYS > 0:
+                maintenance.append(
+                    asyncio.create_task(
+                        run_periodic_expiry(
+                            stop_maintenance,
+                            retention=timedelta(days=OUTPUT_RETENTION_DAYS),
+                        )
+                    )
+                )
             if WORKER_HEARTBEAT_FILE is not None:
                 maintenance.append(
                     asyncio.create_task(

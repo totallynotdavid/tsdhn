@@ -92,6 +92,27 @@ class OutputStore:
 
         return self.bucket, metadata_key
 
+    def delete_simulation_outputs(self, simulation_id: str) -> int:
+        """Delete every object stored for a simulation and return how many.
+
+        Deleting nothing is not an error, so a pass that died between this call
+        and its database write can repeat it.
+        """
+        prefix = f"simulations/{simulation_id}/"
+        try:
+            names = [
+                obj.object_name
+                for obj in self._client.list_objects(
+                    self.bucket, prefix=prefix, recursive=True
+                )
+                if obj.object_name
+            ]
+            for name in names:
+                self._client.remove_object(self.bucket, name)
+        except (S3ClientError, urllib3.exceptions.HTTPError, OSError) as e:
+            raise TransientInfraError("deleting expired outputs failed") from e
+        return len(names)
+
     def presigned_url(self, object_name: str, *, filename: str) -> str:
         """Return a short-lived URL for downloading an output file."""
         try:

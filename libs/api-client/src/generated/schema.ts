@@ -269,6 +269,8 @@ export interface components {
              * @default []
              */
             outputs: string[];
+            /** Outputs Expired At */
+            outputs_expired_at?: string | null;
         };
         /** OutputList */
         OutputList: {
@@ -504,6 +506,13 @@ export interface operations {
                     "application/json": components["schemas"]["OutputList"];
                 };
             };
+            /** @description Retention deleted the files */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -531,6 +540,13 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             307: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Retention deleted the files */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -16,6 +16,7 @@ import anyio
 import asyncpg
 
 from api.core.db import JobRow, acquire, notify_channel, transient_connection_errors
+from api.core.errors import OutputsExpiredError
 from api.core.lifecycle import JOB_ID_RE, TERMINAL_STATUSES
 from api.core.storage import iso, output_store
 from tsdhn.domain import EarthquakeInput, JobStatus
@@ -32,6 +33,8 @@ __all__ = [
     "get_outputs",
     "is_database_connected",
     "list_abandoned_work_dirs",
+    "list_jobs_with_expired_outputs",
+    "mark_outputs_expired",
     "mark_started",
     "reconcile_terminal_jobs",
     "record_failure",
@@ -66,7 +69,7 @@ _COLUMNS = """
   id, simulation_id, status, input_params::text AS input_params, details, step,
   step_index, total_steps, calculation::text AS calculation,
   travel_times::text AS travel_times, outputs::text AS outputs, error,
-  created_at, updated_at, started_at, finished_at
+  created_at, updated_at, started_at, finished_at, outputs_expired_at
 """
 
 
@@ -133,6 +136,7 @@ def status_from_row(row: JobRow) -> dict[str, Any]:
         "started_at": iso(row["started_at"]),
         "finished_at": iso(row["finished_at"]),
         "outputs": [output["name"] for output in outputs],
+        "outputs_expired_at": iso(row["outputs_expired_at"]),
     }
 
 
@@ -208,18 +212,24 @@ async def get_job_status(simulation_id: str) -> dict[str, Any]:
 
 
 async def get_outputs(simulation_id: str) -> list[StoredOutput]:
-    """Return the outputs recorded with a completed job."""
+    """Return the outputs recorded with a completed job.
+
+    Raise `OutputsExpiredError` after retention deletes them.
+    """
     simulation_uuid = as_uuid(simulation_id)
     async with acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT status, outputs::text AS outputs FROM compute.jobs
+            SELECT status, outputs::text AS outputs, outputs_expired_at
+            FROM compute.jobs
             WHERE simulation_id = $1
             """,
             simulation_uuid,
         )
     if row is None:
         raise ValueError("Invalid or unknown job ID")
+    if row["outputs_expired_at"] is not None:
+        raise OutputsExpiredError(row["outputs_expired_at"])
     if row["status"] != JobStatus.COMPLETED.value:
         return []
     # `outputs` is NOT NULL today. This query bypasses `_decode` and reads the
@@ -252,6 +262,51 @@ async def list_abandoned_work_dirs(cutoff: datetime) -> list[str]:
             cutoff,
         )
     return [str(row["simulation_id"]) for row in rows]
+
+
+async def list_jobs_with_expired_outputs(cutoff: datetime, limit: int) -> list[str]:
+    """Return completed jobs that finished before `cutoff` and still hold files."""
+    async with acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT simulation_id FROM compute.jobs
+            WHERE status = $1
+              AND finished_at < $2
+              AND outputs_expired_at IS NULL
+            ORDER BY finished_at
+            LIMIT $3
+            """,
+            JobStatus.COMPLETED.value,
+            cutoff,
+            limit,
+        )
+    return [str(row["simulation_id"]) for row in rows]
+
+
+async def mark_outputs_expired(simulation_id: str) -> bool:
+    """Record that a job's files are gone, and return whether this call did.
+
+    The manifest is emptied in the same statement, so no reader is handed a key
+    for a deleted object. A repeat finds the stamp set and changes nothing.
+    """
+    async with acquire() as conn, conn.transaction():
+        stamped = await conn.fetchval(
+            """
+            UPDATE compute.jobs
+            SET outputs = '[]'::jsonb, outputs_expired_at = now(),
+                updated_at = now()
+            WHERE simulation_id = $1
+              AND status = $2
+              AND outputs_expired_at IS NULL
+            RETURNING id
+            """,
+            as_uuid(simulation_id),
+            JobStatus.COMPLETED.value,
+        )
+        if stamped is None:
+            return False
+        await _notify(conn, as_uuid(simulation_id))
+    return True
 
 
 def _reconcile_sql(queue_schema: str) -> str:

@@ -48,6 +48,9 @@ class JobStatusResponse(BaseModel):
     finished_at: str | None = None
     # Output names are public. Storage keys remain inside the compute service.
     outputs: list[str] = []
+    # Set once retention has deleted the files. The job and its arrival times
+    # stay readable.
+    outputs_expired_at: str | None = None
 
 
 class StoredOutput(BaseModel):

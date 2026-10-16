@@ -17,6 +17,8 @@ CREATE TABLE compute.jobs (
   updated_at timestamptz NOT NULL DEFAULT now(),
   started_at timestamptz,
   finished_at timestamptz,
+  -- Set when the retention pass deletes a completed job's stored outputs.
+  outputs_expired_at timestamptz,
   -- The task-queue attempt that owns this row. Every write an attempt makes
   -- matches on this column, so a superseded attempt matches zero rows. NULL
   -- until the first attempt claims the row.

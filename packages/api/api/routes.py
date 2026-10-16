@@ -16,6 +16,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from api import __version__
 from api.core import db, repository
 from api.core.db import notify_channel
+from api.core.errors import OutputsExpiredError
 from api.core.settings import SSE_MAX_DURATION
 from api.core.storage import output_store
 from api.core.tasks import enqueue_simulation
@@ -131,12 +132,22 @@ async def get_job(simulation_id: str) -> JobStatusResponse:
     return JobStatusResponse(simulation_id=simulation_id, **job_status)
 
 
-@router.get("/jobs/{simulation_id}/outputs", response_model=OutputList)
-async def list_outputs(simulation_id: str) -> OutputList:
+async def _outputs_or_error(simulation_id: str) -> list[repository.StoredOutput]:
     try:
-        outputs = await repository.get_outputs(simulation_id)
+        return await repository.get_outputs(simulation_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except OutputsExpiredError as e:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(e)) from e
+
+
+@router.get(
+    "/jobs/{simulation_id}/outputs",
+    response_model=OutputList,
+    responses={status.HTTP_410_GONE: {"description": "Retention deleted the files"}},
+)
+async def list_outputs(simulation_id: str) -> OutputList:
+    outputs = await _outputs_or_error(simulation_id)
     return OutputList(
         simulation_id=simulation_id,
         outputs=[
@@ -154,12 +165,10 @@ async def list_outputs(simulation_id: str) -> OutputList:
     "/jobs/{simulation_id}/outputs/{name}",
     status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     response_class=RedirectResponse,
+    responses={status.HTTP_410_GONE: {"description": "Retention deleted the files"}},
 )
 async def get_output(simulation_id: str, name: str) -> RedirectResponse:
-    try:
-        outputs = await repository.get_outputs(simulation_id)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    outputs = await _outputs_or_error(simulation_id)
 
     match = next((output for output in outputs if output["name"] == name), None)
     if match is None:

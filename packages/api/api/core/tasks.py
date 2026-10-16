@@ -35,6 +35,7 @@ from api.core.errors import TransientInfraError
 from api.core.lifecycle import JOB_ID_RE, JOB_RETENTION, TERMINAL_STATUSES
 from api.core.queue import get_queue
 from api.core.settings import COMPUTE_QUEUE, JOBS_DIR
+from api.core.storage import output_store
 from tsdhn.domain import EarthquakeInput, JobStatus
 from tsdhn.engine import run_simulation
 
@@ -45,10 +46,12 @@ __all__ = [
     "AbandonedAttempt",
     "decode_payload",
     "enqueue_simulation",
+    "expire_old_outputs",
     "purge_finished_jobs",
     "reconcile_terminal_jobs",
     "register_tasks",
     "run_heartbeat",
+    "run_periodic_expiry",
     "run_periodic_purge",
     "run_periodic_reconcile",
     "run_periodic_sweep",
@@ -92,6 +95,10 @@ RECONCILE_INTERVAL_SECONDS = 60.0
 _CLAIM_DRAIN_TASKS: set[asyncio.Task[None]] = set()
 
 PURGE_INTERVAL_SECONDS = 3600.0
+
+EXPIRY_INTERVAL_SECONDS = 3600.0
+# A pass repeats until a query returns fewer than this many jobs.
+EXPIRY_BATCH = 100
 
 HEARTBEAT_INTERVAL_SECONDS = 10.0
 HEARTBEAT_QUERY_TIMEOUT_SECONDS = 5.0
@@ -465,6 +472,40 @@ async def sweep_abandoned_work_dirs() -> None:
         await asyncio.to_thread(remove_workspace, JOBS_DIR / simulation_id)
 
 
+async def ensure_output_bucket() -> None:
+    """Create the bucket at start, so a backup can tell a deleted bucket from a new one.
+
+    A store that does not answer is logged and left to the first upload, which
+    creates the bucket itself.
+    """
+    try:
+        await asyncio.to_thread(output_store.ensure_bucket)
+    except Exception:
+        logger.warning("could not create the output bucket", exc_info=True)
+
+
+async def expire_old_outputs(retention: timedelta, *, batch: int = EXPIRY_BATCH) -> int:
+    """Delete the files of completed jobs older than `retention`, and return the count.
+
+    Files go first, then the manifest is emptied. A pass that dies in between
+    leaves a job that still lists keys for deleted objects, and the next pass
+    finishes it because deleting nothing is not an error. The reverse order
+    would orphan the files with nothing left pointing at them.
+    """
+    cutoff = datetime.now().astimezone() - retention
+    expired = 0
+    while True:
+        simulation_ids = await repository.list_jobs_with_expired_outputs(cutoff, batch)
+        for simulation_id in simulation_ids:
+            await asyncio.to_thread(
+                output_store.delete_simulation_outputs, simulation_id
+            )
+            if await repository.mark_outputs_expired(simulation_id):
+                expired += 1
+        if len(simulation_ids) < batch:
+            return expired
+
+
 async def _eligible_queue_job_ids(
     admin: Admin, compute_pool: asyncpg.Pool, cutoff: datetime
 ) -> list[uuid.UUID]:
@@ -617,6 +658,26 @@ async def run_periodic_reconcile(
         stop,
         interval,
     )
+
+
+async def run_periodic_expiry(
+    stop: asyncio.Event,
+    *,
+    retention: timedelta,
+    interval: float = EXPIRY_INTERVAL_SECONDS,
+) -> None:
+    """Expire old job outputs until `stop` is set."""
+
+    async def expire() -> None:
+        expired = await expire_old_outputs(retention)
+        if expired:
+            logger.info(
+                "deleted the output files of %d job(s) finished more than %d days ago",
+                expired,
+                retention.days,
+            )
+
+    await _run_periodically("Expiry of job outputs", expire, stop, interval)
 
 
 async def run_heartbeat(
