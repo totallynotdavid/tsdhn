@@ -14,6 +14,9 @@ export interface paths {
         /**
          * Health
          * @description Answer 200 when the database and storage answer, 503 when either does not.
+         *
+         *     The body also reports the age of the oldest queued job. A long queue does
+         *     not change the status: it is a reason to add a worker, not a failure.
          */
         get: operations["health_api_v1_health_get"];
         put?: never;
@@ -223,6 +226,8 @@ export interface components {
             database_connected: boolean;
             /** Storage Connected */
             storage_connected: boolean;
+            /** Oldest Queued Age Seconds */
+            oldest_queued_age_seconds: number | null;
         };
         /** JobCreated */
         JobCreated: {

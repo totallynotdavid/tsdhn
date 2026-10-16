@@ -36,6 +36,7 @@ __all__ = [
     "list_jobs_with_expired_outputs",
     "mark_outputs_expired",
     "mark_started",
+    "oldest_queued_age_seconds",
     "reconcile_terminal_jobs",
     "record_failure",
     "record_progress",
@@ -411,6 +412,23 @@ async def reconcile_terminal_jobs(
         for row in rows:
             await _notify(conn, row["simulation_id"])
     return [row["id"] for row in rows]
+
+
+async def oldest_queued_age_seconds(*, queue_schema: str, queue_name: str) -> float:
+    """Return the age of the oldest claimable pending job, or 0 when none waits.
+
+    A job in retry backoff is not claimable and is excluded.
+    """
+    async with acquire() as conn:
+        age = await conn.fetchval(
+            f"""
+            SELECT EXTRACT(EPOCH FROM now() - min(scheduled_at))
+            FROM {queue_schema}.jobs
+            WHERE queue = $1 AND state = 'pending' AND scheduled_at <= now()
+            """,  # noqa: S608
+            queue_name,
+        )
+    return round(float(age), 1) if age is not None else 0.0
 
 
 async def is_database_connected() -> bool:

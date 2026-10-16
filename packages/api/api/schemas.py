@@ -69,6 +69,8 @@ class HealthStatus(BaseModel):
     timestamp: str
     database_connected: bool
     storage_connected: bool
+    # The age is zero when no job waits and null when the database is down.
+    oldest_queued_age_seconds: float | None
 
 
 class VersionInfo(BaseModel):

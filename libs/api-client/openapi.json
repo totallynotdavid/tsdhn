@@ -11,7 +11,7 @@
           "ops"
         ],
         "summary": "Health",
-        "description": "Answer 200 when the database and storage answer, 503 when either does not.",
+        "description": "Answer 200 when the database and storage answer, 503 when either does not.\n\nThe body also reports the age of the oldest queued job. A long queue does\nnot change the status: it is a reason to add a worker, not a failure.",
         "operationId": "health_api_v1_health_get",
         "responses": {
           "200": {
@@ -589,6 +589,17 @@
           "storage_connected": {
             "type": "boolean",
             "title": "Storage Connected"
+          },
+          "oldest_queued_age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Queued Age Seconds"
           }
         },
         "type": "object",
@@ -596,7 +607,8 @@
           "status",
           "timestamp",
           "database_connected",
-          "storage_connected"
+          "storage_connected",
+          "oldest_queued_age_seconds"
         ],
         "title": "HealthStatus"
       },

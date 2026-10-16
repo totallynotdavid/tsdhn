@@ -17,6 +17,7 @@ from api import __version__
 from api.core import db, repository
 from api.core.db import notify_channel
 from api.core.errors import OutputsExpiredError
+from api.core.queue import get_queue
 from api.core.settings import SSE_MAX_DURATION
 from api.core.storage import output_store
 from api.core.tasks import enqueue_simulation
@@ -62,17 +63,31 @@ router = APIRouter(
     responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": HealthStatus}},
 )
 async def health(response: Response) -> HealthStatus:
-    """Answer 200 when the database and storage answer, 503 when either does not."""
+    """Answer 200 when the database and storage answer, 503 when either does not.
+
+    The body also reports the age of the oldest queued job. A long queue does
+    not change the status: it is a reason to add a worker, not a failure.
+    """
     database_connected = await repository.is_database_connected()
     storage_connected = await anyio.to_thread.run_sync(output_store.is_connected)
     healthy = database_connected and storage_connected
     if not healthy:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    queue_age = None
+    if database_connected:
+        queue = get_queue()
+        try:
+            queue_age = await repository.oldest_queued_age_seconds(
+                queue_schema=queue.schema, queue_name=queue.name
+            )
+        except Exception:
+            logger.warning("could not read the queue age", exc_info=True)
     return HealthStatus(
         status="healthy" if healthy else "degraded",
         timestamp=datetime.now(UTC).isoformat(),
         database_connected=database_connected,
         storage_connected=storage_connected,
+        oldest_queued_age_seconds=queue_age,
     )
 
 
