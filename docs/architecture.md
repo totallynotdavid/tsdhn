@@ -31,7 +31,7 @@ and no browser code in the web app calls the compute API.
 ```text
 .github/                  Contributing guide and workflows
 apps/web/                 SvelteKit web app
-deploy/                   Container images
+deploy/                   Container images and the production Compose file
 docs/                     Project manual
 libs/api-client/          Generated TypeScript client
 model/                    Model inputs and Fortran reference programs
@@ -39,7 +39,7 @@ packages/tsdhn/           Simulation engine and researcher CLI
 packages/api/             FastAPI service and worker
 packages/tsdhn-parity/    Comparison with MATLAB and Fortran output
 scripts/                  Setup, generation, database, and end-to-end tasks
-docker-compose.yml        Self-hosted service stack
+docker-compose.yml        Local service stack
 mise.toml                 Project tasks
 ```
 
@@ -112,6 +112,37 @@ intermediate files and the checkpoints that recovery needs.
 Object storage stores completed output files. The compute database stores their
 names, media types, filenames and private object keys. Public API responses omit
 the object keys.
+
+### Health signals
+
+Each long-running service tells its supervisor whether it can work. The
+supervisor only reads these signals. [Deploy](deploy.md#health-checks) lists
+which check reads which.
+
+| Service | Signal               | Healthy                           | Unhealthy                                      |
+| ------- | -------------------- | --------------------------------- | ---------------------------------------------- |
+| API     | `GET /api/v1/health` | 200, database and storage answer  | 503, the body names the dependency that failed |
+| Web     | `GET /health`        | 200, the database answers         | 503                                            |
+| Worker  | heartbeat file mtime | Fresh: touched less than 60 s ago | Absent or stale                                |
+
+The worker owns its heartbeat file, named by `TSDHN_WORKER_HEARTBEAT_FILE`. Its
+states:
+
+- **Absent**: the worker has not completed a beat since the container's file
+  system was created. This is the state at the start of a new container.
+- **Fresh**: the last beat ran less than 60 seconds ago. A beat runs every 10
+  seconds and touches the file only after `SELECT 1` on the worker's database
+  pool succeeds, so a fresh file means the worker's event loop runs and the
+  database answers.
+- **Stale**: the last beat is 60 seconds old or more. The event loop is blocked,
+  the database is unreachable, or the process has died. A container restart
+  leaves the previous file in place, and it is stale until the first beat of the
+  new process.
+
+Only the worker process creates or touches the file, and nothing deletes it. The
+60-second limit belongs to the reader, the health check in
+`deploy/compose.prod.yml`, so the worker never decides that it is unhealthy. A
+worker started without `TSDHN_WORKER_HEARTBEAT_FILE` writes no file.
 
 ## Where the code is
 
