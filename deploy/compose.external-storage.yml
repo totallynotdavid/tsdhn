@@ -1,0 +1,17 @@
+# Adds to compose.prod.yml when the outputs live in an external S3-compatible
+# store such as Cloudflare R2: the bundled RustFS does not run. List this file
+# last and set TSDHN_S3_ENDPOINT in the env file.
+services:
+  storage: !reset null
+  api:
+    depends_on:
+      storage: !reset null
+  worker:
+    depends_on:
+      storage: !reset null
+  backup:
+    depends_on:
+      storage: !reset null
+  restore:
+    depends_on:
+      storage: !reset null

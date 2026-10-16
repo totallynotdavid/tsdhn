@@ -31,6 +31,12 @@ if ! command -v jq >/dev/null; then
     exit 2
 fi
 
+# The copy restores into its own bundled object store, even when production
+# keeps outputs in an external bucket such as R2. Exported values win over the
+# env file.
+export TSDHN_S3_ENDPOINT=storage:9000 TSDHN_S3_SECURE=false \
+    TSDHN_S3_REGION=us-east-1
+
 cleanup() {
     if [ "$keep" = 1 ]; then
         echo "kept the restored stack; remove it with:"

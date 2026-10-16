@@ -1,0 +1,17 @@
+# Adds to compose.prod.yml on the main host: PostgreSQL, and the bundled storage
+# when it runs, listen on the private address so worker hosts reach them. List
+# this file after compose.prod.yml. Compose has no optional port, so the stack
+# publishes nothing until this file is named. List it before
+# compose.external-storage.yml, which removes the storage service.
+services:
+  postgres:
+    ports:
+      - "${TSDHN_PRIVATE_ADDR:?set TSDHN_PRIVATE_ADDR in the env file}:5432:5432"
+    networks: [backend, private]
+  storage:
+    ports:
+      - "${TSDHN_PRIVATE_ADDR:?set TSDHN_PRIVATE_ADDR in the env file}:9000:9000"
+    networks: [backend, private]
+
+networks:
+  private:
