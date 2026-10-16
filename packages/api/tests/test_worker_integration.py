@@ -233,6 +233,43 @@ async def test_an_undecodable_payload_fails_before_the_handler_runs(
     assert row["error_type"] == "PayloadDecodeError"
 
 
+async def _heartbeat_for(pool: asyncpg.Pool, path: Path, seconds: float) -> None:
+    stop = asyncio.Event()
+    beating = asyncio.create_task(tasks.run_heartbeat(path, pool, stop, interval=0.01))
+    await asyncio.sleep(seconds)
+    stop.set()
+    await beating
+
+
+@pytest.mark.asyncio
+async def test_the_heartbeat_file_is_touched_while_the_database_answers(
+    queue: Queue, tmp_path: Path
+) -> None:
+    path = tmp_path / "heartbeat"
+
+    await _heartbeat_for(db.get_pool(), path, 0.3)
+    first = path.stat().st_mtime_ns
+    await _heartbeat_for(db.get_pool(), path, 0.3)
+
+    assert path.stat().st_mtime_ns > first
+
+
+@pytest.mark.asyncio
+async def test_the_heartbeat_file_stays_absent_when_the_database_is_unreachable(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "heartbeat"
+    pool = await asyncpg.create_pool(
+        "postgresql://nobody:nothing@127.0.0.1:1/none", min_size=0, timeout=1
+    )
+    try:
+        await _heartbeat_for(pool, path, 0.3)
+    finally:
+        await pool.close()
+
+    assert not path.exists()
+
+
 @pytest.mark.asyncio
 async def test_the_queue_tables_stay_out_of_the_compute_schema(queue: Queue) -> None:
     async with db.acquire() as conn:
