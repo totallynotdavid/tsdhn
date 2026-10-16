@@ -4,7 +4,7 @@ import os
 import signal
 import socket
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import timedelta
 
 import asyncpg
@@ -24,6 +24,7 @@ from api.core.settings import (
     LOG_LEVEL,
     NUMBA_THREADS,
     OUTPUT_RETENTION_DAYS,
+    RETENTION_ENABLED,
     WORKER_CONCURRENCY,
     WORKER_HEARTBEAT_FILE,
     WORKER_ID,
@@ -104,27 +105,33 @@ async def run() -> None:
         await ensure_output_bucket()
         stop_maintenance = asyncio.Event()
         logger.info("simulation worker serving queue %s", COMPUTE_QUEUE)
-        async with purge_pool() as retention_pool:
+        async with AsyncExitStack() as stack:
             maintenance = [
                 asyncio.create_task(run_periodic_sweep(stop_maintenance)),
                 asyncio.create_task(run_periodic_reconcile(stop_maintenance)),
-                asyncio.create_task(
-                    run_periodic_purge(
-                        Admin(retention_pool, schema=COMPUTE_QUEUE_SCHEMA),
-                        stop_maintenance,
-                        compute_pool=pool,
-                    )
-                ),
             ]
-            if OUTPUT_RETENTION_DAYS > 0:
+            if RETENTION_ENABLED:
+                retention_pool = await stack.enter_async_context(purge_pool())
                 maintenance.append(
                     asyncio.create_task(
-                        run_periodic_expiry(
+                        run_periodic_purge(
+                            Admin(retention_pool, schema=COMPUTE_QUEUE_SCHEMA),
                             stop_maintenance,
-                            retention=timedelta(days=OUTPUT_RETENTION_DAYS),
+                            compute_pool=pool,
                         )
                     )
                 )
+                if OUTPUT_RETENTION_DAYS > 0:
+                    maintenance.append(
+                        asyncio.create_task(
+                            run_periodic_expiry(
+                                stop_maintenance,
+                                retention=timedelta(days=OUTPUT_RETENTION_DAYS),
+                            )
+                        )
+                    )
+            else:
+                logger.info("retention passes are off on this worker")
             if WORKER_HEARTBEAT_FILE is not None:
                 maintenance.append(
                     asyncio.create_task(

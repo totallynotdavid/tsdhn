@@ -25,9 +25,11 @@ __all__ = [
     "NUMBA_THREADS",
     "OUTPUT_RETENTION_DAYS",
     "OUTPUT_URL_TTL",
+    "RETENTION_ENABLED",
     "S3_ACCESS_KEY",
     "S3_BUCKET",
     "S3_ENDPOINT",
+    "S3_REGION",
     "S3_SECRET_KEY",
     "S3_SECURE",
     "SSE_MAX_DURATION",
@@ -154,6 +156,9 @@ S3_SECURE = os.environ.get("TSDHN_S3_SECURE", "false").lower() in {
     "true",
     "yes",
 }
+# Cloudflare R2 signs for the region `auto`. A fixed region makes presigning
+# local arithmetic.
+S3_REGION = os.environ.get("TSDHN_S3_REGION", "us-east-1")
 
 OUTPUT_URL_TTL = int(os.environ.get("TSDHN_OUTPUT_URL_TTL_SECONDS", str(15 * 60)))
 
@@ -161,6 +166,15 @@ OUTPUT_URL_TTL = int(os.environ.get("TSDHN_OUTPUT_URL_TTL_SECONDS", str(15 * 60)
 # The job row, its parameters and its arrival times stay. Zero keeps files
 # forever.
 OUTPUT_RETENTION_DAYS = int(os.environ.get("TSDHN_OUTPUT_RETENTION_DAYS", "90"))
+
+# The retention passes delete data for the whole deployment: expired output
+# files and finished queue rows. Run them on one host. A worker that turns them
+# off needs no purger credential.
+RETENTION_ENABLED = os.environ.get("TSDHN_RETENTION_ENABLED", "true").lower() not in {
+    "0",
+    "false",
+    "no",
+}
 
 SSE_MAX_DURATION = int(os.environ.get("TSDHN_SSE_MAX_DURATION_SECONDS", str(30 * 60)))
 

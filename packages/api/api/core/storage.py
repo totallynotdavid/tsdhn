@@ -6,6 +6,7 @@ from typing import Any
 import urllib3
 from minio import Minio as S3Client
 from minio.error import MinioException as S3ClientError
+from minio.error import S3Error
 
 from api.core.errors import TransientInfraError
 from api.core.settings import (
@@ -13,6 +14,7 @@ from api.core.settings import (
     S3_ACCESS_KEY,
     S3_BUCKET,
     S3_ENDPOINT,
+    S3_REGION,
     S3_SECRET_KEY,
     S3_SECURE,
 )
@@ -31,22 +33,31 @@ class OutputStore:
             secure=S3_SECURE,
             # A fixed region makes presigning local arithmetic. Without one the
             # client asks the endpoint for the bucket region first.
-            region="us-east-1",
+            region=S3_REGION,
             http_client=urllib3.PoolManager(
                 timeout=urllib3.Timeout(connect=2.0, read=2.0),
                 retries=False,
             ),
         )
 
+    def _bucket_exists(self) -> bool:
+        """Treat a bucket-lookup refusal as proof that the bucket is usable."""
+        try:
+            return self._client.bucket_exists(self.bucket)
+        except S3Error as e:
+            if e.code == "AccessDenied":
+                return True
+            raise
+
     def is_connected(self) -> bool:
         try:
-            self._client.bucket_exists(self.bucket)
+            self._bucket_exists()
             return True
         except Exception:
             return False
 
     def ensure_bucket(self) -> None:
-        if not self._client.bucket_exists(self.bucket):
+        if not self._bucket_exists():
             self._client.make_bucket(self.bucket)
 
     def upload_simulation_result(
