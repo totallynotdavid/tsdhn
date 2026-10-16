@@ -48,6 +48,7 @@ __all__ = [
     "purge_finished_jobs",
     "reconcile_terminal_jobs",
     "register_tasks",
+    "run_heartbeat",
     "run_periodic_purge",
     "run_periodic_reconcile",
     "run_periodic_sweep",
@@ -91,6 +92,9 @@ RECONCILE_INTERVAL_SECONDS = 60.0
 _CLAIM_DRAIN_TASKS: set[asyncio.Task[None]] = set()
 
 PURGE_INTERVAL_SECONDS = 3600.0
+
+HEARTBEAT_INTERVAL_SECONDS = 10.0
+HEARTBEAT_QUERY_TIMEOUT_SECONDS = 5.0
 
 # Bounds one purge pass; the next pass takes the rest.
 PURGE_LIMIT = 10000
@@ -613,6 +617,26 @@ async def run_periodic_reconcile(
         stop,
         interval,
     )
+
+
+async def run_heartbeat(
+    path: Path,
+    pool: asyncpg.Pool,
+    stop: asyncio.Event,
+    *,
+    interval: float = HEARTBEAT_INTERVAL_SECONDS,
+) -> None:
+    """Touch `path` on an interval while the event loop and the database answer.
+
+    A supervisor reads the file's age. A blocked loop, a lost database or a
+    dead process all leave it stale.
+    """
+
+    async def beat() -> None:
+        await pool.fetchval("SELECT 1", timeout=HEARTBEAT_QUERY_TIMEOUT_SECONDS)
+        path.touch()
+
+    await _run_periodically("Worker heartbeat", beat, stop, interval)
 
 
 async def run_periodic_purge(

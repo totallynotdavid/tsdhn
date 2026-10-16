@@ -23,12 +23,14 @@ from api.core.settings import (
     LOG_LEVEL,
     NUMBA_THREADS,
     WORKER_CONCURRENCY,
+    WORKER_HEARTBEAT_FILE,
     WORKER_ID,
     WORKER_LEASE_SECONDS,
     worker_pool_size,
 )
 from api.core.tasks import (
     register_tasks,
+    run_heartbeat,
     run_periodic_purge,
     run_periodic_reconcile,
     run_periodic_sweep,
@@ -109,6 +111,12 @@ async def run() -> None:
                     )
                 ),
             ]
+            if WORKER_HEARTBEAT_FILE is not None:
+                maintenance.append(
+                    asyncio.create_task(
+                        run_heartbeat(WORKER_HEARTBEAT_FILE, pool, stop_maintenance)
+                    )
+                )
             try:
                 await worker.run()
             finally:
