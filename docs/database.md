@@ -50,6 +50,9 @@ security scopes each to the deployment's queue.
 | `COMPUTE_WORKER_ROLE`   | worker           | claim and transition (`CONSUME`) | `SELECT`, `UPDATE` |
 | `COMPUTE_PURGER_ROLE`   | worker retention | inspect plus delete queue jobs   | none               |
 
+Only a worker with `TSDHN_RETENTION_ENABLED` on connects as the purger. Worker
+hosts turn it off and hold no purger password.
+
 The producer cannot claim a job. The worker cannot insert or delete a queue job.
 The purger cannot reach `compute.jobs`. Deleting a queue job cascades to its
 attempt history, so retention has its own credential instead of using the

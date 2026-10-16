@@ -24,6 +24,13 @@ FastAPI compute service
   |-- worker -> tsdhn engine -> object storage
 ```
 
+Production has two host roles. The main host runs the web app, the compute API,
+PostgreSQL, the backup and the tunnel, and it runs a worker. A worker host runs
+only a worker. It reaches PostgreSQL over a private network and uploads outputs
+to object storage, so it needs nothing else from the main host. Any number of
+worker hosts can join. [Deploy](deploy.md#add-a-worker-host) describes the
+setup.
+
 The browser talks to the web app. The web app checks the session and handles the
 researcher-facing flow. Its server code calls the compute API at
 `COMPUTE_API_URL` with `COMPUTE_API_TOKEN`. The token never reaches the browser,
@@ -34,7 +41,7 @@ and no browser code in the web app calls the compute API.
 ```text
 .github/                  Contributing guide and workflows
 apps/web/                 SvelteKit web app
-deploy/                   Container images, edge Worker and production Compose file
+deploy/                   Container images, edge Worker and production Compose files
 docs/                     Project manual
 libs/api-client/          Generated TypeScript client
 model/                    Model inputs and Fortran reference programs
@@ -75,6 +82,27 @@ The compute service owns:
 It receives a `simulation_id` from the web app. It knows nothing about web
 sessions, users or passwords.
 
+### Shared state across hosts
+
+Several workers on several hosts act on the same state. Each row below names the
+state, who may move it and when. [Jobs](jobs.md#invariants) holds the transition
+rules of the compute row.
+
+| State                                          | Moved by                                                     | When                                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Queue task: `pending`                          | API (enqueue); the queue (lease expired)                     | A job is submitted or retried, or a lease ran out with attempts left.                                                                   |
+| Queue task: `leased`                           | A worker on any host                                         | It claims a `pending` task and renews the lease every beat. One worker holds a lease.                                                   |
+| Queue task: `succeeded`, `failed`, `cancelled` | The worker that holds the lease; the queue                   | The lease fence accepts the attempt. A worker whose attempt lost the job cancels it. The queue fails a task whose last attempt expired. |
+| Queue task row deleted                         | The purger, on the main host only                            | The task is terminal for seven days and its compute job is finished.                                                                    |
+| `compute.jobs` row                             | The worker that holds the lease; any worker's reconciliation | `owner_attempt` fences it. A superseded attempt cannot write.                                                                           |
+| Output objects                                 | The worker that ran the job                                  | It uploads before it marks the job `completed`. Output expiry, on the main host only, deletes them.                                     |
+| Workspace and checkpoints (`jobs-data` volume) | The worker on that host                                      | Under the workspace lock. No other host reads it, so a job that moves starts over.                                                      |
+
+Retention is one task for the whole deployment, not one per host: the main
+host's worker runs the queue purge and the output expiry, and a worker host sets
+`TSDHN_RETENTION_ENABLED=false`. Every worker reconciles the jobs the queue gave
+up on.
+
 ### Simulation engine
 
 The `tsdhn` package owns the scientific calculation, the pipeline order, the run
@@ -110,12 +138,16 @@ The stub keeps the rules of [Jobs](jobs.md#states):
 ### Output storage
 
 The worker uses local disk while a simulation runs. The work directory holds
-intermediate files and the checkpoints that recovery needs.
+intermediate files and the checkpoints that recovery needs. Checkpoints stay on
+the host that wrote them, so a job that moves to another host starts over.
 
-Object storage stores completed output files. The compute database stores their
-names, media types, filenames and private object keys. Public API responses omit
-the object keys. The worker deletes a job's files after the output retention
-([Jobs](jobs.md#output-retention)).
+Object storage stores completed output files. It is S3-compatible: Cloudflare R2
+in production, or the bundled RustFS. Every worker uploads to it directly, and
+the API signs the download URLs against the same endpoint. The compute database
+stores their names, media types, filenames and private object keys. Public API
+responses omit the object keys. The main host deletes a job's files after the
+output retention ([Jobs](jobs.md#output-retention)); worker hosts run no
+retention pass.
 
 The production stack copies the database and the stored outputs off the host
 every day. The work directory is not copied, so a restored stack has none of the
@@ -134,6 +166,11 @@ which check reads which.
 | Web     | `GET /health`        | 200, the database answers         | 503                                            |
 | Worker  | heartbeat file mtime | Fresh: touched less than 60 s ago | Absent or stale                                |
 | Backup  | last-backup file     | Touched less than two intervals   | Absent or stale                                |
+
+The API body also carries `oldest_queued_age_seconds`, the wait of the job that
+has been claimable longest, `0.0` when none waits. It is a load signal for
+[adding a worker host](deploy.md#add-a-worker-host) and never changes the
+status.
 
 The worker owns its heartbeat file, named by `TSDHN_WORKER_HEARTBEAT_FILE`. Its
 states:

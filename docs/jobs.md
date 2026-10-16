@@ -109,12 +109,15 @@ attempts (`MAX_ATTEMPTS`), with a 15 second backoff that doubles. Invalid input,
 missing model files and failed scientific steps fail the job at once, because
 repeating them does not change the result.
 
-The engine records its progress in the workspace, so a retry resumes completed
-work. See [Pipeline](pipeline.md#resume-behavior).
+The engine records its progress in the workspace, so a retry on the same host
+resumes completed work. See [Pipeline](pipeline.md#resume-behavior). The
+workspace stays on the host that wrote it. A retry that another host claims
+finds no checkpoints and starts over.
 
 A worker asked to stop gives its running simulation a short grace period. A
 simulation outlasts that, so it is cancelled and its claim goes back to the
-queue for another worker, which resumes from the checkpoints.
+queue for another worker. That worker resumes from the checkpoints if it runs on
+the same host, and starts over if it does not.
 
 A worker that dies loses its lease, and the queue reclaims the job. When that
 happens on the last attempt, the queue records the failure itself and no running
@@ -201,7 +204,8 @@ attempts while it waits.
 ### Queue retention
 
 An hourly pass in the worker deletes a `task_queue.jobs` row when all of these
-hold in one database policy:
+hold in one database policy. Only a worker with `TSDHN_RETENTION_ENABLED` on
+runs the pass, which is the main host's worker in production:
 
 - the row belongs to this queue;
 - its queue state is terminal;
@@ -220,12 +224,13 @@ output metadata or object storage objects.
 
 ### Output retention
 
-The worker runs a second hourly pass when `TSDHN_OUTPUT_RETENTION_DAYS` is above
-zero. It takes up to 100 completed jobs at a time whose `finished_at` is older
-than the retention and whose `outputs_expired_at` is unset. For each job it
-deletes every object under `simulations/{simulation_id}/` (the output files and
-`metadata.json`), then empties `outputs` and sets `outputs_expired_at` in one
-update and notifies listeners.
+A worker with `TSDHN_RETENTION_ENABLED` on runs a second hourly pass when
+`TSDHN_OUTPUT_RETENTION_DAYS` is above zero. It takes up to 100 completed jobs
+at a time whose `finished_at` is older than the retention and whose
+`outputs_expired_at` is unset. For each job it deletes every object under
+`simulations/{simulation_id}/` (the output files and `metadata.json`), then
+empties `outputs` and sets `outputs_expired_at` in one update and notifies
+listeners.
 
 The files go first. A pass that dies between the two steps leaves a job that
 still lists files that are gone, and the next pass finds it again. Deleting

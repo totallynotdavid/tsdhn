@@ -9,6 +9,8 @@ RustFS `docker.io/rustfs/rustfs:1.0.1`.
 
 [Local stack](#local-stack) covers development. [Production](#production) covers
 the stack that runs behind a Cloudflare Tunnel.
+[Add a worker host](#add-a-worker-host) covers more machines that run
+simulations.
 
 ## Settings
 
@@ -35,6 +37,8 @@ variable is unset.
 | `TSDHN_S3_ENDPOINT`                                                 | `localhost:9000`                                 | S3 address the API uploads to and signs download URLs for           |
 | `TSDHN_S3_ACCESS_KEY`, `TSDHN_S3_SECRET_KEY`                        | `tsdhn-local`, `tsdhn-local-secret`              | S3 credentials                                                      |
 | `TSDHN_S3_BUCKET`, `TSDHN_S3_SECURE`                                | `tsdhn-results`, `false`                         | Bucket name and TLS                                                 |
+| `TSDHN_S3_REGION`                                                   | `us-east-1`                                      | Region that signs download URLs; `auto` for Cloudflare R2           |
+| `TSDHN_RETENTION_ENABLED`                                           | `true`                                           | `false` turns off the output expiry and queue purge on this host    |
 | `TSDHN_OUTPUT_URL_TTL_SECONDS`                                      | `900`                                            | Lifetime of a download URL                                          |
 | `TSDHN_OUTPUT_RETENTION_DAYS`                                       | `90`                                             | Days a completed job keeps its output files; `0` keeps them         |
 | `TSDHN_SSE_MAX_DURATION_SECONDS`                                    | `1800`                                           | Longest progress stream                                             |
@@ -48,7 +52,8 @@ the output retention has deleted a job's files.
 
 The web app downloads each output from the address in the signed URL the API
 returns and streams it to the browser. `TSDHN_S3_ENDPOINT` must therefore name
-an address the web app reaches: `storage:9000` in both stacks.
+an address the web app reaches: `storage:9000` for the bundled RustFS, or the S3
+host of an external store such as [Cloudflare R2](#object-storage-on-r2).
 
 ## Local stack
 
@@ -128,27 +133,33 @@ uses the same engine socket setup as the mise tasks:
 ## Production
 
 [`deploy/compose.prod.yml`](../deploy/compose.prod.yml) runs the stack on one
-host. It builds nothing: it pulls the API, web and backup images you name. The
-Cloudflare Tunnel carries the web route to the Worker. The only traffic that
-leaves the host besides the tunnel is the daily backup to an S3-compatible
-bucket ([Backup and restore](#backup-and-restore)).
+host: the main host. It builds nothing: it pulls the API, web and backup images
+you name. The Cloudflare Tunnel carries the web route to the Worker. The only
+traffic that leaves the host besides the tunnel is the daily backup to an
+S3-compatible bucket ([Backup and restore](#backup-and-restore)) and the traffic
+to an external object store. [Add a worker host](#add-a-worker-host) runs
+simulations on more machines.
 
 ### Networks and ports
 
-| Network   | Members                                                 | Reach                              |
-| --------- | ------------------------------------------------------- | ---------------------------------- |
-| `backend` | PostgreSQL, storage, API, worker, one-shot jobs and web | Internal: no route to the internet |
-| `edge`    | web and `cloudflared`                                   | Outbound to Cloudflare             |
-| `offsite` | `backup` and `restore`                                  | Outbound to the backup bucket      |
+| Network   | Members                                                 | Reach                                              |
+| --------- | ------------------------------------------------------- | -------------------------------------------------- |
+| `backend` | PostgreSQL, storage, API, worker, one-shot jobs and web | Internal: no route to the internet                 |
+| `edge`    | web and `cloudflared`                                   | Outbound to Cloudflare                             |
+| `offsite` | API, worker, `backup` and `restore`                     | Outbound to object storage and the backup bucket   |
+| `private` | PostgreSQL, with `compose.private.yml` only             | Carries the port that worker hosts connect through |
 
 Members of `backend` reach each other and nothing else. Only web also joins
-`edge`, so `cloudflared` reaches web and no other service. The backup services
+`edge`, so `cloudflared` reaches web and no other service. The API and the
+worker join `offsite` to reach an external object store. The backup services
 join `backend` to read PostgreSQL and storage and `offsite` to reach the bucket.
 
 Only web publishes a port, on `127.0.0.1:${TSDHN_WEB_PORT}` for checks from the
-host. PostgreSQL, storage and the API publish nothing, and the RustFS console is
-off. Web proxies the progress stream and the output downloads, so the API and
-storage need no public address.
+host. Storage and the API publish nothing, and the RustFS console is off.
+PostgreSQL publishes a port on `TSDHN_PRIVATE_ADDR` once you
+[add a worker host](#add-a-worker-host), and nothing before. Web proxies the
+progress stream and the output downloads, so the API and storage need no public
+address.
 
 ### Images
 
@@ -259,10 +270,11 @@ tsdhn-prod up -d
 tsdhn-prod ps
 ```
 
-`up` waits for each dependency: PostgreSQL and storage are healthy, the
-migrations and role grants have completed, the API is healthy, then web, then
-`cloudflared`. To deploy another release, change `API_IMAGE` and `WEB_IMAGE` and
-run the three commands again. Stop the stack and keep its volumes:
+`up` waits for each dependency: PostgreSQL and the bundled storage are healthy,
+the migrations and role grants have completed, the API is healthy, then web,
+then `cloudflared`. To deploy another release, change `API_IMAGE` and
+`WEB_IMAGE` and run the three commands again. Stop the stack and keep its
+volumes:
 
 ```sh
 tsdhn-prod down
@@ -288,7 +300,7 @@ Through the tunnel the browser sends the public origin, which matches.
 | Service       | Check                                                         |
 | ------------- | ------------------------------------------------------------- |
 | `postgres`    | `pg_isready`                                                  |
-| `storage`     | `GET /health`                                                 |
+| `storage`     | `GET /health` (bundled storage only)                          |
 | `api`         | `GET /api/v1/health` returns 200                              |
 | `worker`      | Heartbeat file touched less than 60 seconds ago               |
 | `web`         | `GET /health` returns 200                                     |
@@ -298,6 +310,232 @@ Through the tunnel the browser sends the public origin, which matches.
 [Architecture](architecture.md#health-signals) defines what each signal means,
 including the states of the worker's heartbeat file. `backup` has one hour to
 finish its first run before a missing file counts as unhealthy.
+
+### Object storage on R2
+
+Outputs go to the bundled RustFS unless you name an external S3-compatible
+store. [Cloudflare R2](https://developers.cloudflare.com/r2/) is the store to
+use with worker hosts: they upload to it directly, and downloads cost no egress
+fee.
+
+1. In the Cloudflare dashboard, open **Storage & databases > R2 > Overview**.
+   Create a bucket named `tsdhn-results`.
+2. Under **API Tokens**, select **Manage**, then **Create Account API token**.
+   Choose the permission **Object Read & Write**, select **Apply to specific
+   buckets only** and pick that bucket. Select **Create API Token**.
+3. Copy the **Access Key ID** and the **Secret Access Key**. The dashboard shows
+   the secret once. Copy the S3 endpoint from the same page. It reads
+   `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`.
+4. In `/etc/tsdhn/prod.env`, set the keys and the endpoint without `https://`:
+
+   ```sh
+   TSDHN_S3_ENDPOINT=<ACCOUNT_ID>.r2.cloudflarestorage.com
+   TSDHN_S3_SECURE=true
+   TSDHN_S3_REGION=auto
+   TSDHN_S3_ACCESS_KEY=<Access Key ID>
+   TSDHN_S3_SECRET_KEY=<Secret Access Key>
+   ```
+
+5. Add [`compose.external-storage.yml`](../deploy/compose.external-storage.yml)
+   last in the `tsdhn-prod` alias. It removes the bundled RustFS and every wait
+   for it. Without it the stack still starts RustFS next to R2:
+
+   ```sh
+   alias tsdhn-prod='sudo docker compose --env-file /etc/tsdhn/prod.env -f deploy/compose.prod.yml -f deploy/compose.external-storage.yml'
+   ```
+
+6. Apply the change and read the health body. `storage_connected` must be
+   `true`. `--remove-orphans` stops and removes the old RustFS container; its
+   data stays in the `storage-data` volume:
+
+   ```sh
+   tsdhn-prod up -d --remove-orphans
+   tsdhn-prod exec api curl -fsS http://127.0.0.1:8000/api/v1/health
+   ```
+
+`TSDHN_S3_REGION=auto` is the region R2 signs for. The API signs each download
+URL with the endpoint, the region and the secret key. A plain `curl` of the URL
+downloads the file until `TSDHN_OUTPUT_URL_TTL_SECONDS` pass. A key limited to
+one bucket may not look the bucket up. The API reads that refusal as "the bucket
+exists" and any other failure as "storage is down".
+
+Objects written to RustFS stay in the `storage-data` volume. Copy them into the
+new bucket before you switch, or the jobs that list them point at files the new
+bucket does not hold.
+
+### Add a worker host
+
+One main host runs web, the API, PostgreSQL, the backup and the tunnel. Any
+number of worker hosts run only the worker. A worker host pulls the API image
+that the main host runs, claims jobs from PostgreSQL over a private network and
+uploads outputs to the object store. It builds nothing and keeps no data that
+the stack needs.
+
+The signal to add a host is the age of the oldest queued job. Read it on the
+main host:
+
+```sh
+tsdhn-prod exec api curl -fsS http://127.0.0.1:8000/api/v1/health
+```
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-10-16T21:35:16.583662+00:00",
+  "database_connected": true,
+  "storage_connected": true,
+  "oldest_queued_age_seconds": 23.0
+}
+```
+
+`oldest_queued_age_seconds` is how long the job that has waited longest has been
+claimable. It is `0.0` when no job waits. It never changes the status. A
+simulation takes about 13 minutes ([Reference run](#reference-run)), so an age
+that stays above that means every worker is busy: add a host.
+
+#### Prepare the main host
+
+1. Join the main host and the worker host to one private network. With
+   [Tailscale](https://tailscale.com/kb/1347/installation), install it on both
+   hosts and run `sudo tailscale up`. With WireGuard, give each host an address
+   in a subnet that only these hosts share. Print the main host's address:
+
+   ```sh
+   tailscale ip -4
+   ```
+
+2. Keep the outputs in a store that worker hosts reach. Use
+   [R2](#object-storage-on-r2). With the bundled RustFS, leave
+   `TSDHN_S3_ENDPOINT` unset: the worker env points at the main host's private
+   address, where the stack publishes RustFS.
+3. In `/etc/tsdhn/prod.env`, set the address and the network that workers
+   connect from. `100.64.0.0/10` is the Tailscale range and the default. Use the
+   WireGuard subnet otherwise:
+
+   ```sh
+   TSDHN_PRIVATE_ADDR=<address from step 1>
+   TSDHN_PRIVATE_CIDR=100.64.0.0/10
+   ```
+
+4. Name `compose.private.yml` in the command from now on. It publishes
+   PostgreSQL, and the bundled storage when it runs, on `TSDHN_PRIVATE_ADDR` and
+   nowhere else. A stack that does not name the file publishes nothing. If the
+   alias also names `compose.external-storage.yml`, keep that file last:
+
+   ```sh
+   alias tsdhn-prod='sudo docker compose --env-file /etc/tsdhn/prod.env -f deploy/compose.prod.yml -f deploy/compose.private.yml'
+   tsdhn-prod up -d
+   tsdhn-prod ps postgres
+   ```
+
+   `ps` lists `<address>:5432->5432/tcp`.
+
+PostgreSQL accepts the `tsdhn_worker` role on the database `tsdhn` from
+`TSDHN_PRIVATE_CIDR` with a `scram-sha-256` password, and the other containers
+of the stack. It rejects every other connection. PostgreSQL does not use TLS:
+the private network encrypts the traffic. PostgreSQL reads the rule at start.
+After you change `TSDHN_PRIVATE_CIDR`, recreate it:
+
+```sh
+tsdhn-prod up -d --force-recreate postgres
+```
+
+#### Prepare the worker env
+
+Generate the worker env on the main host. It holds the worker role password, the
+object store keys, the image and the database address, and none of the other
+secrets:
+
+```sh
+sudo scripts/env-init.sh --worker worker.env
+```
+
+Copy it to the worker host, and delete the copy on the main host. Copy
+[`deploy/compose.worker.yml`](../deploy/compose.worker.yml) of the same release
+next to it:
+
+```sh
+sudo cat worker.env | ssh admin@worker-host 'sudo install -D -m 600 /dev/stdin /etc/tsdhn/worker.env'
+scp deploy/compose.worker.yml admin@worker-host:compose.worker.yml
+ssh admin@worker-host 'sudo install -m 644 compose.worker.yml /etc/tsdhn/compose.worker.yml && rm compose.worker.yml'
+sudo rm worker.env
+```
+
+#### Set up the worker host
+
+1. Install Docker Engine with the Compose plugin from
+   [docs.docker.com](https://docs.docker.com/engine/install/). Join the private
+   network as above.
+2. Sign in to GHCR with a token that can read packages. The `tsdhn-api` package
+   is private ([Images](#images)):
+
+   ```sh
+   sudo docker login ghcr.io
+   ```
+
+3. Set the size of the host in `/etc/tsdhn/worker.env`:
+
+   | Variable                   | Value                                                     |
+   | -------------------------- | --------------------------------------------------------- |
+   | `TSDHN_WORKER_CONCURRENCY` | Simulations this host runs at once, `1` default           |
+   | `TSDHN_NUMBA_THREADS`      | CPUs divided by the concurrency, rounded down             |
+   | `TSDHN_WORKER_ID`          | Name in queue records, `tsdhn-worker-HOST-PID` by default |
+
+   A host with 16 CPUs that runs 2 simulations sets `TSDHN_NUMBA_THREADS=8`.
+   Each simulation peaks near 0.8 GiB of memory
+   ([Reference run](#reference-run)). An empty `TSDHN_NUMBA_THREADS` lets one
+   simulation use every CPU, which suits a concurrency of 1.
+
+4. Start the worker and check it:
+
+   ```sh
+   alias tsdhn-worker='sudo docker compose --env-file /etc/tsdhn/worker.env -f /etc/tsdhn/compose.worker.yml'
+   tsdhn-worker pull
+   tsdhn-worker up -d --wait
+   tsdhn-worker ps
+   ```
+
+   `ps` shows `healthy` once the worker has touched its heartbeat file in the
+   last 60 seconds. The worker touches it every 10 seconds while it reaches the
+   database. The log says which queue it serves:
+
+   ```sh
+   tsdhn-worker logs worker
+   ```
+
+   Compose stops with the name of any required value that the env file lacks.
+
+5. On the main host, list the jobs that run and the worker that holds each:
+
+   ```sh
+   tsdhn-prod exec postgres psql -U tsdhn -d tsdhn -c "SELECT worker_id, count(*) FROM task_queue.jobs WHERE state = 'leased' GROUP BY worker_id"
+   ```
+
+The worker host runs no retention pass. The main host deletes expired outputs
+and finished queue rows (`TSDHN_RETENTION_ENABLED=false` on the worker host).
+
+To deploy another release, change `API_IMAGE` in `/etc/tsdhn/prod.env` and in
+every worker env, then run `pull` and `up -d` on each host.
+
+#### Checkpoints stay on the host
+
+A running job writes checkpoints to the `jobs-data` volume of the host that runs
+it. They are not uploaded. A job that moves to another host starts over from the
+first step.
+
+#### Remove a worker host
+
+Stop it:
+
+```sh
+tsdhn-worker down
+```
+
+Add `-v` to delete the workspaces too. A job the host was running stays leased
+until its lease ends, 60 seconds (`TSDHN_WORKER_LEASE_SECONDS`). Then another
+worker takes the job and starts it over. Every take-over counts as an attempt,
+and a job fails after three. To lose no work, wait until the query above lists
+no job for the host before you stop it.
 
 ### Backup and restore
 
@@ -351,14 +589,16 @@ tsdhn-prod --profile restore run --rm --no-deps --entrypoint restic restore snap
 `restore` is a second command of the same image, in the Compose profile
 `restore`. It refuses a database that already has the `compute` or `task_queue`
 schema, and a bucket that already holds objects, so it cannot overwrite a live
-stack. It restores into the database and the bucket that the stack's own
-`postgres` and `storage` services provide. To restore into a storage volume that
-holds leftovers, pass `--wipe-objects` before the snapshot: it deletes every
-object in the bucket that the snapshot does not contain.
+stack. It restores into the database of the stack's own `postgres` service and
+the bucket in `TSDHN_S3_*`: the bundled `storage` service, or the external
+bucket, which must exist and be empty. To restore into a bucket that holds
+leftovers, pass `--wipe-objects` before the snapshot: it deletes every object in
+the bucket that the snapshot does not contain.
 
 To rebuild a lost host, install Docker, copy `prod.env` back to
-`/etc/tsdhn/prod.env`, log in to the registry and start only the two stores.
-Starting the whole stack first would let `backup` write an empty snapshot:
+`/etc/tsdhn/prod.env`, log in to the registry and start only the two stores
+(leave out `storage` for an external bucket). Starting the whole stack first
+would let `backup` write an empty snapshot:
 
 ```sh
 tsdhn-prod pull
@@ -386,11 +626,12 @@ sudo scripts/restore-drill.sh --env-file /etc/tsdhn/prod.env
 ```
 
 The script starts a second copy of the stack under its own Compose project name,
-with its own empty volumes. It restores the latest backup into the copy, starts
-the API on it, and reads the latest completed job through `GET /api/v1/jobs/ID`,
-the job's output list and the first output's download. It prints the job and the
-size of the file, then removes the copy. The running stack is untouched, and the
-copy only reads the backup bucket. A successful run ends like this:
+with its own empty volumes and the bundled storage, even when production uses an
+external bucket. It restores the latest backup into the copy, starts the API on
+it, and reads the latest completed job through `GET /api/v1/jobs/ID`, the job's
+output list and the first output's download. It prints the job and the size of
+the file, then removes the copy. The running stack is untouched, and the copy
+only reads the backup bucket. A successful run ends like this:
 
 ```text
 2026-10-16T14:48:58Z restored 1 compute jobs and 9 objects
