@@ -118,6 +118,9 @@ scenario_crash_and_requeue() {
 
     echo "Killing worker (SIGKILL) to simulate a crash"
     docker compose kill -s SIGKILL worker
+    # Docker treats `kill` as a manual stop, so the restart policy leaves the
+    # worker down until it is started again.
+    docker compose up -d --no-deps worker
 
     echo "Waiting up to 240s for rqueue to recover the expired lease and requeue it"
     local deadline requeued=0
@@ -144,11 +147,15 @@ scenario_crash_and_requeue() {
 
     poll_job_to_completion "$CRASH_SIMULATION_ID" 1800
 
-    docker compose logs worker --no-color | grep -q "resuming tsunami run from step" || {
+    # Read the whole log first: `grep -q` stops at the first match and the
+    # closed pipe fails `docker compose logs` under pipefail.
+    local worker_log resume_line
+    worker_log="$(docker compose logs worker --no-color)"
+    resume_line="$(grep -m1 "resuming tsunami run from step" <<<"$worker_log")" || {
         echo "::error::Worker log has no evidence of resuming from a checkpoint"
         return 1
     }
-    echo "Confirmed: worker log shows checkpoint resume"
+    echo "Confirmed: worker log shows checkpoint resume: $resume_line"
 
     assert_storage_objects "$CRASH_SIMULATION_ID"
 }
@@ -207,14 +214,24 @@ scenario_transient_retry() {
     echo "--- Scenario 3: storage outage during finalize triggers TRANSIENT_RETRY, not a failure ---"
 
     submit_simulation "$TRANSIENT_SIMULATION_ID"
-    wait_for_step "$TRANSIENT_SIMULATION_ID" "copy_ttt_pdf" 1800
-    echo "Reached the last pipeline step; stopping storage to force finalize's upload to fail"
+    # The upload follows the last step within seconds, and stopping storage
+    # takes longer than that, so storage goes down while the engine still runs.
+    wait_for_step "$TRANSIENT_SIMULATION_ID" "tsunami" 600
+    echo "In tsunami step; stopping storage so finalize's upload fails"
     docker compose stop storage
 
-    # Give the queue time to record the transient retry.
-    sleep 30
-    local details
-    details="$(job_status "$TRANSIENT_SIMULATION_ID" | jq -r .details)"
+    local details="" deadline
+    deadline=$((SECONDS + 1800))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        details="$(job_status "$TRANSIENT_SIMULATION_ID" | jq -r .details)"
+        case "$details" in
+            *"Retrying after transient error"*) break ;;
+        esac
+        case "$(job_status "$TRANSIENT_SIMULATION_ID" | jq -r .status)" in
+            completed | failed) break ;;
+        esac
+        sleep 2
+    done
     echo "$details"
     case "$details" in
         *"Retrying after transient error"*) ;;
