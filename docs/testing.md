@@ -2,14 +2,14 @@
 
 Each suite answers a different question.
 
-| Command                     | Question                                       | Needs                               |
-| --------------------------- | ---------------------------------------------- | ----------------------------------- |
-| `mise run test`             | Do the Python units behave as specified?       | nothing                             |
-| `mise run web-test`         | Do the web units behave as specified?          | nothing                             |
-| `mise run test-integration` | Do the queue, roles and migrations work?       | PostgreSQL, which the task starts   |
-| `mise run test-golden`      | Did the full pipeline output change?           | GMT and `ttt_client`                |
-| `mise run test-parity`      | Does Python match the MATLAB and Fortran runs? | `TSDHN_TOOLS_DIR` for Fortran cases |
-| `mise run lint-all`         | Do Python and JavaScript pass the linters?     | nothing                             |
+| Command                     | Question                                          | Needs                                                                     |
+| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| `mise run test`             | Do the Python units behave as specified?          | nothing                                                                   |
+| `mise run web-test`         | Do the web units behave as specified?             | nothing                                                                   |
+| `mise run test-integration` | Do the queue, roles, migrations and backups work? | PostgreSQL, which the task starts; Docker for the backup and expiry tests |
+| `mise run test-golden`      | Did the full pipeline output change?              | GMT and `ttt_client`                                                      |
+| `mise run test-parity`      | Does Python match the MATLAB and Fortran runs?    | `TSDHN_TOOLS_DIR` for Fortran cases                                       |
+| `mise run lint-all`         | Do Python and JavaScript pass the linters?        | nothing                                                                   |
 
 Run one test with:
 
@@ -24,6 +24,32 @@ library cannot load, pytest names the GMT-backed module it does not collect in
 its report header. The suite covers source parameters, longitude conversion,
 file formats, numerical update rules, checkpoints, resume behavior and report
 transformations with focused inputs.
+
+## Backup and restore test
+
+`mise run test-integration` includes
+`packages/api/tests/test_backup_restore.py`. It builds the backup image and
+starts throwaway PostgreSQL and RustFS containers: a source holding a finished
+job, an off-host bucket and an empty target. It runs `tsdhn-backup backup` and
+`tsdhn-backup restore` in the image, then reads the restored job through the
+API's routes. It also checks that the bucket holds no plaintext, that a wrong
+password fails, that a backup fails and writes no snapshot when it cannot list
+the storage service or the bucket is gone, and that a restore refuses a database
+that already has the compute schema or a bucket that already holds objects. It
+skips when Docker is missing or an image cannot be pulled.
+[Deploy](deploy.md#recovery-test) runs the same restore against the production
+stack's own images.
+
+## Output expiry test
+
+`packages/api/tests/test_output_expiry_integration.py` runs the worker's
+retention pass against PostgreSQL and a throwaway RustFS container. It stores
+files, including keys two levels deep, for an old and a recent job, and checks
+that the pass leaves the old job's prefix empty, keeps the recent job's files
+and marks only the old job expired. A storage service that does not answer
+leaves the job's files listed for the next pass. The same file checks that the
+worker creates a missing bucket at start and survives a storage service that
+does not answer. It skips when Docker is missing.
 
 ## Golden tests
 

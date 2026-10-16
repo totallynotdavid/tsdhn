@@ -88,6 +88,19 @@ lists the setting.
 
 Neither the web app nor the compute API relays output bytes.
 
+### Expired outputs
+
+A completed job keeps its files for `TSDHN_OUTPUT_RETENTION_DAYS` days after it
+finishes (default 90; `0` keeps them forever). The job itself stays: its
+parameters, calculation and arrival times remain, and its status carries
+`outputs_expired_at`.
+
+For an expired job the simulation page replaces the file list with a notice that
+the files were deleted on that date and that the parameters and arrival times
+remain. The compute API answers `410 Gone` with `Output files expired on <date>`
+to the output list and to every download, and the web app answers a download
+with 410 too. An output name the job never had is still 404.
+
 ## Failure and recovery
 
 The worker retries only `TransientInfraError`, which covers PostgreSQL, object
@@ -202,5 +215,19 @@ database policy is the boundary.
 
 Deleting a queue row cascades to its attempt and occurrence rows. Rows whose
 compute counterpart is missing, malformed, recent or still running stay for
-reconciliation and inspection. Retention does not delete `compute.jobs`, output
-metadata or object storage objects.
+reconciliation and inspection. Queue retention does not delete `compute.jobs`,
+output metadata or object storage objects.
+
+### Output retention
+
+The worker runs a second hourly pass when `TSDHN_OUTPUT_RETENTION_DAYS` is above
+zero. It takes up to 100 completed jobs at a time whose `finished_at` is older
+than the retention and whose `outputs_expired_at` is unset. For each job it
+deletes every object under `simulations/{simulation_id}/` (the output files and
+`metadata.json`), then empties `outputs` and sets `outputs_expired_at` in one
+update and notifies listeners.
+
+The files go first. A pass that dies between the two steps leaves a job that
+still lists files that are gone, and the next pass finds it again. Deleting
+objects that are already gone is not an error. If object storage is unreachable,
+the pass logs the failure and tries again the next hour.

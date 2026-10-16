@@ -111,7 +111,13 @@ intermediate files and the checkpoints that recovery needs.
 
 Object storage stores completed output files. The compute database stores their
 names, media types, filenames and private object keys. Public API responses omit
-the object keys.
+the object keys. The worker deletes a job's files after the output retention
+([Jobs](jobs.md#output-retention)).
+
+The production stack copies the database and the stored outputs off the host
+every day. The work directory is not copied, so a restored stack has none of the
+checkpoints of a job that was still running.
+[Deploy](deploy.md#backup-and-restore) describes the backup.
 
 ### Health signals
 
@@ -124,6 +130,7 @@ which check reads which.
 | API     | `GET /api/v1/health` | 200, database and storage answer  | 503, the body names the dependency that failed |
 | Web     | `GET /health`        | 200, the database answers         | 503                                            |
 | Worker  | heartbeat file mtime | Fresh: touched less than 60 s ago | Absent or stale                                |
+| Backup  | last-backup file     | Touched less than two intervals   | Absent or stale                                |
 
 The worker owns its heartbeat file, named by `TSDHN_WORKER_HEARTBEAT_FILE`. Its
 states:

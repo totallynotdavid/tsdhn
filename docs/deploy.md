@@ -36,13 +36,15 @@ variable is unset.
 | `TSDHN_S3_ACCESS_KEY`, `TSDHN_S3_SECRET_KEY`                        | `tsdhn-local`, `tsdhn-local-secret`              | S3 credentials                                                      |
 | `TSDHN_S3_BUCKET`, `TSDHN_S3_SECURE`                                | `tsdhn-results`, `false`                         | Bucket name and TLS                                                 |
 | `TSDHN_OUTPUT_URL_TTL_SECONDS`                                      | `900`                                            | Lifetime of a download URL                                          |
+| `TSDHN_OUTPUT_RETENTION_DAYS`                                       | `90`                                             | Days a completed job keeps its output files; `0` keeps them         |
 | `TSDHN_SSE_MAX_DURATION_SECONDS`                                    | `1800`                                           | Longest progress stream                                             |
 | `COMPUTE_API_TOKEN`                                                 | none (required)                                  | Bearer token for every route except health and version              |
 | `TSDHN_ALLOWED_ORIGINS`                                             | empty                                            | Comma-separated origins that may call the API directly              |
 | `TSDHN_HOST`, `TSDHN_PORT`                                          | `127.0.0.1`, `8000`                              | Address `tsdhn-api` listens on                                      |
 
 Retry limits, the 24 hour workspace lifetime and the seven day queue retention
-are fixed in the code. [Jobs](jobs.md) states them.
+are fixed in the code. [Jobs](jobs.md) states them, and what a user sees when
+the output retention has deleted a job's files.
 
 The web app downloads each output from the address in the signed URL the API
 returns and streams it to the browser. `TSDHN_S3_ENDPOINT` must therefore name
@@ -61,12 +63,12 @@ Create the local environment before you start the stack (also done by `dev`):
 mise run env-init
 ```
 
-`env-init` refuses to overwrite an existing `.env`, generates the nine required
+`env-init` refuses to overwrite an existing `.env`, generates the ten required
 secrets and writes the file with mode 600: the compute API token, the Better
 Auth secret, the PostgreSQL password, the web role password, the three
-queue-role passwords and the two object storage keys. The local stack ignores
-the PostgreSQL password and uses a fixed one. See
-[Database](database.md#compute-roles) for the roles.
+queue-role passwords, the two object storage keys and the backup password. The
+local stack ignores the PostgreSQL password and uses a fixed one, and does not
+run backups. See [Database](database.md#compute-roles) for the roles.
 
 The example uses queue `simulations` in schema `task_queue`. Compose sets the
 runtime database endpoint and the S3 endpoints for its containers itself.
@@ -126,8 +128,10 @@ uses the same engine socket setup as the mise tasks:
 ## Production
 
 [`deploy/compose.prod.yml`](../deploy/compose.prod.yml) runs the stack on one
-host. It builds nothing: it pulls the API and web images you name, and
-Cloudflare Tunnel is the only way in from the internet.
+host. It builds nothing: it pulls the API, web and backup images you name, and
+Cloudflare Tunnel is the only way in from the internet. The only traffic that
+leaves the host besides the tunnel is the daily backup to an S3-compatible
+bucket ([Backup and restore](#backup-and-restore)).
 
 ### Networks and ports
 
@@ -135,9 +139,11 @@ Cloudflare Tunnel is the only way in from the internet.
 | --------- | ------------------------------------------------------- | ---------------------------------- |
 | `backend` | PostgreSQL, storage, API, worker, one-shot jobs and web | Internal: no route to the internet |
 | `edge`    | web and `cloudflared`                                   | Outbound to Cloudflare             |
+| `offsite` | `backup` and `restore`                                  | Outbound to the backup bucket      |
 
 Members of `backend` reach each other and nothing else. Only web also joins
-`edge`, so `cloudflared` reaches web and no other service.
+`edge`, so `cloudflared` reaches web and no other service. The backup services
+join `backend` to read PostgreSQL and storage and `offsite` to reach the bucket.
 
 Only web publishes a port, on `127.0.0.1:${TSDHN_WEB_PORT}` for checks from the
 host. PostgreSQL, storage and the API publish nothing, and the RustFS console is
@@ -146,15 +152,16 @@ storage need no public address.
 
 ### Images
 
-`API_IMAGE` and `WEB_IMAGE` are full image references with no default. Name a
-release tag or a digest, never a branch tag. Print the digest of a tag:
+`API_IMAGE`, `WEB_IMAGE` and `BACKUP_IMAGE` are full image references with no
+default. Name a release tag or a digest, never a branch tag. Print the digest of
+a tag:
 
 ```sh
 docker buildx imagetools inspect ghcr.io/totallynotdavid/tsdhn-api:v0.0.1
 ```
 
 Set the reference to `ghcr.io/totallynotdavid/tsdhn-api@sha256:<digest>` to pin
-it. The release workflow publishes `tsdhn-api`, `tsdhn-web` and
+it. The release workflow publishes `tsdhn-api`, `tsdhn-web`, `tsdhn-backup` and
 `tsdhn-toolchain` to GHCR.
 
 The API image contains the TTT SDK, and its licence forbids distributing the SDK
@@ -178,13 +185,22 @@ sudo "$EDITOR" /etc/tsdhn/prod.env
 
 Edit these values in the production section and above it:
 
-| Variable         | Value                                                       |
-| ---------------- | ----------------------------------------------------------- |
-| `ORIGIN`         | Public URL of the site, such as `https://tsdhn.example.org` |
-| `API_IMAGE`      | API image reference                                         |
-| `WEB_IMAGE`      | Web image reference                                         |
-| `TUNNEL_TOKEN`   | Token of the Cloudflare tunnel                              |
-| `TSDHN_WEB_PORT` | Loopback port for host checks, `3000` by default            |
+| Variable                  | Value                                                              |
+| ------------------------- | ------------------------------------------------------------------ |
+| `ORIGIN`                  | Public URL of the site, such as `https://tsdhn.example.org`        |
+| `API_IMAGE`               | API image reference                                                |
+| `WEB_IMAGE`               | Web image reference                                                |
+| `TUNNEL_TOKEN`            | Token of the Cloudflare tunnel                                     |
+| `TSDHN_WEB_PORT`          | Loopback port for host checks, `3000` by default                   |
+| `BACKUP_IMAGE`            | Backup image reference                                             |
+| `BACKUP_REPOSITORY`       | restic repository on the bucket, `s3:https://HOST/BUCKET[/PREFIX]` |
+| `BACKUP_S3_ACCESS_KEY`    | Access key of the bucket, not of the storage service               |
+| `BACKUP_S3_SECRET_KEY`    | Secret key of the bucket                                           |
+| `BACKUP_INTERVAL_SECONDS` | Seconds between backups, `86400` by default                        |
+
+`env-init` generates `BACKUP_PASSWORD`, which encrypts every backup.
+[Backup and restore](#backup-and-restore) says how to keep it. The worker reads
+`TSDHN_OUTPUT_RETENTION_DAYS` from the same file ([Settings](#settings)).
 
 Compose reads the file in the CLI, so run every command with `sudo` and name it:
 
@@ -255,9 +271,136 @@ Through the tunnel the browser sends the public origin, which matches.
 | `worker`      | Heartbeat file touched less than 60 seconds ago               |
 | `web`         | `GET /health` returns 200                                     |
 | `cloudflared` | `cloudflared tunnel ready` reports a connection to Cloudflare |
+| `backup`      | Last successful backup less than two intervals ago            |
 
 [Architecture](architecture.md#health-signals) defines what each signal means,
-including the states of the worker's heartbeat file.
+including the states of the worker's heartbeat file. `backup` has one hour to
+finish its first run before a missing file counts as unhealthy.
+
+### Backup and restore
+
+The `backup` service runs [`tsdhn-backup`](../deploy/backup/tsdhn-backup) from
+the `BACKUP_IMAGE`. At start, and then every `BACKUP_INTERVAL_SECONDS` (a day),
+it:
+
+1. dumps the whole `tsdhn` database with `pg_dump`: the web users, sessions and
+   simulations, `compute.jobs` and the queue;
+2. mirrors the storage bucket, the output files, into its staging volume;
+3. writes both to a [restic](https://restic.net) repository in
+   `BACKUP_REPOSITORY`, an S3-compatible bucket you own and that is not on this
+   host. restic encrypts and authenticates everything with `BACKUP_PASSWORD`
+   before it leaves the host;
+4. keeps the last 7 daily, 4 weekly and 3 monthly snapshots and prunes the rest;
+5. checks the repository's structure and reads one fourteenth of its data, so a
+   damaged pack shows up within two weeks.
+
+A failed backup is logged, writes no snapshot and is tried again after 15
+minutes. That includes a storage service that does not answer or rejects its
+keys: the backup fails instead of recording an empty bucket. It also fails when
+the storage service answers but the bucket `TSDHN_S3_BUCKET` is not in it,
+because the bucket was deleted or the name is wrong. The worker creates the
+bucket when it starts, so a healthy stack always has one. The dump comes before
+the mirror, so a file uploaded in between is an extra file in the backup and
+never a completed job without its files.
+
+The bucket must exist before the first backup, and its keys need to list, read,
+write and delete objects in it. `tsdhn-backup` creates the repository itself on
+the first run, and stops with a message when it cannot open the repository, for
+instance because the bucket is missing or the password is wrong.
+
+`BACKUP_PASSWORD` lives in `/etc/tsdhn/prod.env` and nowhere in the repository.
+Keep a second copy somewhere other than this host, such as a password manager.
+Without it the backups cannot be read, and losing the host would lose both.
+
+The backup leaves out the `jobs-data` volume, which holds the work directories
+and checkpoints of running jobs, so a restored stack cannot resume a job that
+was running. It also leaves out `/etc/tsdhn/prod.env`, the tunnel and the
+images. A file that the [output retention](jobs.md#output-retention) deleted
+stays in the older snapshots until they rotate out, about three months.
+
+List the snapshots:
+
+```sh
+tsdhn-prod --profile restore run --rm --no-deps --entrypoint restic restore snapshots
+```
+
+#### Restore
+
+`restore` is a second command of the same image, in the Compose profile
+`restore`. It refuses a database that already has the `compute` or `task_queue`
+schema, and a bucket that already holds objects, so it cannot overwrite a live
+stack. It restores into the database and the bucket that the stack's own
+`postgres` and `storage` services provide. To restore into a storage volume that
+holds leftovers, pass `--wipe-objects` before the snapshot: it deletes every
+object in the bucket that the snapshot does not contain.
+
+To rebuild a lost host, install Docker, copy `prod.env` back to
+`/etc/tsdhn/prod.env`, log in to the registry and start only the two stores.
+Starting the whole stack first would let `backup` write an empty snapshot:
+
+```sh
+tsdhn-prod pull
+tsdhn-prod up -d postgres storage
+tsdhn-prod --profile restore run --rm restore restore
+tsdhn-prod up -d
+```
+
+The restore takes the latest snapshot. Name another with
+`restore restore SNAPSHOT_ID`. The last command starts the rest of the stack.
+`compute-migrate` creates the queue roles and their grants again, and
+`web-grants` does the same for the web role, because the dump carries neither
+owners nor policies. Each restored job then reads as it did: status, parameters,
+arrival times and the output files. A snapshot taken before the output retention
+deleted a job's files restores those files, and the worker's next hourly pass
+deletes them again.
+
+### Recovery test
+
+A backup counts once it has been restored. Run this on any host that has Docker,
+`jq`, the images and `prod.env`:
+
+```sh
+sudo scripts/restore-drill.sh --env-file /etc/tsdhn/prod.env
+```
+
+The script starts a second copy of the stack under its own Compose project name,
+with its own empty volumes. It restores the latest backup into the copy, starts
+the API on it, and reads the latest completed job through `GET /api/v1/jobs/ID`,
+the job's output list and the first output's download. It prints the job and the
+size of the file, then removes the copy. The running stack is untouched, and the
+copy only reads the backup bucket. A successful run ends like this:
+
+```text
+2026-10-16T14:48:58Z restored 1 compute jobs and 9 objects
+== job b6e1f5a0-2c1b-4a7c-9c7a-3f7b6a5d9e11
+{ "status": "completed", "step": "copy_ttt_pdf", ... }
+== output input: 96 bytes
+== restore drill passed
+```
+
+`--snapshot ID` tests an older snapshot, and `--keep` leaves the copy running
+and prints the command that removes it. The run takes under a minute with the
+images present.
+
+[Testing](testing.md#backup-and-restore-test) describes the test that drives the
+same commands against throwaway containers.
+
+To check that a worker killed in the middle of a job resumes it, run
+[`scripts/e2e/crash_recovery_e2e.sh`](../scripts/e2e/crash_recovery_e2e.sh)
+against a running Compose stack, or start the manual workflow
+`crash-recovery.yml`, which builds the images and runs it. The script:
+
+1. submits a simulation and waits until the tsunami step has written
+   checkpoints;
+2. kills the worker with `SIGKILL` and starts it again;
+3. waits for the queue to reclaim the expired lease, which raises the job's
+   attempt, and for the job to complete rather than fail;
+4. looks for `resuming tsunami run from step N` in the worker log, which proves
+   that the second attempt continued from a checkpoint;
+5. checks the stored outputs.
+
+It also covers the sweep of old work directories and a storage outage during the
+upload, which retries instead of failing the job.
 
 ### Reference run
 
