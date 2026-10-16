@@ -2,14 +2,14 @@
 
 Each suite answers a different question.
 
-| Command                     | Question                                          | Needs                                                                     |
-| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
-| `mise run test`             | Do the Python units behave as specified?          | nothing                                                                   |
-| `mise run web-test`         | Do the web units behave as specified?             | nothing                                                                   |
-| `mise run test-integration` | Do the queue, roles, migrations and backups work? | PostgreSQL, which the task starts; Docker for the backup and expiry tests |
-| `mise run test-golden`      | Did the full pipeline output change?              | GMT and `ttt_client`                                                      |
-| `mise run test-parity`      | Does Python match the MATLAB and Fortran runs?    | `TSDHN_TOOLS_DIR` for Fortran cases                                       |
-| `mise run lint-all`         | Do Python and JavaScript pass the linters?        | nothing                                                                   |
+| Command                     | Question                                                                         | Needs                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `mise run test`             | Do the Python units behave as specified?                                         | nothing                                                                   |
+| `mise run web-test`         | Do the web units behave as specified?                                            | nothing                                                                   |
+| `mise run test-integration` | Do the queue, roles, migrations and backups work?                                | PostgreSQL, which the task starts; Docker for the backup and expiry tests |
+| `mise run test-golden`      | Did the full pipeline output change?                                             | GMT and `ttt_client`                                                      |
+| `mise run test-parity`      | Does Python match the MATLAB and Fortran runs?                                   | `TSDHN_TOOLS_DIR` for Fortran cases                                       |
+| `mise run lint-all`         | Do the linters pass, and do the Dockerfile tool versions match `.tool-versions`? | nothing                                                                   |
 
 Run one test with:
 
