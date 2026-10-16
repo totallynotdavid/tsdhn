@@ -10,10 +10,10 @@ authors = [
 ]
 dependencies = [
     "tsdhn",
-    "fastapi==0.143.2",
-    "uvicorn==0.54.0",
-    "pydantic==2.14.1",
-    "anyio==4.15.1",
+    "fastapi>=0.143.2",
+    "uvicorn>=0.54.0",
+    "pydantic>=2.14.1",
+    "anyio>=4.15.1",
     "psycopg[binary]>=3.3.6",
     "minio>=7.2.20",
     "asyncpg>=0.32.0",
@@ -28,7 +28,7 @@ tsdhn-web-grants = "api.web_grants:main"
 tsdhn-queue-grants = "api.queue_grants:main"
 
 [build-system]
-requires = ["uv_build==0.13.0"]
+requires = ["uv_build>=0.13.0,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]

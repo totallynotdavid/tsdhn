@@ -2,23 +2,15 @@
 
 ## Set up
 
-Follow [Install](../readme.md#install) in the README, then install the web app
-dependencies:
-
-```sh
-mise run web-install
-```
+Follow [Install](../readme.md#install) in the README. `mise run install`
+installs the Python and web dependencies from the lockfiles.
 
 ## Check a change
 
-Run the checks that match the change. The first three need no services and no
-GMT:
-
-```sh
-mise run test
-mise run web-test
-mise run lint-all
-```
+`mise run check` runs lint, typecheck, the unit tests and the builds. It needs
+no services and no GMT. To run one part, use `mise run lint`,
+`mise run typecheck`, `mise run test` or `mise run build`; each has `:py` and
+`:web` subtasks.
 
 [Testing](../docs/testing.md) lists every suite: database-backed tests, the
 golden pipeline test and the comparisons with the MATLAB and Fortran programs.
@@ -40,8 +32,5 @@ commit and cite the source or research case.
 
 ## Format
 
-Format JavaScript and TypeScript with `mise run fmt-js`. Format Markdown with:
-
-```sh
-bunx prettier --print-width 80 --prose-wrap always --write '**/*.md'
-```
+`mise run fix` formats Python, JavaScript, TypeScript, Markdown, YAML and JSON
+and applies safe lint fixes. `mise run lint` checks without writing.

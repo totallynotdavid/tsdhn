@@ -66,4 +66,4 @@ Each runtime role is `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOBYPASSRLS`,
 is repeatable. Running it again removes any grant or membership added by hand.
 
 The web role is provisioned by `tsdhn-compute-migrate` and `tsdhn-web-grants`.
-`mise run db-migrate` and the Compose stack run both. See [Deploy](deploy.md).
+`mise run db:migrate` and the Compose stack run both. See [Deploy](deploy.md).

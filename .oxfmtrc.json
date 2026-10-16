@@ -1,0 +1,20 @@
+{
+  "ignorePatterns": [
+    "**/.svelte-kit/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/*.toml",
+    "model/**",
+    "libs/api-client/src/generated/**",
+    "libs/api-client/openapi.json"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.md"],
+      "options": {
+        "printWidth": 80,
+        "proseWrap": "always"
+      }
+    }
+  ]
+}

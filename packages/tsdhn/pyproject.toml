@@ -9,22 +9,22 @@ authors = [
     { name = "David Duran", email = "dadch1404@gmail.com" },
 ]
 dependencies = [
-    "pydantic==2.14.1",
-    "scipy==1.18.1",
-    "numpy==2.5.4",
-    "numba==0.68.0",
-    "pygmt==0.19.0",
-    "pyyaml==6.0.3",
-    "typer==0.27.3",
-    "rich==15.0.0",
-    "xarray==2026.9.0",
+    "pydantic>=2.14.1",
+    "scipy>=1.18.1",
+    "numpy>=2.5.4",
+    "numba>=0.68.0",
+    "pygmt>=0.19.0",
+    "pyyaml>=6.0.3",
+    "typer>=0.27.3",
+    "rich>=15.0.0",
+    "xarray>=2026.9.0",
 ]
 
 [project.scripts]
 tsdhn = "tsdhn.cli.main:main"
 
 [build-system]
-requires = ["uv_build==0.13.0"]
+requires = ["uv_build>=0.13.0,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]

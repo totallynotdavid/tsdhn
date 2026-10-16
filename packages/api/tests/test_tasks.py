@@ -107,7 +107,7 @@ async def test_enqueue_simulation_builds_the_job_the_worker_expects(
     connection = _Connection()
     compute_job_id = uuid.uuid4()
 
-    await tasks.enqueue_simulation(connection, compute_job_id)
+    await tasks_module.enqueue_simulation(connection, compute_job_id)
 
     (recorded,) = recording_queue.enqueued(RUN_SIMULATION)
     assert recorded.connection is connection
@@ -126,7 +126,7 @@ async def test_enqueue_simulation_fails_when_the_queue_was_never_built(
     monkeypatch.setattr(queue_module, "_queue", None)
 
     with pytest.raises(RuntimeError, match="build_queue"):
-        await tasks.enqueue_simulation(_Connection(), uuid.uuid4())
+        await tasks_module.enqueue_simulation(_Connection(), uuid.uuid4())
 
 
 @pytest.mark.asyncio

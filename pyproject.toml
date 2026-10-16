@@ -1,5 +1,5 @@
 [project]
-name = "picv-2025"
+name = "tsdhn-workspace"
 version = "0.0.1"
 description = "TSDHN tsunami simulation workspace"
 requires-python = ">=3.14"
@@ -19,21 +19,21 @@ tsdhn-parity = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "ruff==0.17.0",
-    "mypy==2.4.0",
-    "types-PyYAML==6.0.12.20260906",
-    "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
-    "pytest-xdist==3.8.0",
-    "pytest-cov==7.1.0",
-    "httpx2==2.13.1",
-    "coverage==7.16.2",
-    "diff-cover==10.6.0",
-    "bandit==1.9.4",
-    "pip-audit==2.10.1",
+    "ruff>=0.17.0",
+    "mypy>=2.4.0",
+    "types-PyYAML>=6.0.12.20260906",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-xdist>=3.8.0",
+    "pytest-cov>=7.1.0",
+    "httpx2>=2.13.1",
+    "coverage>=7.16.2",
+    "diff-cover>=10.6.0",
+    "scipy-stubs>=1.18.1.1",
+    "asyncpg-stubs>=0.32.0",
 ]
 build = [
-    "uv_build==0.13.0",
+    "uv_build>=0.13.0,<0.14",
 ]
 
 [tool.ruff]
@@ -43,14 +43,8 @@ indent-width = 4
 extend-exclude = ["__pycache__", "dist", "build"]
 
 [tool.ruff.lint]
-# E/F/W = pycodestyle/pyflakes/pycodestyle warnings
-# I = isort
-# B = flake8-bugbear
-# UP = pyupgrade
-# S = flake8-bandit (Python security SAST)
-# SIM = flake8-simplify
-# RUF = ruff-specific
-select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+# S = flake8-bandit security checks.
+select = ["E4", "E7", "E9", "F", "B", "I", "UP", "SIM", "RUF", "S"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["tsdhn", "api", "tsdhn_parity"]
@@ -71,10 +65,19 @@ line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.14"
+files = ["packages"]
 strict = true
-ignore_missing_imports = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
+
+# These packages ship no type information and have no stub package.
+[[tool.mypy.overrides]]
+module = ["pygmt", "pygmt.*", "rqueue", "rqueue.*"]
+ignore_missing_imports = true
+
+[tool.diff_cover]
+compare_branch = "origin/master"
+fail_under = 90
 
 [tool.coverage.run]
 branch = true
@@ -100,9 +103,9 @@ exclude_lines = [
 [tool.pytest.ini_options]
 testpaths = ["packages/tsdhn/tests", "packages/api/tests", "packages/tsdhn-parity/tests"]
 pythonpath = ["."]
-addopts = "-ra"
+addopts = "-ra --strict-markers"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
-    "golden: requires the real compiled toolchain; see mise run test-golden",
-    "integration: uses disposable databases on the mise-managed PostgreSQL cluster; see mise run test-integration",
+    "golden: requires the real compiled toolchain; see mise run test:golden",
+    "integration: uses disposable databases on the mise-managed PostgreSQL cluster; see mise run test:integration",
 ]

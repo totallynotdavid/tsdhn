@@ -9,7 +9,7 @@ why `settings.worker_pool_size()` sizes the worker's pool as it does.
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, cast
 
 import asyncpg
 
@@ -175,7 +175,8 @@ async def acquire() -> AsyncIterator[asyncpg.Connection]:
             raise
         raise TransientInfraError("database unavailable") from e
     try:
-        yield connection
+        # The pool's proxy forwards every Connection method.
+        yield cast("asyncpg.Connection", connection)
     finally:
         await pool.release(connection)
 

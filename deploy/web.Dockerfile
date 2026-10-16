@@ -1,10 +1,9 @@
 # SvelteKit image for the self-hosted web target.
 # Edge deployments use adapter-auto and these runtime variables.
 #
-# Build context is the repo root. The BUN_VERSION default mirrors
-# .tool-versions. `mise run lint-all` enforces it. Builds that read
-# .tool-versions pass it explicitly.
-ARG BUN_VERSION=1.4.2
+# Build context is the repo root. Pass BUN_VERSION as a build argument; the bun
+# version is pinned in mise.toml, and `mise current bun` prints it.
+ARG BUN_VERSION
 FROM oven/bun:${BUN_VERSION}
 
 WORKDIR /app

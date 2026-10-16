@@ -540,8 +540,7 @@ async def test_the_notification_bridge_reports_the_keepalive_timeout(
 
 def test_public_error_does_not_leak_exception_message() -> None:
     leaky = FileNotFoundError(
-        "[Errno 2] No such file or directory: "
-        "'/home/dubu/picv-2025/jobs/f5171f2a/tsunami'"
+        "[Errno 2] No such file or directory: '/home/user/tsdhn/jobs/f5171f2a/tsunami'"
     )
 
     with_step = repository._public_error(leaky, "tsunami")

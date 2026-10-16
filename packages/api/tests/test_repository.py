@@ -1,8 +1,9 @@
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
+import asyncpg
 import pytest
 
 from api.core.repository import record_failure, status_from_row
@@ -116,7 +117,7 @@ class _RecordingConnection:
 async def test_failure_keeps_server_paths_out_of_the_client_status(
     caplog: pytest.LogCaptureFixture, will_retry: bool
 ) -> None:
-    path = "/home/dubu/picv-2025/jobs/0b7c/tsunami"
+    path = "/home/user/tsdhn/jobs/0b7c/tsunami"
     conn = _RecordingConnection()
 
     with caplog.at_level(logging.ERROR, logger="api.core.repository"):
@@ -124,7 +125,7 @@ async def test_failure_keeps_server_paths_out_of_the_client_status(
             raise FileNotFoundError(f"[Errno 2] No such file or directory: '{path}'")
         except FileNotFoundError as exc:
             await record_failure(
-                conn,
+                cast("asyncpg.Connection", conn),
                 uuid.uuid4(),
                 uuid.uuid4(),
                 exc,
@@ -136,7 +137,7 @@ async def test_failure_keeps_server_paths_out_of_the_client_status(
     # Every parameter written to compute.jobs is what a client can read back.
     written = " ".join(str(arg) for call in conn.calls for arg in call)
     assert path not in written
-    assert "/home/dubu" not in written
+    assert "/home/user" not in written
     assert "FileNotFoundError" in written
 
     # The full detail stays in the server log.

@@ -23,7 +23,7 @@ REL_TOL = 1e-4
 
 # The production pipeline needs GMT and ttt_client. It does not need legacy
 # binaries.
-SKIP_REASON = "requires gmt + ttt_client on PATH; see mise run test-golden"
+SKIP_REASON = "requires gmt + ttt_client on PATH; see mise run test:golden"
 
 
 def _toolchain_available() -> bool:

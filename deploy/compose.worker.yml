@@ -41,10 +41,7 @@ services:
         max-file: "3"
     healthcheck:
       test:
-        [
-          "CMD-SHELL",
-          "test $$(( $$(date +%s) - $$(stat -c %Y /var/tmp/worker-heartbeat) )) -lt 60",
-        ]
+        ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /var/tmp/worker-heartbeat) )) -lt 60"]
       interval: 15s
       timeout: 5s
       retries: 3

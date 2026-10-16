@@ -15,7 +15,7 @@ describe("simulation repository", () => {
 
   beforeAll(() => {
     if (!databaseUrl) {
-      throw new Error("DATABASE_URL is not set; run `mise run test-integration`");
+      throw new Error("DATABASE_URL is not set; run `mise run test:integration`");
     }
     client = postgres(databaseUrl, { max: 2 });
     repository = createSimulationRepository(drizzle(client, { schema }));

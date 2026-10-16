@@ -1,416 +1,409 @@
 name: Release
 
 on:
-    push:
-        tags: ["v*.*.*"]
-    workflow_dispatch:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
 
 # Default: no permissions.
 # Each job opts into what it needs.
 permissions: {}
 
 concurrency:
-    group: release-${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: false
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-    PYTHON_VERSION: "3.14"
-    IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
-    CANDIDATE_TAG: candidate-${{ github.run_id }}-${{ github.run_attempt }}
-    RELEASE_BRANCH_TAG: master
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  CANDIDATE_TAG: candidate-${{ github.run_id }}-${{ github.run_attempt }}
+  RELEASE_BRANCH_TAG: master
 
 jobs:
-    build-sdist-wheels:
-        name: Build sdist + wheels
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            id-token: write
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                  fetch-depth: 0
+  build-sdist-wheels:
+    name: Build sdist + wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
-              with:
-                  version-file: ".tool-versions"
-                  python-version: ${{ env.PYTHON_VERSION }}
-                  enable-cache: true
-                  cache-dependency-glob: "uv.lock"
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: python uv
 
-            - name: Sync with build group
-              run: uv sync --all-packages --group dev --group build
+      - run: mise run build:py
 
-            - name: Build tsdhn
-              run: uv build --package tsdhn --out-dir dist/tsdhn
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: |
+            dist/tsdhn/*
+            dist/api/*
 
-            - name: Build tsdhn-api
-              run: uv build --package tsdhn-api --out-dir dist/api
+  build-model-assets:
+    name: Build model asset bundle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
 
-            - name: Upload dist artifacts
-              uses: actions/upload-artifact@v7
-              with:
-                  name: dist
-                  path: |
-                      dist/tsdhn/*
-                      dist/api/*
+      - name: Build model archive
+        run: |
+          set -euo pipefail
+          mkdir -p dist/model
+          version="${GITHUB_REF_NAME#v}"
+          archive="dist/model/tsdhn-model-v${version}.tar.gz"
+          tar -czf "$archive" -C model .
+          sha256sum "$archive" > "${archive}.sha256"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
 
-    build-model-assets:
-        name: Build model asset bundle
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        steps:
-            - uses: actions/checkout@v7
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          files = sorted(str(path.relative_to("model")) for path in Path("model").rglob("*") if path.is_file())
+          manifest = {
+              "version": version,
+              "model_schema": 1,
+              "source_commit": os.environ["GITHUB_SHA"],
+              "files": files,
+          }
+          Path(f"dist/model/tsdhn-model-manifest-v{version}.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
 
-            - name: Build model archive
-              run: |
-                  set -euo pipefail
-                  mkdir -p dist/model
-                  version="${GITHUB_REF_NAME#v}"
-                  archive="dist/model/tsdhn-model-v${version}.tar.gz"
-                  tar -czf "$archive" -C model .
-                  sha256sum "$archive" > "${archive}.sha256"
-                  python - <<'PY'
-                  import json
-                  import os
-                  from pathlib import Path
+      - name: Upload model assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: model-assets
+          path: dist/model/*
 
-                  version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
-                  files = sorted(str(path.relative_to("model")) for path in Path("model").rglob("*") if path.is_file())
-                  manifest = {
-                      "version": version,
-                      "model_schema": 1,
-                      "source_commit": os.environ["GITHUB_SHA"],
-                      "files": files,
-                  }
-                  Path(f"dist/model/tsdhn-model-manifest-v{version}.json").write_text(
-                      json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-                      encoding="utf-8",
-                  )
-                  PY
+  build-toolchain-image:
+    name: Build candidate Docker (toolchain)
+    needs: build-sdist-wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
 
-            - name: Upload model assets
-              uses: actions/upload-artifact@v7
-              with:
-                  name: model-assets
-                  path: dist/model/*
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-    build-toolchain-image:
-        name: Build candidate Docker (toolchain)
-        needs: build-sdist-wheels
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            packages: write
-            id-token: write
-            attestations: write
-        steps:
-            - uses: actions/checkout@v7
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain
+          tags: |
+            type=raw,value=${{ env.CANDIDATE_TAG }}
 
-            - name: Log in to GitHub Container Registry
-              uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push candidate
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/toolchain.Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=toolchain
+          cache-to: type=gha,mode=max,scope=toolchain
+          platforms: linux/amd64
+          provenance: true
+          sbom: true
 
-            - name: Extract Docker metadata
-              id: meta
-              uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-              with:
-                  images: ${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain
-                  tags: |
-                      type=raw,value=${{ env.CANDIDATE_TAG }}
+      - name: Attest candidate image
+        uses: actions/attest@v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+          show-summary: false
 
-            - name: Build and push candidate
-              id: build
-              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-              with:
-                  context: .
-                  file: deploy/toolchain.Dockerfile
-                  push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=gha,scope=toolchain
-                  cache-to: type=gha,mode=max,scope=toolchain
-                  platforms: linux/amd64
-                  provenance: true
-                  sbom: true
+  build-app-images:
+    name: Build candidate Docker (${{ matrix.target }})
+    needs: [build-sdist-wheels, build-toolchain-image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: api
+            image: tsdhn-api
+            dockerfile: deploy/api.Dockerfile
+            cache_scope: api
+          - target: web
+            image: tsdhn-web
+            dockerfile: deploy/web.Dockerfile
+            cache_scope: web
+          - target: backup
+            image: tsdhn-backup
+            dockerfile: deploy/backup.Dockerfile
+            cache_scope: backup
+          - target: development
+            image: tsdhn-dev
+            dockerfile: .devcontainer/Dockerfile
+            cache_scope: dev
+    steps:
+      - uses: actions/checkout@v7
 
-            - name: Attest candidate image
-              uses: actions/attest@v4.2.2
-              with:
-                  subject-name: ${{ env.IMAGE_REGISTRY }}/tsdhn-toolchain
-                  subject-digest: ${{ steps.build.outputs.digest }}
-                  push-to-registry: true
-                  show-summary: false
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: uv bun
 
-    build-app-images:
-        name: Build candidate Docker (${{ matrix.target }})
-        needs: [build-sdist-wheels, build-toolchain-image]
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            packages: write
-            id-token: write
-            attestations: write
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - target: api
-                      image: tsdhn-api
-                      dockerfile: deploy/api.Dockerfile
-                      cache_scope: api
-                    - target: web
-                      image: tsdhn-web
-                      dockerfile: deploy/web.Dockerfile
-                      cache_scope: web
-                    - target: backup
-                      image: tsdhn-backup
-                      dockerfile: deploy/backup.Dockerfile
-                      cache_scope: backup
-                    - target: development
-                      image: tsdhn-dev
-                      dockerfile: .devcontainer/Dockerfile
-                      cache_scope: dev
-        steps:
-            - uses: actions/checkout@v7
-
-            - name: Resolve build args
-              id: args
-              env:
-                  TARGET: ${{ matrix.target }}
-              run: |
-                  {
-                      echo "list<<EOF"
-                      case "$TARGET" in
-                          api)
-                              echo "TOOLCHAIN_IMAGE=$IMAGE_REGISTRY/tsdhn-toolchain:$CANDIDATE_TAG"
-                              echo "UV_VERSION=$(scripts/tool-version.sh uv)"
-                              ;;
-                          web)
-                              echo "BUN_VERSION=$(scripts/tool-version.sh bun)"
-                              ;;
-                          development)
-                              echo "TOOLCHAIN_IMAGE=$IMAGE_REGISTRY/tsdhn-toolchain:$CANDIDATE_TAG"
-                              ;;
-                      esac
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
-
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-            - name: Log in to GitHub Container Registry
-              uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Extract Docker metadata
-              id: meta
-              uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-              with:
-                  images: ${{ env.IMAGE_REGISTRY }}/${{ matrix.image }}
-                  tags: |
-                      type=raw,value=${{ env.CANDIDATE_TAG }}
-
-            - name: Build and push candidate
-              id: build
-              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-              with:
-                  context: .
-                  file: ${{ matrix.dockerfile }}
-                  push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
-                  build-args: ${{ steps.args.outputs.list }}
-                  cache-from: type=gha,scope=${{ matrix.cache_scope }}
-                  cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
-                  platforms: linux/amd64
-                  provenance: true
-                  sbom: true
-
-            - name: Attest candidate image
-              uses: actions/attest@v4.2.2
-              with:
-                  subject-name: ${{ env.IMAGE_REGISTRY }}/${{ matrix.image }}
-                  subject-digest: ${{ steps.build.outputs.digest }}
-                  push-to-registry: true
-                  show-summary: false
-
-    compose-smoke:
-        name: Compose smoke candidate images
-        needs: build-app-images
-        runs-on: ubuntu-latest
-        timeout-minutes: 60
-        permissions:
-            contents: read
-            packages: read
+      - name: Resolve build args
+        id: args
         env:
-            API_IMAGE: ghcr.io/${{ github.repository_owner }}/tsdhn-api:candidate-${{ github.run_id }}-${{ github.run_attempt }}
-            TOOLCHAIN_IMAGE: ghcr.io/${{ github.repository_owner }}/tsdhn-toolchain:candidate-${{ github.run_id }}-${{ github.run_attempt }}
-            SIMULATION_ID: 4cfe522f-7e7d-46e0-96ca-7b98743fb9f5
-            COMPUTE_API_TOKEN: compose-e2e-token
-            APP_DB_PASSWORD: compose-e2e-app-db-password
-            COMPUTE_PRODUCER_PASSWORD: compose-e2e-producer-password
-            COMPUTE_WORKER_PASSWORD: compose-e2e-worker-password
-            COMPUTE_PURGER_PASSWORD: compose-e2e-purger-password
-            BETTER_AUTH_SECRET: compose-e2e-better-auth-secret
-            ORIGIN: http://localhost:3000
-            TSDHN_S3_ACCESS_KEY: tsdhn-local
-            TSDHN_S3_SECRET_KEY: tsdhn-local-secret
-            TSDHN_S3_BUCKET: tsdhn-results
-        steps:
-            - uses: actions/checkout@v7
+          TARGET: ${{ matrix.target }}
+        run: |
+          {
+              echo "list<<EOF"
+              case "$TARGET" in
+                  api)
+                      echo "TOOLCHAIN_IMAGE=$IMAGE_REGISTRY/tsdhn-toolchain:$CANDIDATE_TAG"
+                      echo "UV_VERSION=$(mise current uv)"
+                      ;;
+                  web)
+                      echo "BUN_VERSION=$(mise current bun)"
+                      ;;
+                  development)
+                      echo "TOOLCHAIN_IMAGE=$IMAGE_REGISTRY/tsdhn-toolchain:$CANDIDATE_TAG"
+                      ;;
+              esac
+              echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-            - name: Show Docker versions
-              run: |
-                  docker version
-                  docker compose version
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-            - name: Log in to GitHub Container Registry
-              uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Pull candidate runtime image
-              run: docker pull "$API_IMAGE"
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE_REGISTRY }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=${{ env.CANDIDATE_TAG }}
 
-            - name: Validate compose config
-              run: docker compose config --quiet
+      - name: Build and push candidate
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ steps.args.outputs.list }}
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
+          platforms: linux/amd64
+          provenance: true
+          sbom: true
 
-            - name: Start compute stack from candidate images
-              run: docker compose up -d --no-build postgres storage compute-migrate api worker
+      - name: Attest candidate image
+        uses: actions/attest@v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE_REGISTRY }}/${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+          show-summary: false
 
-            - name: Run compute smoke test
-              run: bash scripts/e2e/compute_stack_smoke.sh
+  compose-smoke:
+    name: Compose smoke candidate images
+    needs: build-app-images
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: read
+    env:
+      API_IMAGE: ghcr.io/${{ github.repository_owner }}/tsdhn-api:candidate-${{ github.run_id }}-${{ github.run_attempt }}
+      TOOLCHAIN_IMAGE: ghcr.io/${{ github.repository_owner }}/tsdhn-toolchain:candidate-${{ github.run_id }}-${{ github.run_attempt }}
+      SIMULATION_ID: 4cfe522f-7e7d-46e0-96ca-7b98743fb9f5
+      COMPUTE_API_TOKEN: compose-e2e-token
+      APP_DB_PASSWORD: compose-e2e-app-db-password
+      COMPUTE_PRODUCER_PASSWORD: compose-e2e-producer-password
+      COMPUTE_WORKER_PASSWORD: compose-e2e-worker-password
+      COMPUTE_PURGER_PASSWORD: compose-e2e-purger-password
+      BETTER_AUTH_SECRET: compose-e2e-better-auth-secret
+      ORIGIN: http://localhost:3000
+      TSDHN_S3_ACCESS_KEY: tsdhn-local
+      TSDHN_S3_SECRET_KEY: tsdhn-local-secret
+      TSDHN_S3_BUCKET: tsdhn-results
+    steps:
+      - uses: actions/checkout@v7
 
-            - name: Capture compose diagnostics
-              if: always()
-              run: |
-                  mkdir -p e2e-artifacts
-                  docker compose ps -a > e2e-artifacts/compose-ps.txt || true
-                  docker compose logs --no-color > e2e-artifacts/compose.log || true
-                  cp -f ./*.json ./*.jsonl ./*.txt e2e-artifacts/ 2>/dev/null || true
+      - name: Show Docker versions
+        run: |
+          docker version
+          docker compose version
 
-            - name: Upload diagnostics
-              if: always()
-              uses: actions/upload-artifact@v7
-              with:
-                  name: compose-smoke-diagnostics
-                  path: e2e-artifacts
-                  if-no-files-found: ignore
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Stop stack
-              if: always()
-              run: docker compose down -v --remove-orphans
+      - name: Pull candidate runtime image
+        run: docker pull "$API_IMAGE"
 
-    promote-images:
-        name: Promote Docker images
-        needs: compose-smoke
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            packages: write
-            id-token: write
-        steps:
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Validate compose config
+        run: docker compose config --quiet
 
-            - name: Log in to GitHub Container Registry
-              uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Start compute stack from candidate images
+        run: docker compose up -d --no-build postgres storage compute-migrate api worker
 
-            - name: Install cosign
-              uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-              with:
-                  cosign-release: "v2.4.3"
+      - name: Run compute smoke test
+        run: bash scripts/e2e/compute_stack_smoke.sh
 
-            - name: Promote tested candidates
-              run: |
-                  set -euo pipefail
-                  short_sha="${GITHUB_SHA::7}"
-                  images=(tsdhn-toolchain tsdhn-api tsdhn-web tsdhn-backup tsdhn-dev)
+      - name: Capture compose diagnostics
+        if: always()
+        run: |
+          mkdir -p e2e-artifacts
+          docker compose ps -a > e2e-artifacts/compose-ps.txt || true
+          docker compose logs --no-color > e2e-artifacts/compose.log || true
+          cp -f ./*.json ./*.jsonl ./*.txt e2e-artifacts/ 2>/dev/null || true
 
-                  for image in "${images[@]}"; do
-                      source_ref="${IMAGE_REGISTRY}/${image}:${CANDIDATE_TAG}"
-                      release_ref="${IMAGE_REGISTRY}/${image}:${GITHUB_REF_NAME}"
-                      branch_ref="${IMAGE_REGISTRY}/${image}:${RELEASE_BRANCH_TAG}"
-                      sha_ref="${IMAGE_REGISTRY}/${image}:sha-${short_sha}"
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compose-smoke-diagnostics
+          path: e2e-artifacts
+          if-no-files-found: ignore
 
-                      docker buildx imagetools create \
-                          -t "$release_ref" \
-                          -t "$branch_ref" \
-                          -t "$sha_ref" \
-                          "$source_ref"
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v --remove-orphans
 
-                      cosign sign --yes "$release_ref" "$branch_ref" "$sha_ref"
-                  done
+  promote-images:
+    name: Promote Docker images
+    needs: compose-smoke
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-    publish-pypi:
-        name: Publish to PyPI
-        needs: [build-sdist-wheels, promote-images]
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-        # Only publish when PyPI trusted publishing is explicitly configured.
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && vars.PUBLISH_PYPI == 'true'
-        runs-on: ubuntu-latest
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: "v2.4.3"
 
-        permissions:
-            id-token: write
-            attestations: write
+      - name: Promote tested candidates
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::7}"
+          images=(tsdhn-toolchain tsdhn-api tsdhn-web tsdhn-backup tsdhn-dev)
 
-        environment: pypi
+          for image in "${images[@]}"; do
+              source_ref="${IMAGE_REGISTRY}/${image}:${CANDIDATE_TAG}"
+              release_ref="${IMAGE_REGISTRY}/${image}:${GITHUB_REF_NAME}"
+              branch_ref="${IMAGE_REGISTRY}/${image}:${RELEASE_BRANCH_TAG}"
+              sha_ref="${IMAGE_REGISTRY}/${image}:sha-${short_sha}"
 
-        steps:
-            - name: Download dist artifacts
-              uses: actions/download-artifact@v8
-              with:
-                  name: dist
-                  path: dist
+              docker buildx imagetools create \
+                  -t "$release_ref" \
+                  -t "$branch_ref" \
+                  -t "$sha_ref" \
+                  "$source_ref"
 
-            - name: Attest PyPI artifacts (SLSA build provenance)
-              uses: actions/attest@v4.2.2
-              with:
-                  subject-path: dist/**/*.tar.gz,dist/**/*.whl
-                  show-summary: false
+              cosign sign --yes "$release_ref" "$branch_ref" "$sha_ref"
+          done
 
-            - name: Publish tsdhn
-              uses: pypa/gh-action-pypi-publish@release/v1
-              with:
-                  packages-dir: dist/tsdhn
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build-sdist-wheels, promote-images]
 
-    release-notes:
-        name: Generate release notes
-        needs: [build-model-assets, promote-images]
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                  fetch-depth: 0
+    # Only publish when PyPI trusted publishing is explicitly configured.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && vars.PUBLISH_PYPI == 'true'
+    runs-on: ubuntu-latest
 
-            - name: Download model assets
-              uses: actions/download-artifact@v8
-              with:
-                  name: model-assets
-                  path: dist/model
+    permissions:
+      id-token: write
+      attestations: write
 
-            - uses: softprops/action-gh-release@v3
-              with:
-                  generate_release_notes: true
-                  files: dist/model/*
+    environment: pypi
+
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Attest PyPI artifacts (SLSA build provenance)
+        uses: actions/attest@v4.2.2
+        with:
+          subject-path: dist/**/*.tar.gz,dist/**/*.whl
+          show-summary: false
+
+      - name: Publish tsdhn
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/tsdhn
+
+  release-notes:
+    name: Generate release notes
+    needs: [build-model-assets, promote-images]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download model assets
+        uses: actions/download-artifact@v8
+        with:
+          name: model-assets
+          path: dist/model
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          files: dist/model/*

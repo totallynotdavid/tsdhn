@@ -13,27 +13,27 @@ with `COMPUTE_API_URL` and `COMPUTE_API_TOKEN`. See
 From the repository root:
 
 ```sh
-bun install
+mise run install
 bun --filter web dev
-bun --filter web check
-bun --filter web build
-bun --filter web test
+mise run typecheck:web
+mise run build:web
+mise run test:web
 ```
 
 The Vitest suite is service-free. Database-backed tests use:
 
 ```sh
-mise run test-integration
+mise run test:integration
 ```
 
 ## Preview
 
-`mise run web:preview` serves the app without Postgres, the compute service or a
+`mise run preview:web` serves the app without Postgres, the compute service or a
 login step:
 
 ```sh
-mise run web:preview
-mise run web:preview --host 100.64.0.1 --port 8080
+mise run preview:web
+mise run preview:web --host 100.64.0.1 --port 8080
 ```
 
 The host defaults to `0.0.0.0` and the port to `5174`, so another machine on the

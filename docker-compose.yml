@@ -59,7 +59,7 @@ services:
       [
         "sh",
         "-lc",
-        "uv run --no-dev tsdhn-compute-migrate && uv run --no-dev rqueue --database-url \"$$COMPUTE_DATABASE_URL\" --schema \"$$COMPUTE_QUEUE_SCHEMA\" migrate && uv run --no-dev tsdhn-queue-grants",
+        'uv run --no-dev tsdhn-compute-migrate && uv run --no-dev rqueue --database-url "$$COMPUTE_DATABASE_URL" --schema "$$COMPUTE_QUEUE_SCHEMA" migrate && uv run --no-dev tsdhn-queue-grants',
       ]
     restart: "no"
 

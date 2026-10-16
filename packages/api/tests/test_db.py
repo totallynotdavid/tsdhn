@@ -237,7 +237,7 @@ class _Connection:
 async def test_a_backend_that_dies_mid_statement_is_transient() -> None:
     # What asyncpg raises when the backend goes away with a query in flight.
     with pytest.raises(TransientInfraError, match="database unavailable"):
-        async with db.transient_connection_errors(_Connection(closed=False)):
+        async with db_module.transient_connection_errors(_Connection(closed=False)):
             raise asyncpg.ConnectionDoesNotExistError("connection was closed")
 
 
@@ -246,7 +246,7 @@ async def test_a_statement_issued_on_a_dead_connection_is_transient() -> None:
     # What asyncpg raises when the backend was already gone: a bare
     # InterfaceError, which is in no connection-error class at all.
     with pytest.raises(TransientInfraError, match="database unavailable"):
-        async with db.transient_connection_errors(_Connection(closed=True)):
+        async with db_module.transient_connection_errors(_Connection(closed=True)):
             raise asyncpg.InterfaceError("connection is closed")
 
 
@@ -256,14 +256,14 @@ async def test_a_programming_error_is_not_disguised_as_an_outage() -> None:
     # arguments for this query, 1 was passed"), on a connection that is still
     # perfectly healthy. Retrying that spends the job's budget on a bug.
     with pytest.raises(asyncpg.InterfaceError, match="expects 2 arguments"):
-        async with db.transient_connection_errors(_Connection(closed=False)):
+        async with db_module.transient_connection_errors(_Connection(closed=False)):
             raise asyncpg.InterfaceError("the server expects 2 arguments")
 
 
 @pytest.mark.asyncio
 async def test_an_unrelated_error_passes_through_untouched() -> None:
     with pytest.raises(ValueError, match="not a connection problem"):
-        async with db.transient_connection_errors(_Connection(closed=True)):
+        async with db_module.transient_connection_errors(_Connection(closed=True)):
             raise ValueError("not a connection problem")
 
 
@@ -279,7 +279,7 @@ async def test_a_pool_proxy_that_cannot_answer_is_treated_as_gone() -> None:
             )
 
     with pytest.raises(TransientInfraError, match="database unavailable"):
-        async with db.transient_connection_errors(_ReleasedProxy()):
+        async with db_module.transient_connection_errors(_ReleasedProxy()):
             raise asyncpg.InterfaceError("cannot call Connection.execute()")
 
 

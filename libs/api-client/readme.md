@@ -30,7 +30,7 @@ const client = createTsdhnClient({
 After changing a FastAPI route or schema:
 
 ```sh
-mise run gen-client
+mise run gen:client
 ```
 
 The command exports the FastAPI schema to `openapi.json`, then generates

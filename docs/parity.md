@@ -40,7 +40,7 @@ Checkpoint state is Python's own and has no Fortran counterpart.
 ## Run the comparison
 
 ```sh
-mise run test-parity
+mise run test:parity
 ```
 
 Python cases and the saved MATLAB traces need no extra tools. Fortran cases need
@@ -60,6 +60,5 @@ uv run python scripts/capture_matlab_fixtures.py fault_plane
 ```
 
 The script runs MATLAB in a container and needs the MathWorks image and a
-license. `mise run parity-capture-matlab` runs the same script. The comparison
-code is described in
-[`packages/tsdhn-parity`](../packages/tsdhn-parity/readme.md).
+license. `mise run capture:matlab` runs the same script. The comparison code is
+described in [`packages/tsdhn-parity`](../packages/tsdhn-parity/readme.md).

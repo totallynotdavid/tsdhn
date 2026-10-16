@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "cf workers types && tsc --noEmit",
+    "typecheck": "cf workers types && tsc --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {

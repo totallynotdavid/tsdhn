@@ -65,7 +65,7 @@ RustFS console.
 Create the local environment before you start the stack (also done by `dev`):
 
 ```sh
-mise run env-init
+mise run init:env
 ```
 
 `env-init` refuses to overwrite an existing `.env`, generates the ten required
@@ -107,22 +107,22 @@ are public. The other routes need `COMPUTE_API_TOKEN`.
 Follow the service logs:
 
 ```sh
-mise run dev-logs
+mise run dev:logs
 ```
 
 Show each container's state and configured health status:
 
 ```sh
-mise run dev-status
+mise run dev:status
 ```
 
 Stop the containers and keep the named volumes:
 
 ```sh
-mise run dev-down
+mise run dev:down
 ```
 
-`dev-down` keeps the named volumes. The database and storage are disposable, so
+`dev:down` keeps the named volumes. The database and storage are disposable, so
 wipe the containers, network and volumes when resetting the stack. The command
 uses the same engine socket setup as the mise tasks:
 

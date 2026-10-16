@@ -92,7 +92,7 @@ def process_tsunami_data(working_dir: Path) -> None:
                     cala_val = station_data["cala"][k]
                     mata_val = station_data["mata"][k]
                     f.write(
-                        f"{time_val:12.6f} {fortran_float_format(tala_val)} {fortran_float_format(cala_val)} {fortran_float_format(mata_val)}\n"  # noqa: E501
+                        f"{time_val:12.6f} {fortran_float_format(tala_val)} {fortran_float_format(cala_val)} {fortran_float_format(mata_val)}\n"
                     )
         except Exception as e:
             logger.error(f"Error writing green_rev.dat: {e}")

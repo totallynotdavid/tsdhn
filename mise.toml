@@ -1,184 +1,218 @@
-[tasks]
-install = "uv sync --all-packages --group dev --group build"
-
-lint = [
-  "uv run ruff check --select E,F,W,I,B,UP,S,SIM,RUF .",
-  "uv run ruff format --check .",
-  "uv run mypy --strict packages",
-]
-
-fix = ["uv run ruff check --fix --unsafe-fixes .", "uv run ruff format ."]
-
-# The fast suite is service-free. The integration task owns PostgreSQL.
-test = "uv run pytest -n auto -m 'not integration'"
-test-integration = "bash scripts/integration.sh"
-db-migrate = "mise run db:migrate"
-
-# Golden tests need GMT and ttt_client.
-test-golden = "uv run pytest -m golden"
-
-# Parity tests use frozen MATLAB fixtures and optional Fortran tools.
-test-parity = "uv run pytest packages/tsdhn/tests/parity packages/tsdhn-parity/tests"
-
-# Capture MATLAB checkpoints manually. See scripts/capture_matlab_fixtures.py.
-parity-capture-matlab = "uv run python scripts/capture_matlab_fixtures.py"
-
-# Disable Numba JIT so coverage.py can trace the tsunami kernels.
-coverage = [
-  "NUMBA_DISABLE_JIT=1 uv run coverage run -m pytest",
-  "uv run coverage report",
-  "uv run coverage json",
-  "uv run coverage xml",
-]
-
-diff-coverage = [
-  "mise run db:start",
-  "mise run coverage",
-  "uv run coverage run --append -m pytest -m integration packages/api/tests",
-  "uv run coverage xml",
-  "uv run diff-cover coverage.xml --compare-branch=origin/master --fail-under=90",
-]
-
-security = [
-  "uv run bandit -r packages -lll --skip B101",
-  "mise run audit",
-  "mise run audit-toolchain",
-  "gitleaks detect --source . --no-banner",
-]
-
-# Audit production dependencies.
-audit = "uv audit --locked --preview-features audit-command --no-dev --no-group build"
-
-# Audit development dependencies.
-audit-toolchain = "uv audit --locked --preview-features audit-command"
-
-build = [
-  "uv build --package tsdhn --out-dir dist/tsdhn",
-  "uv build --package tsdhn-api --out-dir dist/api",
-]
-
-api = { description = "Run the API against the local PostgreSQL", env = { _ = { file = ".env" } }, run = "uv run tsdhn-api" }
-worker = { description = "Run the simulation worker against the local PostgreSQL", env = { _ = { file = ".env" } }, run = "uv run tsdhn-worker" }
-
-web-install = "bun install"
-web-dev = "bun --filter web dev"
-web-build = "bun --filter web build"
-web-check = "bun --filter web check"
-web-test = "bun --filter web test"
-edge-check = "bun --filter edge check"
-edge-test = "bun --filter edge test"
-lint-js = "bun run lint"
-fmt-js = "bun run fmt"
-fmt-check-js = "bun run fmt:check"
-gen-client = "bun run gen:client"
-
-diff-coverage-js = [
-  "bun --filter web test:coverage",
-  "sed -i.bak 's|^SF:|SF:apps/web/|' apps/web/coverage/lcov.info",
-  "uv run diff-cover apps/web/coverage/lcov.info --compare-branch=origin/master --fail-under=90",
-]
-
-# PostgreSQL is managed by mise. Compose runs the service stack.
-db = "mise run db:start"
-
-dev-up = """
-. scripts/dev-engine.sh
-UV_VERSION="$(scripts/tool-version.sh uv)" docker compose up -d --build
-"""
-dev-web = """
-. scripts/dev-engine.sh
-UV_VERSION="$(scripts/tool-version.sh uv)" BUN_VERSION="$(scripts/tool-version.sh bun)" docker compose --profile web up -d --build
-"""
-dev-down = """
-. scripts/dev-engine.sh
-docker compose --profile web down
-"""
-dev-status = """
-. scripts/dev-engine.sh
-docker compose --profile web ps -a
-for container in $(docker compose --profile web ps -aq); do
-  name=$(docker inspect --format "$(printf '\\173\\173.Name\\175\\175')" "$container")
-  state=$(docker inspect --format "$(printf '\\173\\173.State.Status\\175\\175')" "$container")
-  health=$(docker inspect --format "$(printf '\\173\\173if .State.Health\\175\\175\\173\\173.State.Health.Status\\175\\175\\173\\173else\\175\\175not-configured\\173\\173end\\175\\175')" "$container")
-  printf '%s state=%s health=%s\\n' "$name" "$state" "$health"
-done
-"""
-dev-logs = """
-. scripts/dev-engine.sh
-docker compose --profile web logs -f
-"""
-
-env-init = "scripts/env-init.sh .env"
-
-dev = """
-if [ ! -e .env ]; then
-  mise run env-init
-fi
-
-. scripts/dev-engine.sh
-config_dir="$(mktemp -d "${TMPDIR:-/tmp}/tsdhn-dev.XXXXXX")"
-docker_config="$config_dir/docker"
-buildx_config="$config_dir/buildx"
-trap 'rm -rf "$config_dir"' EXIT
-mkdir -p "$docker_config" "$buildx_config"
-UV_VERSION="$(scripts/tool-version.sh uv)" \
-BUN_VERSION="$(scripts/tool-version.sh bun)" \
-DOCKER_CONFIG="$docker_config" BUILDX_CONFIG="$buildx_config" \
-docker compose --profile web up -d --build
-
-for _ in $(seq 1 60); do
-  if curl -fsS http://localhost:8000/api/v1/health >/dev/null 2>&1 \
-    && curl -fsS http://localhost:3000 >/dev/null; then
-    echo "Web: http://localhost:3000"
-    echo "API docs: http://localhost:8000/api-docs"
-    echo "Storage console: http://localhost:9001"
-    echo "Sign up at /signup to create a local account (email plus a password of at least 8 characters; no email verification)."
-    exit 0
-  fi
-  sleep 2
-done
-
-echo "The local stack did not become healthy within 120 seconds." >&2
-DOCKER_CONFIG="$docker_config" docker compose --profile web ps >&2 || true
-exit 1
-"""
-
-lint-all = [
-  "mise run lint",
-  "mise run lint-js",
-  "mise run fmt-check-js",
-  "bash scripts/check-tool-versions.sh",
-]
-
-check = [
-  "mise run lint-all",
-  "mise run test",
-  "mise run web-check",
-  "mise run web-test",
-  "mise run edge-check",
-  "mise run edge-test",
-]
-fix-all = ["mise run fix", "mise run fmt-js"]
-
-doctor = [
-  "uv run python --version",
-  "uv --version",
-  "uv run ruff --version",
-  "uv run mypy --version",
-  "gitleaks version",
-]
+[tools]
+python = "3.14.8"
+uv = "0.13.0"
+bun = "1.4.2"
+postgres = "18.6"
 
 # setup.sh creates this file when the scientific toolchain is installed.
 [env]
 _.file = ".tsdhn/env"
 
-[tasks."web:preview"]
+[tasks.install]
+description = "Install the Python and web dependencies from the lockfiles"
+run = [
+  "uv sync --locked --all-packages --all-groups",
+  "bun install --frozen-lockfile",
+]
+
+[tasks.lint]
+description = "Check Python, web code and Markdown without writing"
+depends = ["lint:py", "lint:web"]
+
+[tasks."lint:py"]
+description = "Check Python with ruff"
+run = ["uv run ruff check --no-fix .", "uv run ruff format --check ."]
+
+[tasks."lint:web"]
+description = "Check the web code, Markdown, YAML and JSON with oxlint and oxfmt"
+run = ["bunx oxlint --deny-warnings", "bunx oxfmt --check ."]
+
+[tasks.fix]
+description = "Apply safe lint fixes and format the repository"
+depends = ["fix:py", "fix:web"]
+
+[tasks."fix:py"]
+description = "Fix and format Python with ruff"
+run = ["uv run ruff check --fix .", "uv run ruff format ."]
+
+[tasks."fix:web"]
+description = "Fix and format the web code, Markdown, YAML and JSON"
+run = ["bunx oxlint --fix", "bunx oxfmt ."]
+
+[tasks.typecheck]
+description = "Type-check Python and the web workspaces"
+depends = ["typecheck:py", "typecheck:web"]
+
+[tasks."typecheck:py"]
+description = "Type-check Python with mypy"
+run = "uv run mypy"
+
+[tasks."typecheck:web"]
+description = "Type-check the web workspaces"
+run = "bun --filter '*' typecheck"
+
+[tasks.test]
+description = "Run the fast Python and web tests"
+depends = ["test:py", "test:web"]
+
+# Disable Numba JIT so coverage.py can trace the tsunami kernels. The run
+# records .coverage for the diff-coverage tasks.
+[tasks."test:py"]
+description = "Run the Python tests that need no services and record coverage data"
+env = { NUMBA_DISABLE_JIT = "1" }
+run = "uv run pytest -n auto -m 'not integration' --cov --cov-report="
+
+[tasks."test:web"]
+description = "Run the web tests that need no services and record coverage data"
+run = "bun --filter '*' test"
+
+[tasks."test:integration"]
+description = "Run the database-backed tests on a disposable database; pass -- --coverage to record coverage"
+run = "bash scripts/integration.sh"
+
+# Golden tests need GMT and ttt_client.
+[tasks."test:golden"]
+description = "Run the golden pipeline test against the real toolchain"
+run = "uv run pytest -m golden"
+
+# Parity tests use frozen MATLAB fixtures and optional Fortran tools.
+[tasks."test:parity"]
+description = "Compare Python checkpoints with the MATLAB and Fortran references"
+run = "uv run pytest packages/tsdhn/tests/parity packages/tsdhn-parity/tests"
+
+[tasks.build]
+description = "Build the Python distributions and the web app"
+depends = ["build:py", "build:web"]
+
+[tasks."build:py"]
+description = "Build the tsdhn and tsdhn-api distributions"
+run = [
+  "uv build --package tsdhn --out-dir dist/tsdhn",
+  "uv build --package tsdhn-api --out-dir dist/api",
+]
+
+[tasks."build:web"]
+description = "Build the web app"
+# typecheck:web and test:web regenerate apps/web/.svelte-kit, which the build reads.
+wait_for = ["typecheck:web", "test:web"]
+run = "bun --filter web build"
+
+[tasks.check]
+description = "Run every check that needs no services; the entry for CI and for a contributor before a push"
+depends = ["lint", "typecheck", "test", "build"]
+
+[tasks."coverage:merge"]
+description = "Combine the recorded Python coverage data into reports"
+run = [
+  "uv run coverage combine",
+  "uv run coverage xml",
+  "uv run coverage html --skip-covered --skip-empty",
+  "uv run coverage report",
+]
+
+[tasks."diff-coverage:py"]
+description = "Fail when changed Python lines fall under the coverage threshold in pyproject.toml"
+run = "uv run diff-cover -c pyproject.toml coverage.xml --markdown-report diff-coverage.md"
+
+[tasks."diff-coverage:web"]
+description = "Fail when changed web lines fall under the coverage threshold in pyproject.toml; run test:web first"
+run = [
+  "sed 's|^SF:|SF:apps/web/|' apps/web/coverage/lcov.info > apps/web/coverage/lcov.repo.info",
+  "uv run diff-cover -c pyproject.toml apps/web/coverage/lcov.repo.info --markdown-report diff-coverage-web.md",
+]
+
+[tasks.diff-coverage]
+description = "Run the unit and integration tests, then check coverage of the changed Python lines"
+run = [
+  "mise run db:start",
+  "mise run test:py",
+  "uv run coverage run --append -m pytest -m integration packages/api/tests",
+  "uv run coverage xml",
+  "mise run diff-coverage:py",
+]
+
+[tasks."audit:runtime"]
+description = "Audit the production Python dependencies"
+run = "uv audit --locked --preview-features audit-command --no-dev --no-group build"
+
+[tasks."audit:toolchain"]
+description = "Audit the development Python dependencies"
+run = "uv audit --locked --preview-features audit-command"
+
+[tasks."gen:client"]
+description = "Regenerate the TypeScript API client from the FastAPI schema"
+run = "bun run scripts/gen-client.ts"
+
+[tasks."capture:matlab"]
+description = "Capture MATLAB checkpoints; see scripts/capture_matlab_fixtures.py"
+run = "uv run python scripts/capture_matlab_fixtures.py"
+
+[tasks.api]
+description = "Run the API against the local PostgreSQL"
+env = { _ = { file = ".env" } }
+run = "uv run tsdhn-api"
+
+[tasks.worker]
+description = "Run the simulation worker against the local PostgreSQL"
+env = { _ = { file = ".env" } }
+run = "uv run tsdhn-worker"
+
+[tasks."init:env"]
+description = "Create .env with generated local secrets"
+run = "scripts/env-init.sh .env"
+
+[tasks.dev]
+description = "Start the local stack and wait until the web app and API answer"
+run = "scripts/dev.sh"
+
+[tasks."dev:api"]
+description = "Start the local stack without the web app"
+run = """
+. scripts/dev-engine.sh
+UV_VERSION="$(mise current uv)" docker compose up -d --build
+"""
+
+[tasks."dev:web"]
+description = "Start the local stack with the web app"
+run = """
+. scripts/dev-engine.sh
+UV_VERSION="$(mise current uv)" BUN_VERSION="$(mise current bun)" docker compose --profile web up -d --build
+"""
+
+[tasks."dev:down"]
+description = "Stop the local stack"
+run = """
+. scripts/dev-engine.sh
+docker compose --profile web down
+"""
+
+[tasks."dev:status"]
+description = "Show the state and health of the local stack containers"
+run = "scripts/dev-status.sh"
+
+[tasks."dev:logs"]
+description = "Follow the local stack logs"
+run = """
+. scripts/dev-engine.sh
+docker compose --profile web logs -f
+"""
+
+[tasks."preview:web"]
 description = "Serve the web app on an embedded database and a stub compute API"
 usage = '''
 flag "--host <host>" default="0.0.0.0" help="Address to listen on"
 flag "--port <port>" default="5174" help="Port to listen on"
 '''
 run = 'bun --filter web serve:preview --host "$usage_host" --port "$usage_port"'
+
+[tasks.doctor]
+description = "Print the versions of the Python toolchain"
+run = [
+  "uv run python --version",
+  "uv --version",
+  "uv run ruff --version",
+  "uv run mypy --version",
+]
 
 [tasks."db:init"]
 description = "Initialize the project-local PostgreSQL cluster"

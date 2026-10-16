@@ -6,7 +6,7 @@ Fortran output. It is test support for compatibility checks.
 ## Run it
 
 ```sh
-mise run test-parity
+mise run test:parity
 ```
 
 Saved MATLAB runs and Python cases do not need MATLAB. Fortran cases need

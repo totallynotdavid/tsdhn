@@ -33,7 +33,7 @@ def isolated_database() -> Iterator[str]:
     except psycopg.OperationalError as error:
         pytest.exit(
             f"PostgreSQL is not reachable at {LOCAL_DATABASE_URL} ({error}). "
-            "Run `mise run db:start` or `mise run test-integration` first.",
+            "Run `mise run db:start` or `mise run test:integration` first.",
             returncode=1,
         )
 

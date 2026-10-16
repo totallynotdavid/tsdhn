@@ -2,98 +2,102 @@ name: Crash-recovery e2e
 
 # Run the crash-recovery scenarios against the real Compose stack.
 on:
-    workflow_dispatch:
+  workflow_dispatch:
 
 concurrency:
-    group: crash-recovery-${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  group: crash-recovery-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions: {}
 
 jobs:
-    crash-recovery:
-        name: Crash-recovery e2e (real toolchain)
-        runs-on: ubuntu-latest
-        timeout-minutes: 90
-        permissions:
-            contents: read
-        services:
-            registry:
-                image: public.ecr.aws/docker/library/registry:2
-                ports:
-                    - 5000:5000
+  crash-recovery:
+    name: Crash-recovery e2e (real toolchain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    services:
+      registry:
+        image: public.ecr.aws/docker/library/registry:2
+        ports:
+          - 5000:5000
+    env:
+      COMPUTE_API_TOKEN: compose-e2e-token
+      APP_DB_PASSWORD: compose-e2e-app-db-password
+      COMPUTE_PRODUCER_PASSWORD: compose-e2e-producer-password
+      COMPUTE_WORKER_PASSWORD: compose-e2e-worker-password
+      COMPUTE_PURGER_PASSWORD: compose-e2e-purger-password
+      BETTER_AUTH_SECRET: compose-e2e-better-auth-secret
+      ORIGIN: http://localhost:3000
+      TSDHN_S3_ACCESS_KEY: tsdhn-local
+      TSDHN_S3_SECRET_KEY: tsdhn-local-secret
+      TSDHN_S3_BUCKET: tsdhn-results
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: uv
+
+      - name: Read tool versions
+        id: tools
+        run: echo "uv=$(mise current uv)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver-opts: network=host
+
+      - name: Build toolchain image (cached)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/toolchain.Dockerfile
+          tags: localhost:5000/tsdhn-toolchain:crash-recovery-ci
+          push: true
+          cache-from: type=gha,scope=toolchain
+          cache-to: type=gha,mode=max,scope=toolchain
+
+      - name: Build api image (cached)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/api.Dockerfile
+          build-args: |
+            TOOLCHAIN_IMAGE=localhost:5000/tsdhn-toolchain:crash-recovery-ci
+            UV_VERSION=${{ steps.tools.outputs.uv }}
+          tags: localhost/tsdhn-api:crash-recovery-ci
+          load: true
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Start compute stack
         env:
-            COMPUTE_API_TOKEN: compose-e2e-token
-            APP_DB_PASSWORD: compose-e2e-app-db-password
-            COMPUTE_PRODUCER_PASSWORD: compose-e2e-producer-password
-            COMPUTE_WORKER_PASSWORD: compose-e2e-worker-password
-            COMPUTE_PURGER_PASSWORD: compose-e2e-purger-password
-            BETTER_AUTH_SECRET: compose-e2e-better-auth-secret
-            ORIGIN: http://localhost:3000
-            TSDHN_S3_ACCESS_KEY: tsdhn-local
-            TSDHN_S3_SECRET_KEY: tsdhn-local-secret
-            TSDHN_S3_BUCKET: tsdhn-results
-        steps:
-            - uses: actions/checkout@v7
+          API_IMAGE: localhost/tsdhn-api:crash-recovery-ci
+        run: docker compose up -d --no-build postgres storage compute-migrate api worker
 
-            - name: Read tool versions
-              id: tools
-              run: echo "uv=$(scripts/tool-version.sh uv)" >> "$GITHUB_OUTPUT"
+      - name: Run crash-recovery e2e scenarios
+        env:
+          API_IMAGE: localhost/tsdhn-api:crash-recovery-ci
+        run: bash scripts/e2e/crash_recovery_e2e.sh
 
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-              with:
-                  driver-opts: network=host
+      - name: Capture compose diagnostics
+        if: always()
+        run: |
+          mkdir -p e2e-artifacts
+          docker compose ps -a > e2e-artifacts/compose-ps.txt || true
+          docker compose logs --no-color > e2e-artifacts/compose.log || true
+          cp -f ./*.json e2e-artifacts/ 2>/dev/null || true
 
-            - name: Build toolchain image (cached)
-              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-              with:
-                  context: .
-                  file: deploy/toolchain.Dockerfile
-                  tags: localhost:5000/tsdhn-toolchain:crash-recovery-ci
-                  push: true
-                  cache-from: type=gha,scope=toolchain
-                  cache-to: type=gha,mode=max,scope=toolchain
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: crash-recovery-diagnostics
+          path: e2e-artifacts
+          if-no-files-found: ignore
 
-            - name: Build api image (cached)
-              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-              with:
-                  context: .
-                  file: deploy/api.Dockerfile
-                  build-args: |
-                      TOOLCHAIN_IMAGE=localhost:5000/tsdhn-toolchain:crash-recovery-ci
-                      UV_VERSION=${{ steps.tools.outputs.uv }}
-                  tags: localhost/tsdhn-api:crash-recovery-ci
-                  load: true
-                  cache-from: type=gha,scope=api
-                  cache-to: type=gha,mode=max,scope=api
-
-            - name: Start compute stack
-              env:
-                  API_IMAGE: localhost/tsdhn-api:crash-recovery-ci
-              run: docker compose up -d --no-build postgres storage compute-migrate api worker
-
-            - name: Run crash-recovery e2e scenarios
-              env:
-                  API_IMAGE: localhost/tsdhn-api:crash-recovery-ci
-              run: bash scripts/e2e/crash_recovery_e2e.sh
-
-            - name: Capture compose diagnostics
-              if: always()
-              run: |
-                  mkdir -p e2e-artifacts
-                  docker compose ps -a > e2e-artifacts/compose-ps.txt || true
-                  docker compose logs --no-color > e2e-artifacts/compose.log || true
-                  cp -f ./*.json e2e-artifacts/ 2>/dev/null || true
-
-            - name: Upload diagnostics
-              if: always()
-              uses: actions/upload-artifact@v7
-              with:
-                  name: crash-recovery-diagnostics
-                  path: e2e-artifacts
-                  if-no-files-found: ignore
-
-            - name: Stop stack
-              if: always()
-              run: docker compose down -v --remove-orphans
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v --remove-orphans

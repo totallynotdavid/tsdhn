@@ -112,7 +112,7 @@ stages. [Science](science.md) records its numerical rules.
 
 ### Preview mode
 
-`mise run web:preview` replaces both Postgres and the compute service so the web
+`mise run preview:web` replaces both Postgres and the compute service so the web
 app runs on one machine. The web process then holds both sides of the contract
 above:
 

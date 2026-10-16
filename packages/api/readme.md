@@ -30,6 +30,6 @@ Run the fast API tests with:
 uv run --package tsdhn-api pytest packages/api/tests -m "not integration"
 ```
 
-Database-backed tests use `mise run test-integration`. After a route or schema
+Database-backed tests use `mise run test:integration`. After a route or schema
 change, regenerate the TypeScript client as described in
 [`libs/api-client`](../../libs/api-client/readme.md#regenerate).

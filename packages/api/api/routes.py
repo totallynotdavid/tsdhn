@@ -229,7 +229,7 @@ async def job_events(simulation_id: str) -> StreamingResponse:
         wakeups: asyncio.Queue[None] = asyncio.Queue(maxsize=1)
 
         def on_notify(
-            _connection: object, _pid: int, _channel: str, _payload: str
+            _connection: object, _pid: int, _channel: str, _payload: object
         ) -> None:
             with contextlib.suppress(asyncio.QueueFull):
                 wakeups.put_nowait(None)

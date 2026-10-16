@@ -253,7 +253,7 @@ class TsunamiCalculator:
             if self.bathy_interpolator is None:
                 raise RuntimeError("Bathymetry interpolator not loaded")
 
-            h0 = self.bathy_interpolator((data.lat0, data.lon0))
+            h0 = float(self.bathy_interpolator((data.lat0, data.lon0)))
 
             location = determine_epicenter_location(h0, distance_to_coast)
             warning = determine_tsunami_warning(data.Mw, data.h, h0, distance_to_coast)

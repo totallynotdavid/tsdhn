@@ -1,307 +1,189 @@
 name: CI
 
 on:
-    push:
-        branches: ["master"]
-    pull_request:
-    merge_group:
-    workflow_dispatch:
+  push:
+    branches: ["master"]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
 
 concurrency:
-    group: ci-${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
-
-env:
-    PYTHON_VERSION: "3.14"
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions: {}
 
 jobs:
-    lint:
-        name: Lint
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        steps:
-            - uses: actions/checkout@v7
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TSDHN_MODEL_DIR: ${{ github.workspace }}/model
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
-              with:
-                  version-file: ".tool-versions"
-                  enable-cache: true
-                  cache-dependency-glob: "uv.lock"
+      - name: Install GMT (libgmt) and Ghostscript for pygmt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gmt libgmt-dev ghostscript
+          SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
+          if [ -z "$SO" ]; then
+              echo "::error::libgmt.so.* not found after apt install"
+              find /usr/lib -iname '*gmt*' -print || true
+              exit 1
+          fi
+          sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
 
-            - run: uv sync --all-packages --group dev --no-install-project
-            - run: uv run ruff check --select E,F,W,I,B,UP,S,SIM,RUF .
-            - run: uv run ruff format --check .
-            - run: uv run mypy --strict packages
+      - uses: jdx/mise-action@v5
+      - run: mise run install
+      - run: mise run check
 
-    test:
-        name: Test (py${{ matrix.python-version }})
-        runs-on: ubuntu-latest
-        env:
-            TSDHN_MODEL_DIR: ${{ github.workspace }}/model
-            # Coverage.py cannot trace Numba's compiled kernels.
-            NUMBA_DISABLE_JIT: "1"
-        strategy:
-            fail-fast: false
-            matrix:
-                python-version: ["3.14"]
-        steps:
-            - uses: actions/checkout@v7
-
-            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
-              with:
-                  version-file: ".tool-versions"
-                  python-version: ${{ matrix.python-version }}
-                  enable-cache: true
-                  cache-dependency-glob: "uv.lock"
-
-            - name: Install GMT (libgmt) and Ghostscript for pygmt
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends gmt libgmt-dev ghostscript
-                  SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
-                  if [ -z "$SO" ]; then
-                      echo "::error::libgmt.so.* not found after apt install"
-                      find /usr/lib -iname '*gmt*' -print || true
-                      exit 1
-                  fi
-                  sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
-
-            - run: uv sync --all-packages --group dev
-
-            - name: Run tests with coverage
-              run: |
-                      uv run pytest -n auto --maxfail=1 -q -m "not integration" \
-                      --cov=packages/tsdhn/tsdhn --cov=packages/api/api \
-                      --cov-report= --cov-fail-under=0
-
-            - name: Name coverage data
-              if: always()
-              run: |
-                  if [ -f .coverage ]; then
-                      mv .coverage ".coverage.${{ matrix.python-version }}"
-                  fi
-
-            - name: Upload coverage data
-              if: always()
-              uses: actions/upload-artifact@v7
-              with:
-                  name: coverage-data-${{ matrix.python-version }}
-                  path: .coverage.*
-                  include-hidden-files: true
-                  if-no-files-found: ignore
-
-    coverage:
-        name: Diff coverage gate
-        runs-on: ubuntu-latest
-        needs: [test, api-integration]
+      - name: Name coverage data
         if: always()
-        permissions:
-            contents: read
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                  fetch-depth: 0
+        run: |
+          if [ -f .coverage ]; then
+              mv .coverage .coverage.unit
+          fi
 
-            - name: Fetch master for the diff base
-              run: git fetch origin master:refs/remotes/origin/master
+      - name: Upload coverage data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-data-unit
+          path: |
+            .coverage.unit
+            apps/web/coverage/lcov.info
+          include-hidden-files: true
+          if-no-files-found: ignore
 
-            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
-              with:
-                  version-file: ".tool-versions"
-                  python-version: ${{ env.PYTHON_VERSION }}
-                  enable-cache: true
-                  cache-dependency-glob: "uv.lock"
+  integration:
+    name: Persistence integration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:18
+        env:
+          POSTGRES_USER: tsdhn
+          POSTGRES_PASSWORD: tsdhn
+          POSTGRES_DB: tsdhn
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-            - name: Sync coverage tool
-              run: uv sync --group dev --no-install-project
+      - uses: jdx/mise-action@v5
+      - run: mise run install
 
-            - name: Download coverage data
-              uses: actions/download-artifact@v8
-              with:
-                  pattern: coverage-data-*
-                  merge-multiple: true
+      - name: Run disposable database integration tests
+        run: mise run test:integration -- --coverage
+        env:
+          COMPUTE_DATABASE_URL: postgresql://tsdhn:tsdhn@localhost:5432/tsdhn
 
-            - name: Combine coverage and report the total
-              run: |
-                  uv run coverage combine
-                  uv run coverage html --skip-covered --skip-empty
-                  uv run coverage xml
-                  uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
-                  uv run coverage report
+      - name: Name coverage data
+        if: always()
+        run: |
+          if [ -f .coverage ]; then
+              mv .coverage .coverage.integration
+          fi
 
-            - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@v7
-              with:
-                  files: coverage.xml
-                  fail_ci_if_error: false
+      - name: Upload coverage data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-data-integration
+          path: .coverage.integration
+          include-hidden-files: true
+          if-no-files-found: ignore
 
-            - name: Enforce diff coverage on new/changed lines
-              run: |
-                  uv run diff-cover coverage.xml \
-                      --compare-branch=origin/master \
-                      --markdown-report diff-coverage.md \
-                      --fail-under=80
-                  cat diff-coverage.md >> "$GITHUB_STEP_SUMMARY"
+  coverage:
+    name: Diff coverage gates
+    runs-on: ubuntu-latest
+    needs: [check, integration]
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-            - name: Upload HTML coverage report
-              if: failure()
-              uses: actions/upload-artifact@v7
-              with:
-                  name: html-coverage-report
-                  path: htmlcov
+      - name: Fetch master for the diff base
+        run: git fetch origin master:refs/remotes/origin/master
 
-    web:
-        name: Web (lint, format, types)
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        steps:
-            - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: mise run install
 
-            - uses: oven-sh/setup-bun@v2
-              with:
-                  bun-version-file: ".tool-versions"
+      - name: Download coverage data
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-data-*
+          merge-multiple: true
 
-            - run: bun install --frozen-lockfile
-            - run: bun run lint
-            - run: bun run fmt:check
-            - run: bun --filter web check
+      - run: mise run coverage:merge
 
-    web-test:
-        name: Web tests (diff coverage gate)
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                  fetch-depth: 0
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
 
-            - name: Fetch master for the diff base
-              run: git fetch origin master:refs/remotes/origin/master
+      - run: mise run diff-coverage:py
+      - run: mise run diff-coverage:web
 
-            - uses: oven-sh/setup-bun@v2
-              with:
-                  bun-version-file: ".tool-versions"
+      - name: Report diff coverage
+        if: always()
+        run: |
+          for report in diff-coverage.md diff-coverage-web.md; do
+              if [ -f "$report" ]; then
+                  cat "$report" >> "$GITHUB_STEP_SUMMARY"
+              fi
+          done
 
-            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
-              with:
-                  version-file: ".tool-versions"
-                  python-version: ${{ env.PYTHON_VERSION }}
-                  enable-cache: true
-                  cache-dependency-glob: "uv.lock"
+      - name: Upload HTML coverage report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: html-coverage-report
+          path: htmlcov
 
-            - run: bun install --frozen-lockfile
-            - run: uv sync --group dev --no-install-project
+  contract:
+    name: API client contract (no drift)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-            - run: bun --filter web test:coverage
+      - name: Install GMT (libgmt) for pygmt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gmt libgmt-dev
+          SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
+          [ -n "$SO" ] && sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
 
-            - name: Enforce diff coverage on new/changed lines
-              run: |
-                  # lcov paths are relative to apps/web; diff-cover runs at the root.
-                  sed -i 's|^SF:|SF:apps/web/|' apps/web/coverage/lcov.info
-                  uv run diff-cover apps/web/coverage/lcov.info \
-                      --compare-branch=origin/master \
-                      --markdown-report diff-coverage-web.md \
-                      --fail-under=80
-                  cat diff-coverage-web.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: jdx/mise-action@v5
+      - run: mise run install
+      - run: mise run gen:client
 
-    api-integration:
-        name: Persistence integration
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        services:
-            postgres:
-                image: public.ecr.aws/docker/library/postgres:18
-                env:
-                    POSTGRES_USER: tsdhn
-                    POSTGRES_PASSWORD: tsdhn
-                    POSTGRES_DB: tsdhn
-                options: >-
-                    --health-cmd pg_isready
-                    --health-interval 10s
-                    --health-timeout 5s
-                    --health-retries 5
-                ports:
-                    - 5432:5432
-        steps:
-            - uses: actions/checkout@v7
-
-            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
-              with:
-                  version-file: ".tool-versions"
-                  python-version: ${{ env.PYTHON_VERSION }}
-                  enable-cache: true
-                  cache-dependency-glob: "uv.lock"
-
-            - run: uv sync --all-packages --group dev
-
-            - uses: oven-sh/setup-bun@v2
-              with:
-                  bun-version-file: ".tool-versions"
-
-            - run: bun install --frozen-lockfile
-
-            - name: Run disposable database integration tests
-              run: bash scripts/integration.sh --coverage
-              env:
-                  COMPUTE_DATABASE_URL: postgresql://tsdhn:tsdhn@localhost:5432/tsdhn
-
-            - name: Name coverage data
-              if: always()
-              run: |
-                  if [ -f .coverage ]; then
-                      mv .coverage .coverage.integration
-                  fi
-
-            - name: Upload coverage data
-              if: always()
-              uses: actions/upload-artifact@v7
-              with:
-                  name: coverage-data-integration
-                  path: .coverage.integration
-                  include-hidden-files: true
-                  if-no-files-found: ignore
-
-    contract:
-        name: API client contract (no drift)
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        steps:
-            - uses: actions/checkout@v7
-
-            - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # 10.3.0
-              with:
-                  version-file: ".tool-versions"
-                  python-version: ${{ env.PYTHON_VERSION }}
-                  enable-cache: true
-                  cache-dependency-glob: "uv.lock"
-
-            - name: Install GMT (libgmt) for pygmt
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends gmt libgmt-dev
-                  SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
-                  [ -n "$SO" ] && sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
-
-            - run: uv sync --all-packages --group dev
-
-            - uses: oven-sh/setup-bun@v2
-              with:
-                  bun-version-file: ".tool-versions"
-
-            - run: bun install --frozen-lockfile
-            - run: bun run gen:client
-
-            - name: Fail on drift
-              run: |
-                  if ! git diff --quiet libs/api-client; then
-                      echo "::error::@tsdhn/api-client is stale. Run 'bun run gen:client' and commit."
-                      git diff libs/api-client
-                      exit 1
-                  fi
+      - name: Fail on drift
+        run: |
+          if ! git diff --quiet libs/api-client; then
+              echo "::error::@tsdhn/api-client is stale. Run 'mise run gen:client' and commit."
+              git diff libs/api-client
+              exit 1
+          fi

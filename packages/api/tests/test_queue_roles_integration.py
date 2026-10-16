@@ -638,18 +638,19 @@ async def test_the_provisioned_roles_run_the_real_enqueue_and_claim_paths(
     finally:
         await worker_pool.close()
 
-    async with db.acquire() as connection:
-        row = await connection.fetchrow(
+    async with db.acquire() as checker:
+        row = await checker.fetchrow(
             f"SELECT state, attempt FROM {SCHEMA}.jobs WHERE id = $1",  # noqa: S608
             first.id,
         )
-        attempts = await connection.fetchval(
+        attempts = await checker.fetchval(
             f"SELECT count(*) FROM {SCHEMA}.job_attempts WHERE job_id = $1",  # noqa: S608
             first.id,
         )
 
     assert first.id == second.id
     assert ran == ["yes"]
+    assert row is not None
     assert (row["state"], row["attempt"]) == ("succeeded", 1)
     assert attempts == 1
 

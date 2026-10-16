@@ -7,7 +7,6 @@ set -euo pipefail
 # Project language tooling is intentionally out of scope. Use:
 #   mise install
 #   mise run install
-#   mise run web-install
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TOOLS_DIR="${TSDHN_TOOLS_DIR:-$ROOT_DIR/.tsdhn/tools}"
@@ -40,7 +39,7 @@ Options:
   --skip-ifx         Do not install Intel Fortran Essentials.
   --skip-tools       Do not compile fault_plane/deform/tsunami. These
                      legacy binaries are used only by the parity suite
-                     (mise run test-parity); the pipeline itself is pure
+                     (mise run test:parity); the pipeline itself is pure
                      Python and does not need them.
   --tools-dir DIR    Directory for compiled model executables.
   -h, --help         Show this help.
@@ -374,4 +373,4 @@ log_ok "Runtime setup complete"
 printf "\nFor local CLI/API runs, load runtime paths with:\n"
 printf "  source %s\n" "$ENV_FILE"
 printf "\nProject dependencies are still managed separately:\n"
-printf "  mise install && mise run install && mise run web-install\n"
+printf "  mise install && mise run install\n"

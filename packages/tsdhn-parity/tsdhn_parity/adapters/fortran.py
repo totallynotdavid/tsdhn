@@ -13,7 +13,7 @@ from tsdhn_parity.cases import Case
 from tsdhn_parity.trace import Checkpoint, Trace
 
 SKIP_REASON = (
-    "requires the real compiled toolchain (TSDHN_TOOLS_DIR); see mise run test-parity"
+    "requires the real compiled toolchain (TSDHN_TOOLS_DIR); see mise run test:parity"
 )
 
 

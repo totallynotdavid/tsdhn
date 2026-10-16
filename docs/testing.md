@@ -2,14 +2,16 @@
 
 Each suite answers a different question.
 
-| Command                     | Question                                                                         | Needs                                                                     |
-| --------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `mise run test`             | Do the Python units behave as specified?                                         | nothing                                                                   |
-| `mise run web-test`         | Do the web units behave as specified?                                            | nothing                                                                   |
-| `mise run test-integration` | Do the queue, roles, migrations and backups work?                                | PostgreSQL, which the task starts; Docker for the backup and expiry tests |
-| `mise run test-golden`      | Did the full pipeline output change?                                             | GMT and `ttt_client`                                                      |
-| `mise run test-parity`      | Does Python match the MATLAB and Fortran runs?                                   | `TSDHN_TOOLS_DIR` for Fortran cases                                       |
-| `mise run lint-all`         | Do the linters pass, and do the Dockerfile tool versions match `.tool-versions`? | nothing                                                                   |
+| Command                     | Question                                          | Needs                                                                     |
+| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| `mise run test:py`          | Do the Python units behave as specified?          | nothing                                                                   |
+| `mise run test:web`         | Do the web units behave as specified?             | nothing                                                                   |
+| `mise run test:integration` | Do the queue, roles, migrations and backups work? | PostgreSQL, which the task starts; Docker for the backup and expiry tests |
+| `mise run test:golden`      | Did the full pipeline output change?              | GMT and `ttt_client`                                                      |
+| `mise run test:parity`      | Does Python match the MATLAB and Fortran runs?    | `TSDHN_TOOLS_DIR` for Fortran cases                                       |
+
+`mise run test` runs `test:py` and `test:web`. `mise run check` runs lint,
+typecheck, test and build.
 
 Run one test with:
 
@@ -19,7 +21,7 @@ uv run pytest packages/tsdhn/tests/test_tsunami.py::test_mass_step_hand_computed
 
 ## Fast tests
 
-`mise run test` runs the Python suite without services or GMT. When the GMT
+`mise run test:py` runs the Python suite without services or GMT. When the GMT
 library cannot load, pytest names the GMT-backed module it does not collect in
 its report header. The suite covers source parameters, longitude conversion,
 file formats, numerical update rules, checkpoints, resume behavior and report
@@ -27,7 +29,7 @@ transformations with focused inputs.
 
 ## Backup and restore test
 
-`mise run test-integration` includes
+`mise run test:integration` includes
 `packages/api/tests/test_backup_restore.py`. It builds the backup image and
 starts throwaway PostgreSQL and RustFS containers: a source holding a finished
 job, an off-host bucket and an empty target. It runs `tsdhn-backup backup` and
@@ -53,13 +55,13 @@ does not answer. It skips when Docker is missing.
 
 ## Golden tests
 
-`mise run test-golden` runs the full Python pipeline. It checks output sets,
+`mise run test:golden` runs the full Python pipeline. It checks output sets,
 fixed-width fingerprints and selected spatial values for a saved scenario. A
 golden result tells you whether the output changed for that scenario.
 
 ## Parity tests
 
-`mise run test-parity` compares Python checkpoints with saved MATLAB data and
+`mise run test:parity` compares Python checkpoints with saved MATLAB data and
 compiled Fortran output within an explicit tolerance. [Parity](parity.md)
 describes the references, the Fortran tools and the MATLAB capture.
 

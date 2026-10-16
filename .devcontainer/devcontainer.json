@@ -1,44 +1,43 @@
 {
-    "name": "TSDHN",
-    "image": "ghcr.io/totallynotdavid/tsdhn-dev:master",
-    "workspaceFolder": "/app",
-    "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
+  "name": "TSDHN",
+  "image": "ghcr.io/totallynotdavid/tsdhn-dev:master",
+  "workspaceFolder": "/app",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
 
-    "hostRequirements": {
-        "cpus": 4,
-        "memory": "16gb",
-        "storage": "32gb"
-    },
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "32gb"
+  },
 
-    "remoteUser": "appuser",
+  "remoteUser": "appuser",
 
-    "forwardPorts": [8000],
-    "portsAttributes": {
-        "8000": {
-            "label": "TSDHN API",
-            "onAutoForward": "notify"
-        }
-    },
-
-    "customizations": {
-        "vscode": {
-            "settings": {
-                "python.defaultInterpreterPath": "/opt/venv/bin/python",
-                "python.linting.pylintEnabled": true,
-                "python.linting.enabled": true,
-                "editor.formatOnSave": true,
-                "terminal.integrated.defaultProfile.linux": "bash",
-                "terminal.integrated.profiles.linux": {
-                    "bash": {
-                        "path": "/bin/bash"
-                    }
-                },
-                "files.eol": "\n"
-            },
-
-            "extensions": [
-                "ms-python.python"
-            ]
-        }
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "TSDHN API",
+      "onAutoForward": "notify"
     }
+  },
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        },
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "/bin/bash"
+          }
+        },
+        "files.eol": "\n"
+      },
+
+      "extensions": ["ms-python.python", "charliermarsh.ruff"]
+    }
+  }
 }

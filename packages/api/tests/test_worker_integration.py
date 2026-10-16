@@ -229,6 +229,7 @@ async def test_an_undecodable_payload_fails_before_the_handler_runs(
         row = await conn.fetchrow(
             f"SELECT state, attempt, error_type FROM {COMPUTE_QUEUE_SCHEMA}.jobs"  # noqa: S608
         )
+    assert row is not None
     assert row["state"] == "failed"
     assert row["error_type"] == "PayloadDecodeError"
 

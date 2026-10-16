@@ -1,2 +1,0 @@
-# .env.example:26 is empty; generic-api-key matched "TSDHN_S3_ACCESS_KEY=" and took the next line as its secret.
-50fee6720edcb9397866b97fb8e50fdb835376bd:.env.example:generic-api-key:26

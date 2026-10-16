@@ -1,10 +1,10 @@
 # Compute API and worker image.
 # The toolchain base provides GMT, Intel Fortran, and ttt_client.
 #
-# Build context is the repo root. The UV_VERSION default mirrors .tool-versions
-# `mise run lint-all` enforces it. Builds that read .tool-versions pass it explicitly.
+# Build context is the repo root. Pass UV_VERSION as a build argument; the uv
+# version is pinned in mise.toml, and `mise current uv` prints it.
 ARG TOOLCHAIN_IMAGE=ghcr.io/totallynotdavid/tsdhn-toolchain:master
-ARG UV_VERSION=0.13.0
+ARG UV_VERSION
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 FROM ${TOOLCHAIN_IMAGE}
