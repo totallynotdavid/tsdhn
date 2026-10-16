@@ -27,11 +27,11 @@ __all__ = [
     "S3_ACCESS_KEY",
     "S3_BUCKET",
     "S3_ENDPOINT",
-    "S3_PUBLIC_ENDPOINT",
     "S3_SECRET_KEY",
     "S3_SECURE",
     "SSE_MAX_DURATION",
     "WORKER_CONCURRENCY",
+    "WORKER_HEARTBEAT_FILE",
     "WORKER_ID",
     "WORKER_LEASE_SECONDS",
     "api_pool_size",
@@ -71,6 +71,14 @@ WORKER_CONCURRENCY = int(os.environ.get("TSDHN_WORKER_CONCURRENCY", "1"))
 WORKER_LEASE_SECONDS = float(os.environ.get("TSDHN_WORKER_LEASE_SECONDS", "60"))
 
 WORKER_ID = os.environ.get("TSDHN_WORKER_ID", "")
+
+# The worker touches this file while it can reach the database. When unset, the
+# worker does not write a heartbeat file.
+WORKER_HEARTBEAT_FILE: Path | None = (
+    Path(os.environ["TSDHN_WORKER_HEARTBEAT_FILE"])
+    if os.environ.get("TSDHN_WORKER_HEARTBEAT_FILE")
+    else None
+)
 
 
 def api_pool_size() -> tuple[int, int]:
@@ -137,9 +145,6 @@ def role_database_url(role: str, password: str) -> str:
 
 
 S3_ENDPOINT = os.environ.get("TSDHN_S3_ENDPOINT", "localhost:9000")
-# Browsers download from this endpoint, which can differ from the one the API
-# uploads to.
-S3_PUBLIC_ENDPOINT = os.environ.get("TSDHN_S3_PUBLIC_ENDPOINT", S3_ENDPOINT)
 S3_ACCESS_KEY = os.environ.get("TSDHN_S3_ACCESS_KEY", "tsdhn-local")
 S3_SECRET_KEY = os.environ.get("TSDHN_S3_SECRET_KEY", "tsdhn-local-secret")
 S3_BUCKET = os.environ.get("TSDHN_S3_BUCKET", "tsdhn-results")

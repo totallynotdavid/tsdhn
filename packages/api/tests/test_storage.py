@@ -71,7 +71,7 @@ def test_upload_simulation_result_wraps_storage_failure(tmp_path: Path) -> None:
 def test_presigned_url_wraps_storage_failure() -> None:
     store = OutputStore.__new__(OutputStore)
     store.bucket = "tsdhn-results"
-    store._public_client = _RaisingPresignClient()  # type: ignore[assignment]
+    store._client = _RaisingPresignClient()  # type: ignore[assignment]
 
     with pytest.raises(TransientInfraError, match="presigning output URL failed"):
         store.presigned_url("simulations/job-1/result.pdf", filename="result.pdf")
@@ -114,11 +114,11 @@ def test_upload_simulation_result_creates_bucket_and_persists_manifest(
     assert client.metadata_uploads[0]["content_type"] == "application/json"
 
 
-def test_presigned_url_uses_public_storage_and_download_filename() -> None:
+def test_presigned_url_names_the_download_filename() -> None:
     store = OutputStore.__new__(OutputStore)
     store.bucket = "tsdhn-results"
     client = _RecordingStorageClient()
-    store._public_client = client  # type: ignore[assignment]
+    store._client = client  # type: ignore[assignment]
 
     url = store.presigned_url("simulations/job-1/result.pdf", filename="result.pdf")
 
@@ -131,7 +131,7 @@ def test_presigned_url_uses_public_storage_and_download_filename() -> None:
     }
 
 
-def test_public_client_uses_fixed_s3_region(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_client_uses_fixed_s3_region(monkeypatch: pytest.MonkeyPatch) -> None:
     clients: list[dict[str, Any]] = []
 
     class _RecordingClient:
@@ -142,4 +142,4 @@ def test_public_client_uses_fixed_s3_region(monkeypatch: pytest.MonkeyPatch) -> 
 
     OutputStore()
 
-    assert clients[1]["region"] == "us-east-1"
+    assert [client["region"] for client in clients] == ["us-east-1"]

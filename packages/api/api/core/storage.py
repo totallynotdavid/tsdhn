@@ -13,7 +13,6 @@ from api.core.settings import (
     S3_ACCESS_KEY,
     S3_BUCKET,
     S3_ENDPOINT,
-    S3_PUBLIC_ENDPOINT,
     S3_SECRET_KEY,
     S3_SECURE,
 )
@@ -30,21 +29,13 @@ class OutputStore:
             access_key=S3_ACCESS_KEY,
             secret_key=S3_SECRET_KEY,
             secure=S3_SECURE,
+            # A fixed region makes presigning local arithmetic. Without one the
+            # client asks the endpoint for the bucket region first.
+            region="us-east-1",
             http_client=urllib3.PoolManager(
                 timeout=urllib3.Timeout(connect=2.0, read=2.0),
                 retries=False,
             ),
-        )
-        # Browser downloads may use a different endpoint from uploads.
-        self._public_client = S3Client(
-            S3_PUBLIC_ENDPOINT,
-            access_key=S3_ACCESS_KEY,
-            secret_key=S3_SECRET_KEY,
-            secure=S3_SECURE,
-            # Presigning is local arithmetic, but without a region the client
-            # asks the endpoint for the bucket region, and the browser-facing
-            # endpoint is not reachable from inside the API container.
-            region="us-east-1",
         )
 
     def is_connected(self) -> bool:
@@ -104,7 +95,7 @@ class OutputStore:
     def presigned_url(self, object_name: str, *, filename: str) -> str:
         """Return a short-lived URL for downloading an output file."""
         try:
-            return self._public_client.presigned_get_object(
+            return self._client.presigned_get_object(
                 bucket_name=self.bucket,
                 object_name=object_name,
                 expires=timedelta(seconds=OUTPUT_URL_TTL),
