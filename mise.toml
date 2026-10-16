@@ -106,41 +106,7 @@ dev-logs = """
 docker compose --profile web logs -f
 """
 
-env-init = """
-if [ -e .env ] || [ -L .env ]; then
-  echo "Refusing to overwrite existing .env" >&2
-  exit 1
-fi
-
-umask 077
-tmp_file="$(mktemp .env.XXXXXX)"
-trap 'rm -f "$tmp_file"' EXIT
-compute_api_token="$(openssl rand -hex 32)"
-better_auth_secret="$(openssl rand -hex 32)"
-app_db_password="$(openssl rand -hex 32)"
-compute_producer_password="$(openssl rand -hex 32)"
-compute_worker_password="$(openssl rand -hex 32)"
-compute_purger_password="$(openssl rand -hex 32)"
-awk \
-  -v compute_api_token="$compute_api_token" \
-  -v better_auth_secret="$better_auth_secret" \
-  -v app_db_password="$app_db_password" \
-  -v compute_producer_password="$compute_producer_password" \
-  -v compute_worker_password="$compute_worker_password" \
-  -v compute_purger_password="$compute_purger_password" '
-  /^COMPUTE_API_TOKEN=/ { print "COMPUTE_API_TOKEN=" compute_api_token; next }
-  /^BETTER_AUTH_SECRET=/ { print "BETTER_AUTH_SECRET=" better_auth_secret; next }
-  /^APP_DB_PASSWORD=/ { print "APP_DB_PASSWORD=" app_db_password; next }
-  /^COMPUTE_PRODUCER_PASSWORD=/ { print "COMPUTE_PRODUCER_PASSWORD=" compute_producer_password; next }
-  /^COMPUTE_WORKER_PASSWORD=/ { print "COMPUTE_WORKER_PASSWORD=" compute_worker_password; next }
-  /^COMPUTE_PURGER_PASSWORD=/ { print "COMPUTE_PURGER_PASSWORD=" compute_purger_password; next }
-  { print }
-' .env.example > "$tmp_file"
-chmod 600 "$tmp_file"
-mv "$tmp_file" .env
-trap - EXIT
-echo "Created .env with generated secrets (mode 600)."
-"""
+env-init = "scripts/env-init.sh .env"
 
 dev = """
 if [ ! -e .env ]; then
@@ -159,9 +125,7 @@ DOCKER_CONFIG="$docker_config" BUILDX_CONFIG="$buildx_config" \
 docker compose --profile web up -d --build
 
 for _ in $(seq 1 60); do
-  health="$(curl -fsS http://localhost:8000/api/v1/health 2>/dev/null || true)"
-  if echo "$health" | grep -q '"database_connected":true' \
-    && echo "$health" | grep -q '"storage_connected":true' \
+  if curl -fsS http://localhost:8000/api/v1/health >/dev/null 2>&1 \
     && curl -fsS http://localhost:3000 >/dev/null; then
     echo "Web: http://localhost:3000"
     echo "API docs: http://localhost:8000/api-docs"

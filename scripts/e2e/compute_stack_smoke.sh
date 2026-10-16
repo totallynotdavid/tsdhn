@@ -177,9 +177,10 @@ assert_output_is_downloadable() {
     )"
     test -n "$location"
 
-    # The URL must be usable from the browser-facing endpoint.
+    # The URL names the storage endpoint the web container reaches. The signed
+    # host stays intact. Only the connection goes to the published port.
     downloaded="$(mktemp "${TMPDIR:-/tmp}/tsdhn-output.XXXXXX")"
-    curl -fsS "$location" -o "$downloaded"
+    curl -fsS --connect-to storage:9000:localhost:9000 "$location" -o "$downloaded"
     bytes="$(head -c 4 "$downloaded")"
     rm -f "$downloaded"
     test "$bytes" = "%PDF"

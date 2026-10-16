@@ -1,0 +1,234 @@
+# Production stack. Every setting comes from one env file kept outside the
+# repository; see docs/deploy.md. Compose refuses to start when a required
+# value is missing.
+name: tsdhn-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tsdhn
+      POSTGRES_USER: tsdhn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the env file}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks: [backend]
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsdhn -d tsdhn"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  storage:
+    image: docker.io/rustfs/rustfs:1.0.1
+    restart: unless-stopped
+    command: ["/data"]
+    environment:
+      RUSTFS_ACCESS_KEY: ${TSDHN_S3_ACCESS_KEY:?set TSDHN_S3_ACCESS_KEY in the env file}
+      RUSTFS_SECRET_KEY: ${TSDHN_S3_SECRET_KEY:?set TSDHN_S3_SECRET_KEY in the env file}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+    volumes:
+      - storage-data:/data
+    networks: [backend]
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  compute-migrate:
+    image: ${API_IMAGE:?set API_IMAGE in the env file}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      COMPUTE_DATABASE_URL: postgresql://tsdhn:${POSTGRES_PASSWORD}@postgres:5432/tsdhn
+      COMPUTE_QUEUE: ${COMPUTE_QUEUE:-simulations}
+      COMPUTE_QUEUE_SCHEMA: ${COMPUTE_QUEUE_SCHEMA:-task_queue}
+      APP_DB_ROLE: ${APP_DB_ROLE:-tsdhn_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in the env file}
+      COMPUTE_PRODUCER_ROLE: ${COMPUTE_PRODUCER_ROLE:-tsdhn_producer}
+      COMPUTE_PRODUCER_PASSWORD: ${COMPUTE_PRODUCER_PASSWORD:?set COMPUTE_PRODUCER_PASSWORD in the env file}
+      COMPUTE_WORKER_ROLE: ${COMPUTE_WORKER_ROLE:-tsdhn_worker}
+      COMPUTE_WORKER_PASSWORD: ${COMPUTE_WORKER_PASSWORD:?set COMPUTE_WORKER_PASSWORD in the env file}
+      COMPUTE_PURGER_ROLE: ${COMPUTE_PURGER_ROLE:-tsdhn_purger}
+      COMPUTE_PURGER_PASSWORD: ${COMPUTE_PURGER_PASSWORD:?set COMPUTE_PURGER_PASSWORD in the env file}
+    command:
+      [
+        "sh",
+        "-lc",
+        "uv run --no-dev tsdhn-compute-migrate && uv run --no-dev rqueue --database-url \"$$COMPUTE_DATABASE_URL\" --schema \"$$COMPUTE_QUEUE_SCHEMA\" migrate && uv run --no-dev tsdhn-queue-grants",
+      ]
+    restart: "no"
+    networks: [backend]
+    logging: *logging
+
+  api:
+    image: ${API_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      compute-migrate:
+        condition: service_completed_successfully
+      storage:
+        condition: service_healthy
+    environment:
+      COMPUTE_RUNTIME_DATABASE_URL: postgresql://postgres:5432/tsdhn
+      COMPUTE_QUEUE: ${COMPUTE_QUEUE:-simulations}
+      COMPUTE_QUEUE_SCHEMA: ${COMPUTE_QUEUE_SCHEMA:-task_queue}
+      TSDHN_S3_ENDPOINT: storage:9000
+      # The web app downloads each output from storage and streams it to the
+      # browser, so download URLs name the internal endpoint.
+      TSDHN_S3_ACCESS_KEY: ${TSDHN_S3_ACCESS_KEY}
+      TSDHN_S3_SECRET_KEY: ${TSDHN_S3_SECRET_KEY}
+      TSDHN_S3_BUCKET: ${TSDHN_S3_BUCKET:-tsdhn-results}
+      COMPUTE_API_TOKEN: ${COMPUTE_API_TOKEN:?set COMPUTE_API_TOKEN in the env file}
+      COMPUTE_PRODUCER_ROLE: ${COMPUTE_PRODUCER_ROLE:-tsdhn_producer}
+      COMPUTE_PRODUCER_PASSWORD: ${COMPUTE_PRODUCER_PASSWORD}
+    networks: [backend]
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 60s
+
+  worker:
+    image: ${API_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      compute-migrate:
+        condition: service_completed_successfully
+      storage:
+        condition: service_healthy
+    environment:
+      COMPUTE_RUNTIME_DATABASE_URL: postgresql://postgres:5432/tsdhn
+      COMPUTE_QUEUE: ${COMPUTE_QUEUE:-simulations}
+      COMPUTE_QUEUE_SCHEMA: ${COMPUTE_QUEUE_SCHEMA:-task_queue}
+      TSDHN_S3_ENDPOINT: storage:9000
+      TSDHN_S3_ACCESS_KEY: ${TSDHN_S3_ACCESS_KEY}
+      TSDHN_S3_SECRET_KEY: ${TSDHN_S3_SECRET_KEY}
+      TSDHN_S3_BUCKET: ${TSDHN_S3_BUCKET:-tsdhn-results}
+      TSDHN_MODEL_DIR: /app/model
+      TSDHN_JOBS_DIR: /var/tmp/jobs
+      TSDHN_WORKER_HEARTBEAT_FILE: /var/tmp/worker-heartbeat
+      COMPUTE_WORKER_ROLE: ${COMPUTE_WORKER_ROLE:-tsdhn_worker}
+      COMPUTE_WORKER_PASSWORD: ${COMPUTE_WORKER_PASSWORD}
+      COMPUTE_PURGER_ROLE: ${COMPUTE_PURGER_ROLE:-tsdhn_purger}
+      COMPUTE_PURGER_PASSWORD: ${COMPUTE_PURGER_PASSWORD}
+    command: ["uv", "run", "--no-dev", "tsdhn-worker"]
+    volumes:
+      - jobs-data:/var/tmp/jobs
+    networks: [backend]
+    logging: *logging
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "test $$(( $$(date +%s) - $$(stat -c %Y /var/tmp/worker-heartbeat) )) -lt 60",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  web-migrate:
+    image: ${WEB_IMAGE:?set WEB_IMAGE in the env file}
+    depends_on:
+      compute-migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://tsdhn:${POSTGRES_PASSWORD}@postgres:5432/tsdhn
+    command: ["bun", "run", "db:migrate"]
+    restart: "no"
+    networks: [backend]
+    logging: *logging
+
+  web-grants:
+    image: ${API_IMAGE}
+    depends_on:
+      web-migrate:
+        condition: service_completed_successfully
+    environment:
+      COMPUTE_DATABASE_URL: postgresql://tsdhn:${POSTGRES_PASSWORD}@postgres:5432/tsdhn
+      APP_DB_ROLE: ${APP_DB_ROLE:-tsdhn_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    command: ["uv", "run", "--no-dev", "tsdhn-web-grants"]
+    restart: "no"
+    networks: [backend]
+    logging: *logging
+
+  web:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      web-grants:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    environment:
+      COMPUTE_API_URL: http://api:8000
+      COMPUTE_API_TOKEN: ${COMPUTE_API_TOKEN}
+      DATABASE_URL: postgresql://${APP_DB_ROLE:-tsdhn_app}:${APP_DB_PASSWORD}@postgres:5432/tsdhn
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in the env file}
+      ORIGIN: ${ORIGIN:?set ORIGIN in the env file}
+    # Loopback only, for checks from this host. Cloudflared reaches web over
+    # the edge network.
+    ports:
+      - "127.0.0.1:${TSDHN_WEB_PORT:-3000}:3000"
+    networks: [backend, edge]
+    logging: *logging
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:2026.10.1
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in the env file}
+    networks: [edge]
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+
+networks:
+  # This network has no route to the internet or the host. PostgreSQL, storage,
+  # the API, and the worker use it only for backend traffic.
+  backend:
+    internal: true
+  edge:
+
+volumes:
+  postgres-data:
+  storage-data:
+  jobs-data:
