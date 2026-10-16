@@ -11,6 +11,9 @@ read [Database](database.md). For running the services, read
 Browser
   |
   v
+Edge route (see [Deploy](deploy.md#cloudflare-edge-route))
+  |
+  v
 SvelteKit web app
   |-- users, sessions, and simulations in public
   |-- reads current jobs from compute.jobs
@@ -31,7 +34,7 @@ and no browser code in the web app calls the compute API.
 ```text
 .github/                  Contributing guide and workflows
 apps/web/                 SvelteKit web app
-deploy/                   Container images and the production Compose file
+deploy/                   Container images, edge Worker and production Compose file
 docs/                     Project manual
 libs/api-client/          Generated TypeScript client
 model/                    Model inputs and Fortran reference programs

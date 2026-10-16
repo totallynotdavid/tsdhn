@@ -128,8 +128,8 @@ uses the same engine socket setup as the mise tasks:
 ## Production
 
 [`deploy/compose.prod.yml`](../deploy/compose.prod.yml) runs the stack on one
-host. It builds nothing: it pulls the API, web and backup images you name, and
-Cloudflare Tunnel is the only way in from the internet. The only traffic that
+host. It builds nothing: it pulls the API, web and backup images you name. The
+Cloudflare Tunnel carries the web route to the Worker. The only traffic that
 leaves the host besides the tunnel is the daily backup to an S3-compatible
 bucket ([Backup and restore](#backup-and-restore)).
 
@@ -187,7 +187,7 @@ Edit these values in the production section and above it:
 
 | Variable                  | Value                                                              |
 | ------------------------- | ------------------------------------------------------------------ |
-| `ORIGIN`                  | Public URL of the site, such as `https://tsdhn.example.org`        |
+| `ORIGIN`                  | `https://tsdhn.caefisica.workers.dev`                              |
 | `API_IMAGE`               | API image reference                                                |
 | `WEB_IMAGE`               | Web image reference                                                |
 | `TUNNEL_TOKEN`            | Token of the Cloudflare tunnel                                     |
@@ -210,12 +210,34 @@ alias tsdhn-prod='sudo docker compose --env-file /etc/tsdhn/prod.env -f deploy/c
 
 Compose stops with the name of any missing required value.
 
-### Cloudflare Tunnel
+### Cloudflare edge route
 
-The tunnel is remotely managed. In the Zero Trust dashboard, create a tunnel,
-copy its token into `TUNNEL_TOKEN` and add one public hostname whose service is
-`http://web:3000`. The hostname must match `ORIGIN`. `cloudflared` joins the
-`edge` network, where `web` resolves.
+The public route is the `tsdhn` Worker, the `tsdhn-web` Workers VPC service and
+the `tsdhn` tunnel. From the web container outward, the route is:
+
+```text
+web:3000 -> tsdhn tunnel -> tsdhn-web VPC service -> tsdhn Worker
+```
+
+Requests enter that route in the opposite direction. The tunnel has no public
+hostname. `cloudflared` joins the `edge` network, where `web` resolves, and the
+VPC service reaches that container through the tunnel.
+
+The Worker source and its VPC binding live in
+[`deploy/edge/src/index.ts`](../deploy/edge/src/index.ts) and
+[`deploy/edge/cloudflare.config.ts`](../deploy/edge/cloudflare.config.ts).
+Deploy it from that directory:
+
+```sh
+cd deploy/edge
+bunx cf deploy
+```
+
+The Worker keeps the public workers.dev host and forwards the request to the VPC
+binding over HTTP. A VPC service that accepts only HTTP refuses an HTTPS URL, so
+the Worker changes the forwarded URL's scheme to `http:` and sets
+`x-forwarded-proto: https` for the web app. `ORIGIN` must be the Worker's
+workers.dev URL so origin checks use the public address.
 
 The progress stream stays open for up to `TSDHN_SSE_MAX_DURATION_SECONDS`
 (1800). Inside the stack nothing closes it early: the API sends a `: keepalive`
