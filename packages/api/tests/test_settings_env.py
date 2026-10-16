@@ -70,6 +70,35 @@ def test_unprefixed_names_are_ignored() -> None:
     }
 
 
+def _setting(name: str, env: dict[str, str]) -> object:
+    result = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-c",
+            f"import json; from api.core import settings; "
+            f"print(json.dumps(settings.{name}))",
+        ],
+        env={"PATH": "", **env},
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    )
+    return json.loads(result.stdout)
+
+
+def test_retention_runs_unless_turned_off() -> None:
+    assert _setting("RETENTION_ENABLED", {}) is True
+    assert _setting("RETENTION_ENABLED", {"TSDHN_RETENTION_ENABLED": "true"}) is True
+    assert _setting("RETENTION_ENABLED", {"TSDHN_RETENTION_ENABLED": "false"}) is False
+    assert _setting("RETENTION_ENABLED", {"TSDHN_RETENTION_ENABLED": "0"}) is False
+
+
+def test_the_signing_region_defaults_to_us_east_1_and_can_be_auto() -> None:
+    assert _setting("S3_REGION", {}) == "us-east-1"
+    assert _setting("S3_REGION", {"TSDHN_S3_REGION": "auto"}) == "auto"
+
+
 def test_compose_owns_the_runtime_database_endpoint() -> None:
     compose = (REPO_ROOT / "docker-compose.yml").read_text()
     example = (REPO_ROOT / ".env.example").read_text()

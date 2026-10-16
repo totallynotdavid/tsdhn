@@ -3,6 +3,7 @@ import json
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -70,6 +71,7 @@ def _async(value: Any) -> Callable[..., Any]:
 def test_health_is_unauthenticated(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    _stub_queue_age(monkeypatch, 0.0)
     monkeypatch.setattr(repository, "is_database_connected", _async(True))
     monkeypatch.setattr(output_store, "is_connected", lambda: True)
 
@@ -81,7 +83,62 @@ def test_health_is_unauthenticated(
         "timestamp",
         "database_connected",
         "storage_connected",
+        "oldest_queued_age_seconds",
     }
+
+
+def _stub_queue_age(monkeypatch: pytest.MonkeyPatch, age: float | Exception) -> None:
+    async def oldest_queued_age_seconds(**_kwargs: Any) -> float:
+        if isinstance(age, Exception):
+            raise age
+        return age
+
+    monkeypatch.setattr(
+        routes_module, "get_queue", lambda: SimpleNamespace(schema="q", name="n")
+    )
+    monkeypatch.setattr(
+        repository, "oldest_queued_age_seconds", oldest_queued_age_seconds
+    )
+
+
+def test_health_reports_the_age_of_the_oldest_queued_job_and_stays_healthy(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_queue_age(monkeypatch, 5400.5)
+    monkeypatch.setattr(repository, "is_database_connected", _async(True))
+    monkeypatch.setattr(output_store, "is_connected", lambda: True)
+
+    response = client.get("/api/v1/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+    assert response.json()["oldest_queued_age_seconds"] == 5400.5
+
+
+def test_health_reports_no_age_when_the_database_does_not_answer(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_queue_age(monkeypatch, 1.0)
+    monkeypatch.setattr(repository, "is_database_connected", _async(False))
+    monkeypatch.setattr(output_store, "is_connected", lambda: True)
+
+    response = client.get("/api/v1/health")
+
+    assert response.status_code == 503
+    assert response.json()["oldest_queued_age_seconds"] is None
+
+
+def test_health_survives_a_failed_queue_age_read(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_queue_age(monkeypatch, RuntimeError("no queue table"))
+    monkeypatch.setattr(repository, "is_database_connected", _async(True))
+    monkeypatch.setattr(output_store, "is_connected", lambda: True)
+
+    response = client.get("/api/v1/health")
+
+    assert response.status_code == 200
+    assert response.json()["oldest_queued_age_seconds"] is None
 
 
 @pytest.mark.parametrize(
@@ -93,6 +150,7 @@ def test_health_answers_503_when_a_dependency_is_down(
     database_up: bool,
     storage_up: bool,
 ) -> None:
+    _stub_queue_age(monkeypatch, 0.0)
     monkeypatch.setattr(repository, "is_database_connected", _async(database_up))
     monkeypatch.setattr(output_store, "is_connected", lambda: storage_up)
 

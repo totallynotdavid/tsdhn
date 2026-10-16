@@ -2,6 +2,8 @@
 
 import asyncio
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -107,3 +109,74 @@ def test_the_shutdown_story_holds_together(monkeypatch: pytest.MonkeyPatch) -> N
 
     assert captured["executor_shutdown"] == "detach"
     assert exits == [0]
+
+
+async def _run_worker_recording_maintenance(
+    monkeypatch: pytest.MonkeyPatch, *, retention: bool
+) -> list[str]:
+    started: list[str] = []
+
+    class _Worker:
+        def __init__(self, _queue: Any, **_kwargs: Any) -> None:
+            return None
+
+        def stop(self) -> None:
+            return None
+
+        async def run(self) -> None:
+            await asyncio.sleep(0)
+
+    def recorder(name: str) -> Any:
+        async def run_pass(*_args: Any, **_kwargs: Any) -> None:
+            started.append(name)
+
+        return run_pass
+
+    @asynccontextmanager
+    async def purge_pool() -> AsyncIterator[object]:
+        started.append("purger pool")
+        yield object()
+
+    async def open_pool(**_kwargs: Any) -> object:
+        return object()
+
+    async def close_pool() -> None:
+        return None
+
+    async def ensure_output_bucket() -> None:
+        return None
+
+    monkeypatch.setattr(worker_any, "RETENTION_ENABLED", retention)
+    monkeypatch.setattr(worker_any, "OUTPUT_RETENTION_DAYS", 90)
+    monkeypatch.setattr(worker_any, "Worker", _Worker)
+    monkeypatch.setattr(worker_any, "Admin", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(worker_any, "build_queue", lambda _pool: object())
+    monkeypatch.setattr(worker_any, "register_tasks", lambda queue: queue)
+    monkeypatch.setattr(worker_any, "ensure_output_bucket", ensure_output_bucket)
+    monkeypatch.setattr(worker_any, "purge_pool", purge_pool)
+    for name in ("sweep", "reconcile", "purge", "expiry"):
+        monkeypatch.setattr(worker_any, f"run_periodic_{name}", recorder(name))
+    monkeypatch.setattr(db, "open_pool", open_pool)
+    monkeypatch.setattr(db, "close_pool", close_pool)
+    monkeypatch.setattr(db, "runtime_dsn", lambda *_args: "postgresql://test")
+
+    await asyncio.wait_for(worker_module.run(), timeout=10)
+    return started
+
+
+@pytest.mark.asyncio
+async def test_a_worker_with_retention_off_runs_neither_retention_pass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = await _run_worker_recording_maintenance(monkeypatch, retention=False)
+
+    assert sorted(started) == ["reconcile", "sweep"]
+
+
+@pytest.mark.asyncio
+async def test_a_worker_with_retention_on_runs_both_retention_passes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = await _run_worker_recording_maintenance(monkeypatch, retention=True)
+
+    assert sorted(started) == ["expiry", "purge", "purger pool", "reconcile", "sweep"]

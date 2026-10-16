@@ -1,8 +1,10 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from minio.error import MinioException as S3ClientError
+from minio.error import S3Error
 
 from api.core.errors import TransientInfraError
 from api.core.storage import OutputStore
@@ -143,3 +145,64 @@ def test_client_uses_fixed_s3_region(monkeypatch: pytest.MonkeyPatch) -> None:
     OutputStore()
 
     assert [client["region"] for client in clients] == ["us-east-1"]
+
+
+def test_the_download_url_for_an_r2_endpoint_is_https_and_signed_for_auto(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Presigning is local arithmetic: no request reaches the endpoint."""
+    host = "0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com"
+    for name, value in (
+        ("S3_ENDPOINT", host),
+        ("S3_SECURE", True),
+        ("S3_REGION", "auto"),
+        ("S3_BUCKET", "tsdhn-results"),
+    ):
+        monkeypatch.setattr(f"api.core.storage.{name}", value)
+
+    url = OutputStore().presigned_url(
+        "simulations/job-1/outputs/map.pdf", filename="map.pdf"
+    )
+
+    parts = urlsplit(url)
+    query = parse_qs(parts.query)
+    assert (parts.scheme, parts.netloc) == ("https", host)
+    assert parts.path == "/tsdhn-results/simulations/job-1/outputs/map.pdf"
+    assert query["X-Amz-Credential"][0].endswith("/auto/s3/aws4_request")
+    assert query["response-content-disposition"] == ['attachment; filename="map.pdf"']
+
+
+class _BucketLookupClient:
+    def __init__(self, code: str) -> None:
+        self.code = code
+        self.made = False
+
+    def bucket_exists(self, bucket_name: str) -> bool:
+        raise S3Error(cast(Any, None), self.code, "refused", None, None, None)
+
+    def make_bucket(self, bucket_name: str) -> None:
+        self.made = True
+
+
+def _store_with(client: _BucketLookupClient) -> OutputStore:
+    store = OutputStore.__new__(OutputStore)
+    store.bucket = "tsdhn-results"
+    store._client = client  # type: ignore[assignment]
+    return store
+
+
+def test_a_key_refused_the_bucket_lookup_still_reaches_its_bucket() -> None:
+    client = _BucketLookupClient("AccessDenied")
+    store = _store_with(client)
+
+    assert store.is_connected()
+    store.ensure_bucket()
+    assert not client.made
+
+
+def test_a_failed_bucket_lookup_other_than_a_refusal_is_an_outage() -> None:
+    store = _store_with(_BucketLookupClient("InternalError"))
+
+    assert not store.is_connected()
+    with pytest.raises(S3Error):
+        store.ensure_bucket()
