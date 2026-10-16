@@ -66,29 +66,52 @@ describe("output download route", () => {
     await expectHttpError(GET(requestContext as never), 502);
   });
 
-  it("redirects the browser after ownership and output checks", async () => {
-    const fetch = vi.fn().mockResolvedValue(
-      new Response(null, {
-        status: 307,
-        headers: { location: "https://storage.example/result.pdf" },
-      }),
-    );
-    const requestContext = context({ fetch });
+  it("streams the stored file after ownership and output checks", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 307,
+          headers: { location: "http://storage:9000/result.pdf?signature=x" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response("%PDF-1.7", {
+          headers: {
+            "content-type": "application/pdf",
+            "content-length": "8",
+            "content-disposition": 'attachment; filename="result.pdf"',
+            "set-cookie": "storage=leak",
+          },
+        }),
+      );
 
-    try {
-      await GET(requestContext as never);
-      throw new Error("expected redirect");
-    } catch (redirect) {
-      expect(redirect).toMatchObject({
-        status: 302,
-        location: "https://storage.example/result.pdf",
-      });
-    }
+    const response = await GET(context({ fetch }) as never);
 
+    expect(await response.text()).toBe("%PDF-1.7");
+    expect(response.headers.get("content-type")).toBe("application/pdf");
+    expect(response.headers.get("content-disposition")).toBe('attachment; filename="result.pdf"');
+    expect(response.headers.get("set-cookie")).toBeNull();
     expect(mocks.getSimulation).toHaveBeenCalledWith("user-1", "sim-1");
-    expect(fetch).toHaveBeenCalledWith(
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
       "https://compute.example/api/v1/jobs/sim-1/outputs/max_height_map",
       { headers: { authorization: "Bearer token" }, redirect: "manual" },
     );
+    expect(fetch).toHaveBeenNthCalledWith(2, "http://storage:9000/result.pdf?signature=x");
+  });
+
+  it("returns a controlled gateway error when storage does not return the file", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 307,
+          headers: { location: "http://storage:9000/result.pdf" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    await expectHttpError(GET(context({ fetch }) as never), 502);
   });
 });

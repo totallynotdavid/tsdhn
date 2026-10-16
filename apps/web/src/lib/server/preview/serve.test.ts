@@ -193,10 +193,8 @@ describe.skipIf(!hasBun)("preview mode served", () => {
     expect(frame).toMatchObject({ status: "running", step: "tsunami", step_index: 3 });
   });
 
-  it("redirects a download to a file the stub serves", async () => {
-    const redirect = await get(`/simulations/${SEEDED[0].id}/outputs/max_height_map`);
-    expect(redirect.status).toBe(302);
-    const file = await get(redirect.headers.get("location")!);
+  it("streams a download from the file the stub serves", async () => {
+    const file = await get(`/simulations/${SEEDED[0].id}/outputs/max_height_map`);
     expect(file.status).toBe(200);
     expect(file.headers.get("content-type")).toBe("application/pdf");
   });
