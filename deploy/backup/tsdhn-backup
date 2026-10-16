@@ -1,0 +1,168 @@
+#!/bin/sh
+# Back up PostgreSQL and the stored outputs to an encrypted restic repository,
+# and restore them. See docs/deploy.md.
+# Usage: tsdhn-backup schedule | backup | restore [--wipe-objects] [SNAPSHOT]
+# restic reads RESTIC_* and AWS_*, pg_dump and psql read PG*, and the object
+# store is TSDHN_S3_*, the names the API uses.
+set -eu
+
+WORK=/backup
+# Snapshots group by host, and a container's hostname changes whenever it is
+# recreated. A fixed host keeps one retention history.
+SNAPSHOT_HOST=tsdhn
+HEALTH_FILE=/tmp/last-backup
+
+scheme=http
+[ "${TSDHN_S3_SECURE:-false}" = true ] && scheme=https
+export RCLONE_CONFIG_STORE_TYPE=s3
+export RCLONE_CONFIG_STORE_PROVIDER=Other
+export RCLONE_CONFIG_STORE_ENDPOINT="$scheme://${TSDHN_S3_ENDPOINT:-}"
+export RCLONE_CONFIG_STORE_ACCESS_KEY_ID="${TSDHN_S3_ACCESS_KEY:-}"
+export RCLONE_CONFIG_STORE_SECRET_ACCESS_KEY="${TSDHN_S3_SECRET_KEY:-}"
+export RCLONE_CONFIG_STORE_REGION=us-east-1
+# The remote comes from the environment, so there is no config file to warn about.
+export RCLONE_LOG_LEVEL=ERROR
+
+log() {
+    printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"
+}
+
+# Print yes or no. A listing that fails, such as an unreachable store or a wrong
+# key, fails: it must not read as a missing bucket. errexit does not reach a
+# command substitution, so callers check the status themselves.
+bucket_present() {
+    listing=$(rclone lsf store:) || return 1
+    if printf '%s\n' "$listing" | grep -qx "$TSDHN_S3_BUCKET/"; then
+        echo yes
+    else
+        echo no
+    fi
+}
+
+# Print the number of objects, 0 for a bucket that does not exist. Only restore
+# may read a missing bucket as empty; it creates the bucket by copying into it.
+object_count() {
+    present=$(bucket_present) || return 1
+    if [ "$present" = no ]; then
+        echo 0
+        return
+    fi
+    size=$(rclone size "store:$TSDHN_S3_BUCKET" --json) || return 1
+    printf '%s\n' "$size" | sed 's/.*"count":\([0-9]*\).*/\1/'
+}
+
+# Create the repository on the first run only. restic retries a missing bucket
+# for a quarter of an hour, so the probe is bounded, and any other failure,
+# such as a wrong password, stops here instead of being met by `restic init`.
+ensure_repository() {
+    if probe=$(timeout 120 restic cat config 2>&1); then
+        return
+    fi
+    case $probe in
+    *"Is there a repository at the following location"*)
+        log "creating the restic repository"
+        timeout 120 restic init
+        ;;
+    *)
+        printf '%s\n' "$probe" >&2
+        log "cannot open the repository: check BACKUP_REPOSITORY, the bucket, and BACKUP_PASSWORD"
+        return 1
+        ;;
+    esac
+}
+
+backup() {
+    mkdir -p "$WORK/db" "$WORK/objects"
+    ensure_repository
+
+    # The dump comes first. An output uploaded after it is an orphan the
+    # restored database does not mention. The other order could leave a
+    # completed job without its files.
+    log "dumping PostgreSQL"
+    # The runtime roles' policies name roles the restore target does not have.
+    # tsdhn-queue-grants creates them again.
+    pg_dump --format=custom --no-policies --file="$WORK/db/tsdhn.dump"
+
+    log "mirroring bucket $TSDHN_S3_BUCKET"
+    present=$(bucket_present) || return 1
+    if [ "$present" = no ]; then
+        # The store answered, so the bucket was deleted or TSDHN_S3_BUCKET is
+        # wrong. The worker creates it at start, so a stack always has one.
+        log "bucket $TSDHN_S3_BUCKET is not in the object store; no snapshot written"
+        return 1
+    fi
+    rclone sync "store:$TSDHN_S3_BUCKET" "$WORK/objects"
+
+    log "writing the snapshot"
+    restic backup --host "$SNAPSHOT_HOST" --tag tsdhn "$WORK/db" "$WORK/objects"
+    rm -f "$WORK/db/tsdhn.dump"
+
+    # The oldest monthly snapshot is about as old as the output retention, so
+    # a deleted output does not outlive its retention for long.
+    restic forget --host "$SNAPSHOT_HOST" --tag tsdhn \
+        --keep-daily 7 --keep-weekly 4 --keep-monthly 3 --prune
+    # Metadata every time. Each day also reads one fourteenth of the data
+    # packs, so all of them are read within two weeks.
+    restic check --read-data-subset="$(($(date +%j | sed 's/^0*//') % 14 + 1))/14"
+    log "backup finished"
+}
+
+schedule() {
+    interval="${BACKUP_INTERVAL_SECONDS:-86400}"
+    retry="${BACKUP_RETRY_SECONDS:-900}"
+    while :; do
+        # Not a subshell: errexit does not apply inside a tested command.
+        if "$0" backup; then
+            touch "$HEALTH_FILE"
+            sleep "$interval"
+        else
+            log "backup failed; retrying in ${retry}s"
+            sleep "$retry"
+        fi
+    done
+}
+
+restore() {
+    # rclone sync makes the bucket match the snapshot and deletes the rest.
+    # rclone copy would mix the snapshot into what is there.
+    transfer=copy
+    if [ "${1:-}" = --wipe-objects ]; then
+        transfer=sync
+        shift
+    fi
+    snapshot="${1:-latest}"
+
+    existing="$(psql --no-psqlrc -Atc \
+        "SELECT count(*) FROM pg_namespace WHERE nspname IN ('compute', 'task_queue')")"
+    if [ "$existing" != 0 ]; then
+        log "refusing to restore: the target database already has the compute or queue schema"
+        exit 1
+    fi
+    stored="$(object_count)" || exit 1
+    if [ "$stored" != 0 ] && [ "$transfer" = copy ]; then
+        log "refusing to restore: bucket $TSDHN_S3_BUCKET already holds $stored objects; pass --wipe-objects to delete them first"
+        exit 1
+    fi
+
+    log "restoring snapshot $snapshot"
+    rm -rf "$WORK/restore"
+    restic restore "$snapshot" --host "$SNAPSHOT_HOST" --tag tsdhn --target "$WORK/restore"
+
+    # The dump has no owners or grants. tsdhn-compute-migrate and
+    # tsdhn-queue-grants provision them on the next start.
+    pg_restore --single-transaction --exit-on-error --no-owner --no-acl \
+        --dbname "${PGDATABASE:-tsdhn}" "$WORK/restore$WORK/db/tsdhn.dump"
+    rclone "$transfer" "$WORK/restore$WORK/objects" "store:$TSDHN_S3_BUCKET"
+    rm -rf "$WORK/restore"
+
+    jobs="$(psql --no-psqlrc -Atc "SELECT count(*) FROM compute.jobs")"
+    objects="$(object_count)" || exit 1
+    log "restored $jobs compute jobs and $objects objects"
+}
+
+case "${1:-}" in
+    schedule) schedule ;;
+    backup) backup ;;
+    restore) shift; restore "$@" ;;
+    *) echo "usage: tsdhn-backup schedule | backup | restore [--wipe-objects] [SNAPSHOT]" >&2; exit 2 ;;
+esac
