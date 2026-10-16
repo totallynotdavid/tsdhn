@@ -61,6 +61,7 @@ router = APIRouter(
     responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": HealthStatus}},
 )
 async def health(response: Response) -> HealthStatus:
+    """Answer 200 when the database and storage answer, 503 when either does not."""
     database_connected = await repository.is_database_connected()
     storage_connected = await anyio.to_thread.run_sync(output_store.is_connected)
     healthy = database_connected and storage_connected

@@ -7,7 +7,7 @@ import type { RequestHandler } from "./$types";
 
 const RELAYED_HEADERS = ["content-type", "content-length", "content-disposition"];
 
-/** Keep object storage private by streaming outputs through the web app. */
+/** Stream private object storage through the web app. */
 export const GET: RequestHandler = async ({ params, locals, fetch }) => {
   if (!locals.user) error(401);
 

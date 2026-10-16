@@ -22,7 +22,6 @@ trap 'rm -f "$tmp_file"' EXIT
 while IFS= read -r line; do
     name="${line%%=*}"
     if [ "$line" = "$name=" ] && [[ "$secrets" == *" $name "* ]]; then
-        # An S3 access key is 20 characters and a secret key is 40.
         case "$name" in
             TSDHN_S3_ACCESS_KEY) line="$name=$(openssl rand -hex 10)" ;;
             TSDHN_S3_SECRET_KEY) line="$name=$(openssl rand -hex 20)" ;;
