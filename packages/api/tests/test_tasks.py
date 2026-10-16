@@ -113,7 +113,6 @@ async def test_enqueue_simulation_builds_the_job_the_worker_expects(
     assert recorded.connection is connection
     assert recorded.queue == COMPUTE_QUEUE
     assert recorded.payload == {"compute_job_id": str(compute_job_id)}
-    # queueing_lock and lock, ported one for one onto rqueue's two keys.
     assert recorded.dedupe_key == f"simulation:{compute_job_id}"
     assert recorded.concurrency_key == f"compute-job:{compute_job_id}"
     # The registered retry policy, not the queue default, reaches the row.

@@ -286,7 +286,6 @@ def generate_maxola_plot(work_dir: Path) -> None:
         fig = pygmt.Figure()
         fig.shift_origin(xshift="4.2c", yshift="10.0c")
 
-        # Center the projection on the Pacific basin.
         fig.grdimage(
             grid=max_height_grid,
             cmap=hgt_cpt,

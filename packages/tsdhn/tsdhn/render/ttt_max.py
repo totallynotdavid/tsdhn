@@ -60,7 +60,6 @@ def process_tsunami_data(working_dir: Path) -> None:
         for i, name in enumerate(station_names):
             station_data[name] = data[:, i + 1]
 
-        # Adjust synthetic amplitudes for each station's depth.
         scaling_factors = {
             "cruz": (12.9 / 14.0) ** (0.25),
             "tala": (183.1 / 20.0) ** (0.25),
@@ -99,7 +98,6 @@ def process_tsunami_data(working_dir: Path) -> None:
             logger.error(f"Error writing green_rev.dat: {e}")
             raise OSError(f"Failed to write green_rev.dat: {e}") from e
 
-        # The report needs the first positive sample and peak amplitude.
         first_nonzero = {}
         max_values = {}
         for name in station_names:
@@ -123,7 +121,6 @@ def process_tsunami_data(working_dir: Path) -> None:
         maxmax = max(max_values.values())
         logger.info(f"Maximum wave height: {maxmax}")
 
-        # Choose a scale that contains the largest wave.
         if maxmax <= 0.1:
             plot_mareograma(scale=0.1, tick_type="small")
         elif maxmax <= 0.2:

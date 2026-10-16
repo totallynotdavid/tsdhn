@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 # The legacy grid uses the same spacing on both axes.
 _DX = np.float32(7412.9951096)
-# These velocities feed the dimensionless rigidity term.
 _VP = np.float32(4.82e3)
 _VS = np.float32(2.78e3)
 _RMU = _VS * _VS / (_VP * _VP - _VS * _VS)

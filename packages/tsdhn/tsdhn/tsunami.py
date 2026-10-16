@@ -69,7 +69,6 @@ def _read_grid_a(path: Path) -> np.ndarray:
 
 
 def _read_deform_a(path: Path, ids: int, ide: int, jds: int, jde: int) -> np.ndarray:
-    # The file contains the initial elevation for the requested grid window.
     values = np.array(path.read_text().split(), dtype=np.float32)
     rows = ide - ids + 1
     cols = jde - jds + 1

@@ -178,7 +178,6 @@ RETENTION_ENABLED = os.environ.get("TSDHN_RETENTION_ENABLED", "true").lower() no
 
 SSE_MAX_DURATION = int(os.environ.get("TSDHN_SSE_MAX_DURATION_SECONDS", str(30 * 60)))
 
-# Comma-separated browser origins allowed to call the API directly.
 ALLOWED_ORIGINS = [
     origin
     for origin in os.environ.get("TSDHN_ALLOWED_ORIGINS", "").split(",")

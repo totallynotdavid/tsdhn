@@ -126,7 +126,6 @@ def test_run_skips_completed_steps_on_resume(
     work_dir = tmp_path / "work"
     work_dir.mkdir()
 
-    # Establish completed markers before the resumed run.
     engine.run(SimulationRequest(input=INPUT, work_dir=work_dir))
 
     events: list[str] = []
