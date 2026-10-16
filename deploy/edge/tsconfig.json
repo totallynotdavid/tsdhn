@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    ".cloudflare/types/**/*.d.ts",
+    "src/**/*.ts",
+    "cloudflare.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
+}
