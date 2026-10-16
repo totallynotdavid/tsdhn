@@ -170,6 +170,10 @@ jobs:
                       image: tsdhn-web
                       dockerfile: deploy/web.Dockerfile
                       cache_scope: web
+                    - target: backup
+                      image: tsdhn-backup
+                      dockerfile: deploy/backup.Dockerfile
+                      cache_scope: backup
                     - target: development
                       image: tsdhn-dev
                       dockerfile: .devcontainer/Dockerfile
@@ -339,7 +343,7 @@ jobs:
               run: |
                   set -euo pipefail
                   short_sha="${GITHUB_SHA::7}"
-                  images=(tsdhn-toolchain tsdhn-api tsdhn-web tsdhn-dev)
+                  images=(tsdhn-toolchain tsdhn-api tsdhn-web tsdhn-backup tsdhn-dev)
 
                   for image in "${images[@]}"; do
                       source_ref="${IMAGE_REGISTRY}/${image}:${CANDIDATE_TAG}"
