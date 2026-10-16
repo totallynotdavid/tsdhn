@@ -1,0 +1,55 @@
+#cloud-config
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - jq
+
+write_files:
+  - path: /opt/tsdhn/compose.prod.yml
+    owner: root:root
+    permissions: '0644'
+    encoding: b64
+    content: ${compose_b64}
+  - path: /opt/tsdhn/bootstrap
+    owner: root:root
+    permissions: '0700'
+    encoding: b64
+    content: ${base64encode(<<-BOOTSTRAP
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      exec > >(tee -a /var/log/tsdhn-ec2-measure.log) 2>&1
+
+      env_file=/opt/tsdhn/prod.env
+      compose_file=/opt/tsdhn/compose.prod.yml
+      cd /opt/tsdhn
+      until [[ -s "$env_file" ]]; do sleep 2; done
+      set -a
+      source "$env_file"
+      set +a
+
+      systemctl enable --now docker
+      until docker info >/dev/null 2>&1; do sleep 2; done
+
+      if [[ -n "$${GHCR_USERNAME:-}" && -n "$${GHCR_TOKEN:-}" ]]; then
+        printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+      fi
+
+      for image in "$API_IMAGE" "$WEB_IMAGE"; do
+        case "$image" in
+          *@sha256:*) ;;
+          *) echo "GHCR image is not digest-pinned: $image" >&2; exit 1 ;;
+        esac
+        docker pull "$image"
+      done
+
+      docker compose -f "$compose_file" config --quiet
+      docker compose -f "$compose_file" pull
+      docker compose -f "$compose_file" up -d --wait --wait-timeout 1200
+      docker compose -f "$compose_file" ps
+      touch /var/lib/tsdhn-ec2-measure.ready
+    BOOTSTRAP
+    )}
+
+runcmd:
+  - [bash, /opt/tsdhn/bootstrap]
