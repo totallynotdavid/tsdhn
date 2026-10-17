@@ -58,6 +58,12 @@ The purger cannot reach `compute.jobs`. Deleting a queue job cascades to its
 attempt history, so retention has its own credential instead of using the
 consumer role.
 
+`tsdhn-queue-grants` explicitly revokes `INSERT` on `task_queue.jobs` after
+rqueue's `CONSUME` capability grants it. Row-level security scopes `jobs` and
+`job_attempts` to the deployment's queue. rqueue has no per-queue row-level
+security on `concurrency_slots` or `runtime_heartbeats`, so this arrangement is
+acceptable only for a single-queue deployment.
+
 The API, the worker and the purger each need their own configured password. None
 falls back to the owner URL, which only migrations and provisioning use.
 
