@@ -10,8 +10,8 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from api import __version__, routes
 from api import main as main_module
-from api import routes
 from api.core import db, repository
 from api.core.errors import OutputsExpiredError
 from api.core.storage import output_store
@@ -165,7 +165,7 @@ def test_health_answers_503_when_a_dependency_is_down(
 def test_version(client: TestClient) -> None:
     response = client.get("/api/v1/version")
     assert response.status_code == 200
-    assert response.json()["name"] == "tsdhn-api"
+    assert response.json() == {"name": "tsdhn-api", "version": __version__}
 
 
 def test_get_job_returns_repository_status(
