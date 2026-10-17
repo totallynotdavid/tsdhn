@@ -57,7 +57,16 @@ does not answer. It skips when Docker is missing.
 
 `mise run test:golden` runs the full Python pipeline. It checks output sets,
 fixed-width fingerprints and selected spatial values for a saved scenario. A
-golden result tells you whether the output changed for that scenario.
+golden result tells you whether the output changed for that scenario. The
+production pipeline needs GMT and `ttt_client`, but not the legacy binaries used
+by the parity suite. The test writes PDFs through GMT and Ghostscript, so its
+temporary workspace must be under a directory allowed by the container's
+Ghostscript policy; set `TMPDIR` to such a directory when the default is not
+allowed.
+
+The numerical-value tests compare the checked-in Alaska model data. They are not
+an independent scientific validation of the source relations. Their rectangle
+values depend on the legacy rigidity constant and longitude frame.
 
 ## Parity tests
 
