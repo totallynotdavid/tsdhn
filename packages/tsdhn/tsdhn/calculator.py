@@ -105,7 +105,6 @@ def calculate_rectangle_parameters(
     h1 = np.hypot(L1, W1)
     checkpoint("h1", h1)
 
-    # Keep the names used by the legacy report files.
     params = {
         "L1": L1,
         "W1": W1,

@@ -21,8 +21,6 @@ SCENARIO = EarthquakeInput(
 # tolerance leaves room for that noise while still catching science changes.
 REL_TOL = 1e-4
 
-# The production pipeline needs GMT and ttt_client. It does not need legacy
-# binaries.
 SKIP_REASON = "requires gmt + ttt_client on PATH; see mise run test:golden"
 
 
@@ -35,8 +33,6 @@ def golden_result() -> Iterator[SimulationResult]:
     if not _toolchain_available():
         pytest.skip(SKIP_REASON)
 
-    # GMT uses Ghostscript for PDF output. The default temporary directory is
-    # allowed by the container's Ghostscript policy.
     work_root = Path(tempfile.mkdtemp(prefix="tsdhn-golden-"))
     try:
         yield run_simulation(SCENARIO, work_root, model_dir=MODEL_DIR)

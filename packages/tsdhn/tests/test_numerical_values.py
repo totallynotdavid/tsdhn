@@ -20,8 +20,6 @@ def input_data() -> EarthquakeInput:
     )
 
 
-# Compatibility values for the checked-in Alaska model data. They are not an
-# independent scientific validation of the source relations.
 expected_basic = {
     "length": 575.439937,  # L (km)
     "width": 144.543977,  # W (km)

@@ -74,7 +74,7 @@ def is_transient(exc: BaseException) -> bool:
 
 
 def runtime_dsn(role: str, password: str) -> str:
-    """Resolve a runtime role's DSN, failing before an owner fallback."""
+    """Resolve a runtime role's DSN; never fall back to the owner URL."""
     try:
         return role_database_url(role, password)
     except ValueError as error:

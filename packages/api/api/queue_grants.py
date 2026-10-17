@@ -1,24 +1,3 @@
-"""Provision the least-privilege roles the API and worker connect as.
-
-`tsdhn-compute-migrate` owns the compute schema and the web role, and
-`rqueue ... migrate` owns the queue schema. This runs after both, as
-`tsdhn-web-grants` runs after the web migrations, because a GRANT needs the
-tables to exist. Everything here is idempotent, and rerunning it narrows an
-over-granted role back to the table below.
-
-| role                | queue schema                          | compute schema |
-| ------------------- | ------------------------------------- | -------------- |
-| COMPUTE_PRODUCER    | `Capability.PRODUCE`                  | SELECT, INSERT |
-| COMPUTE_WORKER      | `Capability.CONSUME`                  | SELECT, UPDATE |
-| COMPUTE_PURGER      | `Capability.INSPECT` + DELETE on jobs | none           |
-
-`provision_role` grants no DDL to any of them. This module also revokes the
-INSERT on `jobs` that rqueue's CONSUME capability grants. Row-level security
-scopes `jobs` and `job_attempts` to the deployment's queue. `concurrency_slots`
-and `runtime_heartbeats` have no per-queue RLS in rqueue, which is acceptable
-for a single-queue deployment.
-"""
-
 from __future__ import annotations
 
 import asyncio
