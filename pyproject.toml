@@ -19,14 +19,14 @@ tsdhn-parity = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "ruff>=0.17.0",
+    "ruff>=0.17.1",
     "mypy>=2.4.0",
     "types-PyYAML>=6.0.12.20260906",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-xdist>=3.8.0",
     "pytest-cov>=7.1.0",
-    "httpx2>=2.13.1",
+    "httpx2>=2.15.1",
     "coverage>=7.16.2",
     "diff-cover>=10.6.0",
     "scipy-stubs>=1.18.1.1",

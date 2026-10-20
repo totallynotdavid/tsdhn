@@ -22,7 +22,7 @@ jobs:
     env:
       TSDHN_MODEL_DIR: ${{ github.workspace }}/model
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
@@ -38,7 +38,7 @@ jobs:
           fi
           sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
 
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
       - run: mise run install
       - run: mise run check
 
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload coverage data
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: coverage-data-unit
           path: |
@@ -80,11 +80,11 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
       - run: mise run install
 
       - name: Run disposable database integration tests
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload coverage data
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: coverage-data-integration
           path: .coverage.integration
@@ -116,18 +116,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Fetch master for the diff base
         run: git fetch origin master:refs/remotes/origin/master
 
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
       - run: mise run install
 
       - name: Download coverage data
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: coverage-data-*
           merge-multiple: true
@@ -135,7 +135,7 @@ jobs:
       - run: mise run coverage:merge
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           files: coverage.xml
           fail_ci_if_error: false
@@ -154,7 +154,7 @@ jobs:
 
       - name: Upload HTML coverage report
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: html-coverage-report
           path: htmlcov
@@ -165,7 +165,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
@@ -176,7 +176,7 @@ jobs:
           SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
           [ -n "$SO" ] && sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
 
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
       - run: mise run install
       - run: mise run gen:client
 

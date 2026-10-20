@@ -34,9 +34,9 @@ jobs:
       TSDHN_S3_SECRET_KEY: tsdhn-local-secret
       TSDHN_S3_BUCKET: tsdhn-results
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
         with:
           install_args: uv
 
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload diagnostics
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: crash-recovery-diagnostics
           path: e2e-artifacts
