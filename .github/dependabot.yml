@@ -35,8 +35,10 @@ updates:
       default-days: 7
     groups:
       all:
-        patterns:
-          - "*"
+        update-types:
+          - major
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directories:
@@ -47,8 +49,10 @@ updates:
       default-days: 7
     groups:
       all:
-        patterns:
-          - "*"
+        update-types:
+          - major
+          - minor
+          - patch
 
   - package-ecosystem: devcontainers
     directories:
@@ -59,5 +63,7 @@ updates:
       default-days: 7
     groups:
       all:
-        patterns:
-          - "*"
+        update-types:
+          - major
+          - minor
+          - patch
