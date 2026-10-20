@@ -67,7 +67,7 @@ jobs:
       contents: read
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:18
+        image: mirror.gcr.io/library/postgres:18
         env:
           POSTGRES_USER: tsdhn
           POSTGRES_PASSWORD: tsdhn
