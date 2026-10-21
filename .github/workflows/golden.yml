@@ -64,9 +64,13 @@ jobs:
       - name: Run golden suite against the real toolchain
         run: |
           docker run --rm \
+            -v "$PWD/mise.toml:/app/mise.toml:ro" \
+            -v "$(readlink -f "$(command -v mise)"):/usr/local/bin/mise:ro" \
+            -e MISE_DISABLE_TOOLS=python,uv,bun,postgres \
             localhost/tsdhn-api:golden-ci \
             sh -c '
               set -eu
+              mise trust /app/mise.toml
               uv sync --frozen --group dev --all-packages
-              uv run pytest -m golden -v packages/tsdhn/tests/test_pipeline_golden.py
+              mise run test:golden
             '
