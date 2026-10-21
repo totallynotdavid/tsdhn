@@ -10,8 +10,8 @@ Each suite answers a different question.
 | `mise run test:golden`      | Did the full pipeline output change?              | GMT and `ttt_client`                                                      |
 | `mise run test:parity`      | Does Python match the MATLAB and Fortran runs?    | `TSDHN_TOOLS_DIR` for Fortran cases                                       |
 
-`mise run test` runs `test:py` and the web tests. `mise run check` runs lint,
-typecheck, test and build.
+`mise run check` runs lint, typecheck, the unit tests and the builds.
+`mise run check:web` runs the web part alone.
 
 Run one test with:
 

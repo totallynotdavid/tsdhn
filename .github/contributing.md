@@ -8,11 +8,11 @@ installs the Python and web dependencies from the lockfiles.
 ## Check a change
 
 `mise run check` runs lint, typecheck, the unit tests and the builds. It needs
-no services and no GMT. To run one part, use `mise run lint`,
-`mise run typecheck`, `mise run test` or `mise run build`. `lint` has `:py` and
-`:web` subtasks. The other three have a `:py` subtask for the Python part; run
-the web part alone with `bun --filter '*' typecheck`, `bun --filter '*' test` or
-`bun --filter web build`.
+no services and no GMT. To run one part, use `mise run lint` (split into
+`lint:py` and `lint:web`), `mise run typecheck:py`, `mise run test:py` or
+`mise run build:py` for the Python part, and `bun --filter '*' typecheck`,
+`bun --filter '*' test` or `bun --filter web build` for the web part.
+`mise run check:web` runs the three web commands in order.
 
 [Testing](../docs/testing.md) lists every suite: database-backed tests, the
 golden pipeline test and the comparisons with the MATLAB and Fortran programs.

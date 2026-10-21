@@ -39,19 +39,9 @@ run = ["uv run ruff check --fix .", "uv run ruff format ."]
 description = "Fix and format the web code, Markdown, YAML and JSON"
 run = ["bunx oxlint --fix", "bunx oxfmt ."]
 
-[tasks.typecheck]
-description = "Type-check Python and the web workspaces"
-depends = ["typecheck:py"]
-run = "bun --filter '*' typecheck"
-
 [tasks."typecheck:py"]
 description = "Type-check Python with mypy"
 run = "uv run mypy"
-
-[tasks.test]
-description = "Run the fast Python and web tests and record coverage data"
-depends = ["test:py"]
-run = "bun --filter '*' test"
 
 # Disable Numba JIT so coverage.py can trace the tsunami kernels. The run
 # records .coverage for the diff-coverage tasks.
@@ -67,19 +57,12 @@ run = "bash scripts/integration.sh"
 # Golden tests need GMT and ttt_client.
 [tasks."test:golden"]
 description = "Run the golden pipeline test against the real toolchain"
-run = "uv run pytest -m golden"
+run = "uv run pytest -m golden packages/tsdhn/tests"
 
 # Parity tests use frozen MATLAB fixtures and optional Fortran tools.
 [tasks."test:parity"]
 description = "Compare Python checkpoints with the MATLAB and Fortran references"
 run = "uv run pytest packages/tsdhn/tests/parity packages/tsdhn-parity/tests"
-
-# typecheck and test regenerate apps/web/.svelte-kit, which the web build reads.
-[tasks.build]
-description = "Build the Python distributions and the web app"
-depends = ["build:py"]
-wait_for = ["typecheck", "test"]
-run = "bun --filter web build"
 
 [tasks."build:py"]
 description = "Build the tsdhn and tsdhn-api distributions"
@@ -88,9 +71,18 @@ run = [
   "uv build --package tsdhn-api --out-dir dist/api",
 ]
 
+# The web build reads files that typecheck and test regenerate.
+[tasks."check:web"]
+description = "Type-check, test and build the web workspaces"
+run = [
+  "bun --filter '*' typecheck",
+  "bun --filter '*' test",
+  "bun --filter web build",
+]
+
 [tasks.check]
 description = "Run every check that needs no services; the entry for CI and for a contributor before a push"
-depends = ["lint", "typecheck", "test", "build"]
+depends = ["lint", "typecheck:py", "test:py", "build:py", "check:web"]
 
 [tasks."coverage:merge"]
 description = "Combine the recorded Python coverage data into reports"
@@ -106,7 +98,7 @@ description = "Fail when changed Python lines fall under the coverage threshold 
 run = "uv run diff-cover -c pyproject.toml coverage.xml --markdown-report diff-coverage.md"
 
 [tasks."diff-coverage:web"]
-description = "Fail when changed web lines fall under the coverage threshold in pyproject.toml; run mise run test first"
+description = "Fail when changed web lines fall under the coverage threshold in pyproject.toml; run bun --filter '*' test first"
 run = [
   "sed 's|^SF:|SF:apps/web/|' apps/web/coverage/lcov.info > apps/web/coverage/lcov.repo.info",
   "uv run diff-cover -c pyproject.toml apps/web/coverage/lcov.repo.info --markdown-report diff-coverage-web.md",
