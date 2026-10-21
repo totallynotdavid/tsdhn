@@ -1,6 +1,6 @@
 [project]
 name = "tsdhn-api"
-version = "0.0.1"
+version = "0.2.0"
 description = "TSDHN FastAPI service and rqueue simulation worker"
 requires-python = ">=3.14"
 readme = "readme.md"

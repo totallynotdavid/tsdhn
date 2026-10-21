@@ -1,6 +1,6 @@
 [project]
 name = "tsdhn-parity"
-version = "0.0.1"
+version = "0.2.0"
 description = "Checkpoint-trace parity testing between legacy MATLAB/Fortran units and their tsdhn Python ports"
 requires-python = ">=3.14"
 readme = "readme.md"
