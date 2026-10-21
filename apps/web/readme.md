@@ -15,9 +15,9 @@ From the repository root:
 ```sh
 mise run install
 bun --filter web dev
-mise run typecheck:web
-mise run build:web
-mise run test:web
+bun --filter web typecheck
+bun --filter web build
+bun --filter web test
 ```
 
 The Vitest suite is service-free. Database-backed tests use:
@@ -28,12 +28,12 @@ mise run test:integration
 
 ## Preview
 
-`mise run preview:web` serves the app without Postgres, the compute service or a
-login step:
+`bun --filter web serve:preview` serves the app without Postgres, the compute
+service or a login step:
 
 ```sh
-mise run preview:web
-mise run preview:web --host 100.64.0.1 --port 8080
+bun --filter web serve:preview
+bun --filter web serve:preview --host 100.64.0.1 --port 8080
 ```
 
 The host defaults to `0.0.0.0` and the port to `5174`, so another machine on the

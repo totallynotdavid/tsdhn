@@ -15,7 +15,7 @@ function env(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   return { ...rest, ...extra };
 }
 
-/** Start preview through the package script used by `mise run preview:web`. */
+/** Launch the preview through its package script, not the module internals. */
 function launch(port: number, extra: Record<string, string> = {}) {
   return spawn("bun", ["run", "serve:preview", "--host", "127.0.0.1", "--port", String(port)], {
     cwd: WEB_ROOT,

@@ -5,12 +5,12 @@ Each suite answers a different question.
 | Command                     | Question                                          | Needs                                                                     |
 | --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
 | `mise run test:py`          | Do the Python units behave as specified?          | nothing                                                                   |
-| `mise run test:web`         | Do the web units behave as specified?             | nothing                                                                   |
+| `bun --filter web test`     | Do the web units behave as specified?             | nothing                                                                   |
 | `mise run test:integration` | Do the queue, roles, migrations and backups work? | PostgreSQL, which the task starts; Docker for the backup and expiry tests |
 | `mise run test:golden`      | Did the full pipeline output change?              | GMT and `ttt_client`                                                      |
 | `mise run test:parity`      | Does Python match the MATLAB and Fortran runs?    | `TSDHN_TOOLS_DIR` for Fortran cases                                       |
 
-`mise run test` runs `test:py` and `test:web`. `mise run check` runs lint,
+`mise run test` runs `test:py` and the web tests. `mise run check` runs lint,
 typecheck, test and build.
 
 Run one test with:

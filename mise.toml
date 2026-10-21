@@ -41,19 +41,17 @@ run = ["bunx oxlint --fix", "bunx oxfmt ."]
 
 [tasks.typecheck]
 description = "Type-check Python and the web workspaces"
-depends = ["typecheck:py", "typecheck:web"]
+depends = ["typecheck:py"]
+run = "bun --filter '*' typecheck"
 
 [tasks."typecheck:py"]
 description = "Type-check Python with mypy"
 run = "uv run mypy"
 
-[tasks."typecheck:web"]
-description = "Type-check the web workspaces"
-run = "bun --filter '*' typecheck"
-
 [tasks.test]
-description = "Run the fast Python and web tests"
-depends = ["test:py", "test:web"]
+description = "Run the fast Python and web tests and record coverage data"
+depends = ["test:py"]
+run = "bun --filter '*' test"
 
 # Disable Numba JIT so coverage.py can trace the tsunami kernels. The run
 # records .coverage for the diff-coverage tasks.
@@ -61,10 +59,6 @@ depends = ["test:py", "test:web"]
 description = "Run the Python tests that need no services and record coverage data"
 env = { NUMBA_DISABLE_JIT = "1" }
 run = "uv run pytest -n auto -m 'not integration' --cov --cov-report="
-
-[tasks."test:web"]
-description = "Run the web tests that need no services and record coverage data"
-run = "bun --filter '*' test"
 
 [tasks."test:integration"]
 description = "Run the database-backed tests on a disposable database; pass -- --coverage to record coverage"
@@ -80,9 +74,12 @@ run = "uv run pytest -m golden"
 description = "Compare Python checkpoints with the MATLAB and Fortran references"
 run = "uv run pytest packages/tsdhn/tests/parity packages/tsdhn-parity/tests"
 
+# typecheck and test regenerate apps/web/.svelte-kit, which the web build reads.
 [tasks.build]
 description = "Build the Python distributions and the web app"
-depends = ["build:py", "build:web"]
+depends = ["build:py"]
+wait_for = ["typecheck", "test"]
+run = "bun --filter web build"
 
 [tasks."build:py"]
 description = "Build the tsdhn and tsdhn-api distributions"
@@ -90,12 +87,6 @@ run = [
   "uv build --package tsdhn --out-dir dist/tsdhn",
   "uv build --package tsdhn-api --out-dir dist/api",
 ]
-
-[tasks."build:web"]
-description = "Build the web app"
-# typecheck:web and test:web regenerate apps/web/.svelte-kit, which the build reads.
-wait_for = ["typecheck:web", "test:web"]
-run = "bun --filter web build"
 
 [tasks.check]
 description = "Run every check that needs no services; the entry for CI and for a contributor before a push"
@@ -115,7 +106,7 @@ description = "Fail when changed Python lines fall under the coverage threshold 
 run = "uv run diff-cover -c pyproject.toml coverage.xml --markdown-report diff-coverage.md"
 
 [tasks."diff-coverage:web"]
-description = "Fail when changed web lines fall under the coverage threshold in pyproject.toml; run test:web first"
+description = "Fail when changed web lines fall under the coverage threshold in pyproject.toml; run mise run test first"
 run = [
   "sed 's|^SF:|SF:apps/web/|' apps/web/coverage/lcov.info > apps/web/coverage/lcov.repo.info",
   "uv run diff-cover -c pyproject.toml apps/web/coverage/lcov.repo.info --markdown-report diff-coverage-web.md",
@@ -196,14 +187,6 @@ run = """
 . scripts/dev-engine.sh
 docker compose --profile web logs -f
 """
-
-[tasks."preview:web"]
-description = "Serve the web app on an embedded database and a stub compute API"
-usage = '''
-flag "--host <host>" default="0.0.0.0" help="Address to listen on"
-flag "--port <port>" default="5174" help="Port to listen on"
-'''
-run = 'bun --filter web serve:preview --host "$usage_host" --port "$usage_port"'
 
 [tasks.doctor]
 description = "Print the versions of the Python toolchain"
