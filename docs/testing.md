@@ -74,6 +74,43 @@ values depend on the legacy rigidity constant and longitude frame.
 compiled Fortran output within an explicit tolerance. [Parity](parity.md)
 describes the references, the Fortran tools and the MATLAB capture.
 
+## CI
+
+A `Changes` job at the top of CI and Release reads the diff and turns jobs off
+([`changes.py`](../scripts/ci/changes.py)). A skipped job reports as skipped, so
+a required check is never left pending. Only a pull request skips jobs in CI. In
+Release, a manual run and a tag run every job, and a push to master runs only
+`Warm image caches`.
+
+| Job                                                 | Workflow | Runs when the change is       |
+| --------------------------------------------------- | -------- | ----------------------------- |
+| `Check`, with the API client drift check            | CI       | not documentation only        |
+| `Persistence integration`                           | CI       | not documentation only        |
+| `Diff coverage gates`                               | CI       | not documentation only        |
+| `Docs format`                                       | CI       | documentation only            |
+| `CodeQL`, `Dependency audit` (both)                 | Security | any                           |
+| `Preflight`, `Build sdist + wheels`                 | Release  | any pull request              |
+| `Build model asset bundle`, `Create GitHub release` | Release  | any pull request              |
+| `Build candidate Docker` (five), `Compose smoke`    | Release  | an image input                |
+| `Promote Docker images`                             | Release  | an image input                |
+| `Warm image caches`                                 | Release  | a push to master, image input |
+
+Documentation is every file matching `*.md` or `docs/**`. A pull request from a
+fork cannot push images, so it runs the image jobs on no change. On a pull
+request that runs no image job, `Create GitHub release` only checks that the
+notes file and the model bundle exist.
+
+An image input is a path the image Dockerfiles `COPY`, a file that sets their
+build arguments, or a file the compose smoke runs. `mise run check` already
+builds and tests the source under `packages/`, `apps/web/` and `libs/`, so a
+change there does not rebuild the images. The manifests do: `pyproject.toml`,
+`uv.lock`, `package.json`, `bun.lock`, `mise.toml`, `packages/*/pyproject.toml`,
+`apps/web/package.json`, `apps/web/vite.config.ts` and
+`libs/api-client/package.json`. So do `deploy/`, the compose files, the
+Dockerfiles, `model/`, `scripts/e2e/`, `release.yml` and
+`.github/release-notes.md`. [Release](release.md#image-build-cache) explains the
+build cache.
+
 ## Choose evidence for a change
 
 | Change                                     | Evidence                                          |
