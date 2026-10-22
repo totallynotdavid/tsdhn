@@ -117,6 +117,16 @@ ttt_version() {
     ttt_client 2>&1 | sed -n 's/.*ttt API version \([0-9.]*\).*/\1/p' | head -n1
 }
 
+# Other oneAPI packages can install a newer compiler directory than the Fortran
+# compiler's, which leaves compiler/latest pointing at a directory with no ifx.
+# Only version directories are candidates: latest is the link being replaced.
+link_ifx_latest() {
+    local ifx_bin
+    ifx_bin="$(printf '%s\n' /opt/intel/oneapi/compiler/[0-9]*/bin/ifx | sort -V | tail -n1)"
+    [[ -x "$ifx_bin" ]] || return 1
+    sudo ln -sfn "$(dirname "$(dirname "$ifx_bin")")" /opt/intel/oneapi/compiler/latest
+}
+
 load_ifx_env() {
     if cmd_exists ifx; then
         return 0
@@ -265,6 +275,7 @@ if [[ "$INSTALL_IFX" == true ]]; then
         'echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list >/dev/null'
     run "Updating apt metadata for oneAPI" sudo apt-get update
     run "Installing Intel Fortran Essentials" sudo apt-get install -y --no-install-recommends intel-fortran-essentials
+    run "Pointing oneAPI compiler/latest at the Fortran compiler" link_ifx_latest
 
     add_bashrc_line "Intel oneAPI" '[ -f /opt/intel/oneapi/setvars.sh ] && source /opt/intel/oneapi/setvars.sh > /dev/null'
     load_ifx_env || {

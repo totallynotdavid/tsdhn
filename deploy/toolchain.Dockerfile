@@ -52,12 +52,18 @@ RUN apt-get update \
 
 RUN git lfs install --system
 
+# Other oneAPI packages can install a newer compiler directory than the Fortran
+# compiler's, which leaves compiler/latest pointing at a directory with no ifx.
+# Only version directories are candidates: latest is the link being replaced.
 RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
     | gpg --dearmor > /usr/share/keyrings/oneapi-archive-keyring.gpg \
  && echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
     > /etc/apt/sources.list.d/oneAPI.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends intel-fortran-essentials \
+ && ifx_bin="$(printf '%s\n' "${INTEL_ONEAPI_ROOT}"/compiler/[0-9]*/bin/ifx | sort -V | tail -n1)" \
+ && test -x "${ifx_bin}" \
+ && ln -sfn "$(dirname "$(dirname "${ifx_bin}")")" "${INTEL_ONEAPI_ROOT}/compiler/latest" \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /opt/intel/oneapi/installer_payloads \
           "${INTEL_ONEAPI_ROOT}/logs" /root/.intel/
@@ -80,7 +86,7 @@ RUN set -eux; \
     command -v gmt; \
     command -v gs; \
     command -v ttt_client; \
-    command -v ifx
+    ifx --version
 
 WORKDIR /app
 USER appuser
