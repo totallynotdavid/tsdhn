@@ -15,6 +15,7 @@ members = [
     "tsdhn",
     "tsdhn-api",
     "tsdhn-parity",
+    "tsdhn-ttt",
     "tsdhn-workspace",
 ]
 
@@ -1480,6 +1481,21 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "tsdhn", editable = "packages/tsdhn" },
+]
+
+[[package]]
+name = "tsdhn-ttt"
+version = "0.2.0"
+source = { editable = "packages/tsdhn-ttt" }
+dependencies = [
+    { name = "numba" },
+    { name = "numpy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numba", specifier = ">=0.68.0" },
+    { name = "numpy", specifier = ">=2.5.4" },
 ]
 
 [[package]]

@@ -10,12 +10,18 @@ authors = [
 ]
 
 [tool.uv.workspace]
-members = ["packages/tsdhn", "packages/api", "packages/tsdhn-parity"]
+members = [
+    "packages/tsdhn",
+    "packages/api",
+    "packages/tsdhn-parity",
+    "packages/tsdhn-ttt",
+]
 
 [tool.uv.sources]
 tsdhn = { workspace = true }
 tsdhn-api = { workspace = true }
 tsdhn-parity = { workspace = true }
+tsdhn-ttt = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -47,7 +53,7 @@ extend-exclude = ["__pycache__", "dist", "build"]
 select = ["E4", "E7", "E9", "F", "B", "I", "UP", "SIM", "RUF", "S"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["tsdhn", "api", "tsdhn_parity"]
+known-first-party = ["tsdhn", "api", "tsdhn_parity", "tsdhn_ttt"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*.py" = ["S101", "S105", "S106"]  # asserts and dummy tokens are fine in tests
@@ -101,7 +107,12 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/tsdhn/tests", "packages/api/tests", "packages/tsdhn-parity/tests"]
+testpaths = [
+    "packages/tsdhn/tests",
+    "packages/api/tests",
+    "packages/tsdhn-parity/tests",
+    "packages/tsdhn-ttt/tests",
+]
 pythonpath = ["."]
 addopts = "-ra --strict-markers"
 asyncio_default_fixture_loop_scope = "function"
