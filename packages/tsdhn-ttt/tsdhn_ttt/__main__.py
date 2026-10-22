@@ -35,11 +35,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "-T", "--output", type=Path, required=True, help="travel-time grid to write"
     )
+    parser.add_argument(
+        "--client-compatible",
+        action="store_true",
+        help="reproduce ttt_client: float32, its segment metric, nearest-node start",
+    )
     args = parser.parse_args(argv)
     lon, lat = args.epicenter
     bathymetry = read_bathymetry(args.grid)
     try:
-        result = travel_times(bathymetry, lon, lat)
+        result = travel_times(
+            bathymetry, lon, lat, client_compatible=args.client_compatible
+        )
     except ValueError as error:
         print(f"tsdhn-ttt: {error}", file=sys.stderr)
         return 1
