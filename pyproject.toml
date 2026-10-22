@@ -63,6 +63,8 @@ known-first-party = ["tsdhn", "api", "tsdhn_parity", "tsdhn_ttt"]
 "packages/tsdhn/tsdhn/render/ttt_inverso.py" = ["S603"]
 "packages/tsdhn/tests/test_pipeline_golden.py" = ["S603"]
 "scripts/capture_matlab_fixtures.py" = ["S603"]
+"scripts/ci/changes.py" = ["S603", "S607"]
+"scripts/tests/*.py" = ["S603", "S607"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -112,6 +114,7 @@ testpaths = [
     "packages/api/tests",
     "packages/tsdhn-parity/tests",
     "packages/tsdhn-ttt/tests",
+    "scripts/tests",
 ]
 pythonpath = ["."]
 addopts = "-ra --strict-markers"

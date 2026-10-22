@@ -14,8 +14,49 @@ concurrency:
 permissions: {}
 
 jobs:
+  # A pull request that changes only documentation skips the code jobs. A
+  # skipped job reports as skipped, so a required check is never left pending.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+      docs: ${{ steps.changes.outputs.docs }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: python3 scripts/ci/changes.py ci | tee -a "$GITHUB_OUTPUT"
+
+  docs:
+    name: Docs format
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
+        with:
+          install_args: bun
+      - run: bun install --frozen-lockfile
+      - run: mise run lint:web
+
   check:
     name: Check
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -42,6 +83,16 @@ jobs:
       - run: mise run install
       - run: mise run check
 
+      - name: Check the API client has no drift
+        if: ${{ !cancelled() }}
+        run: |
+          mise run gen:client
+          if ! git diff --quiet libs/api-client; then
+              echo "::error::@tsdhn/api-client is stale. Run 'mise run gen:client' and commit."
+              git diff libs/api-client
+              exit 1
+          fi
+
       - name: Name coverage data
         if: always()
         run: |
@@ -62,6 +113,8 @@ jobs:
 
   integration:
     name: Persistence integration
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -111,8 +164,8 @@ jobs:
   coverage:
     name: Diff coverage gates
     runs-on: ubuntu-latest
-    needs: [check, integration]
-    if: always()
+    needs: [changes, check, integration]
+    if: ${{ !cancelled() && needs.changes.outputs.code == 'true' }}
     permissions:
       contents: read
     steps:
@@ -158,32 +211,3 @@ jobs:
         with:
           name: html-coverage-report
           path: htmlcov
-
-  contract:
-    name: API client contract (no drift)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Install GMT (libgmt) for pygmt
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gmt libgmt-dev
-          SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
-          [ -n "$SO" ] && sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
-
-      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
-      - run: mise run install
-      - run: mise run gen:client
-
-      - name: Fail on drift
-        run: |
-          if ! git diff --quiet libs/api-client; then
-              echo "::error::@tsdhn/api-client is stale. Run 'mise run gen:client' and commit."
-              git diff libs/api-client
-              exit 1
-          fi
