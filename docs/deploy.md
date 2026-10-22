@@ -4,8 +4,8 @@ The repository includes two Docker Compose stacks for the API, the worker,
 PostgreSQL, RustFS and the web app: a local stack for development
 ([`docker-compose.yml`](../docker-compose.yml)) and a production stack
 ([`deploy/compose.prod.yml`](../deploy/compose.prod.yml)). Named volumes hold
-PostgreSQL data, object storage data and worker workspaces. Both stacks pin
-RustFS `docker.io/rustfs/rustfs:1.0.1`.
+PostgreSQL data, object storage data and worker workspaces. Both stacks pin the
+same RustFS image version.
 
 [Local stack](#local-stack) covers development. [Production](#production) covers
 the stack that runs behind a Cloudflare Tunnel.

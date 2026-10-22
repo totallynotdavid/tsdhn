@@ -63,7 +63,7 @@ services:
 
   # compose.external-storage.yml removes this service for an external store.
   storage:
-    image: docker.io/rustfs/rustfs:1.0.1
+    image: docker.io/rustfs/rustfs:1.0.3
     restart: unless-stopped
     command: ["/data"]
     environment:
@@ -243,7 +243,7 @@ services:
       start_period: 20s
 
   cloudflared:
-    image: docker.io/cloudflare/cloudflared:2026.10.1
+    image: docker.io/cloudflare/cloudflared:2026.10.3
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
     depends_on:

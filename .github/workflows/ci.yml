@@ -38,7 +38,7 @@ jobs:
           fi
           sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
 
-      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
       - run: mise run install
       - run: mise run check
 
@@ -84,7 +84,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
       - run: mise run install
 
       - name: Run disposable database integration tests
@@ -123,7 +123,7 @@ jobs:
       - name: Fetch master for the diff base
         run: git fetch origin master:refs/remotes/origin/master
 
-      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
       - run: mise run install
 
       - name: Download coverage data
@@ -176,7 +176,7 @@ jobs:
           SO=$(find /usr/lib -type f -name 'libgmt.so.*' -print -quit)
           [ -n "$SO" ] && sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
 
-      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
       - run: mise run install
       - run: mise run gen:client
 
