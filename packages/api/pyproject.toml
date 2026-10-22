@@ -10,7 +10,7 @@ authors = [
 ]
 dependencies = [
     "tsdhn",
-    "fastapi>=0.143.2",
+    "fastapi>=0.159.1",
     "uvicorn>=0.54.0",
     "pydantic>=2.14.1",
     "anyio>=4.15.1",
@@ -28,7 +28,7 @@ tsdhn-web-grants = "api.web_grants:main"
 tsdhn-queue-grants = "api.queue_grants:main"
 
 [build-system]
-requires = ["uv_build>=0.13.0,<0.14"]
+requires = ["uv_build>=0.13.5,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]

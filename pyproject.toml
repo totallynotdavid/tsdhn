@@ -32,14 +32,14 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "pytest-xdist>=3.8.0",
     "pytest-cov>=7.1.0",
-    "httpx2>=2.15.1",
+    "httpx2>=2.16.0",
     "coverage>=7.16.2",
     "diff-cover>=10.6.0",
     "scipy-stubs>=1.18.1.1",
     "asyncpg-stubs>=0.32.0",
 ]
 build = [
-    "uv_build>=0.13.0,<0.14",
+    "uv_build>=0.13.5,<0.14",
 ]
 
 [tool.ruff]
