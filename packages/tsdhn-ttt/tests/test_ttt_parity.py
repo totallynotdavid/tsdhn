@@ -140,11 +140,13 @@ class ClientAdapter:
 
 
 class PackageAdapter:
-    """Run `tsdhn_ttt` on the same grid and epicenter."""
+    """Run `tsdhn_ttt` in its `ttt_client`-compatible mode on the same case."""
 
     def run(self, case: Case) -> Trace:
         lon, lat = _epicenter(case)
-        result = travel_times(_grid(str(case.params["grid"])), lon, lat)
+        result = travel_times(
+            _grid(str(case.params["grid"])), lon, lat, client_compatible=True
+        )
         return _trace(case, result.hours)
 
 

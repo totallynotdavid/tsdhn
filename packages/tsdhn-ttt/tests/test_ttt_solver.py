@@ -9,7 +9,7 @@ from tsdhn_ttt.solver import EARTH_RADIUS_M
 
 from .conftest import WriteI2
 
-BIAS = 0.999772
+BIAS = math.sqrt(math.sin(2 * math.pi / 120) / (2 * math.pi / 120))
 G_EQUATOR = 9.7803267715
 
 
@@ -29,7 +29,7 @@ def test_open_ocean_row_matches_depth_speed(
 
     metres = steps * math.radians(0.1) * EARTH_RADIUS_M * math.cos(math.radians(lat))
     seconds = metres / math.sqrt(G_EQUATOR * 4000.0)
-    assert result.hours[source_row, source_col] == 0.0
+    assert result.hours[source_row, source_col] == pytest.approx(0.0, abs=1e-12)
     assert result.hours[source_row, source_col + steps] * 3600.0 == pytest.approx(
         seconds * BIAS, rel=1e-4
     )
@@ -123,3 +123,55 @@ def test_negative_longitude_is_read_east_of_the_date_line(
     b = _bathymetry(write_i2, ocean, x_min=178.0)
 
     assert locate_source(b, -179.5, 0.0) == locate_source(b, 180.5, 0.0) == (10, 25)
+
+
+def test_epicenter_between_nodes_starts_the_wavefront_at_the_epicenter(
+    write_i2: WriteI2, ocean: np.ndarray
+) -> None:
+    b = _bathymetry(write_i2, ocean)
+    metres_per_degree = math.radians(1.0) * EARTH_RADIUS_M
+    speed = math.sqrt(G_EQUATOR * 4000.0)
+
+    result = travel_times(b, 0.43, 0.0)
+
+    assert result.hours.dtype == np.float64
+    # Both nodes lie on the epicenter's row, so the straight segment is exact
+    # and only float64 rounding is left.
+    assert result.hours[10, 4] * 3600.0 == pytest.approx(
+        0.03 * metres_per_degree / speed * BIAS, rel=1e-9
+    )
+    assert result.hours[10, 5] * 3600.0 == pytest.approx(
+        0.07 * metres_per_degree / speed * BIAS, rel=1e-9
+    )
+
+
+def test_client_compatible_mode_starts_at_the_nearest_node_in_float32(
+    write_i2: WriteI2, ocean: np.ndarray
+) -> None:
+    b = _bathymetry(write_i2, ocean)
+
+    result = travel_times(b, 0.43, 0.0, client_compatible=True)
+
+    assert result.hours.dtype == np.float32
+    assert result.hours[10, 4] == 0.0
+    assert result.hours[10, 5] > 0.0
+
+
+def test_epicenter_start_does_not_cross_land(
+    write_i2: WriteI2, ocean: np.ndarray
+) -> None:
+    wall = ocean.copy()
+    wall[:, 6] = 100
+    wall[2, 6] = -4000
+    walled = _bathymetry(write_i2, wall)
+    open_sea = _bathymetry(write_i2, ocean, name="open.i2")
+
+    behind = travel_times(walled, 0.53, 0.0).hours[10, 8]
+    direct = travel_times(open_sea, 0.53, 0.0).hours[10, 8]
+
+    # The wall leaves one opening, at 0.6/0.8. A path through it, even half a
+    # cell (0.05 degrees) closer to the epicenter's row, is the two legs below
+    # long, against 0.27 degrees straight. The sphere shortens a leg by less
+    # than 1e-3 at these latitudes.
+    detour = (math.hypot(0.07, 0.75) + math.hypot(0.2, 0.75)) / 0.27
+    assert behind >= (1.0 - 1e-3) * detour * direct
