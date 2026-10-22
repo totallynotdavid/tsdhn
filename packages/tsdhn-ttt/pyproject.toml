@@ -1,0 +1,25 @@
+[project]
+name = "tsdhn-ttt"
+version = "0.2.0"
+description = "Tsunami travel-time grids from a GMT bathymetry grid, without a compiled client"
+requires-python = ">=3.14"
+readme = "readme.md"
+license = { text = "MIT" }
+authors = [
+    { name = "David Duran", email = "dadch1404@gmail.com" },
+]
+dependencies = [
+    "numpy>=2.5.4",
+    "numba>=0.68.0",
+]
+
+[project.scripts]
+tsdhn-ttt = "tsdhn_ttt.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "tsdhn_ttt"
+module-root = ""
