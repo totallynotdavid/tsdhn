@@ -1,8 +1,12 @@
 name: Release
 
+# A pull request or a manual run is a dry run. It builds every artifact and
+# checks every upload with a dry-run mode. It skips only publishing steps
+# without one. Those steps name the tag ref in their `if:`.
 on:
   push:
     tags: ["v*.*.*"]
+  pull_request:
   workflow_dispatch:
 
 # Default: no permissions.
@@ -11,7 +15,7 @@ permissions: {}
 
 concurrency:
   group: release-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
@@ -19,6 +23,47 @@ env:
   RELEASE_BRANCH_TAG: master
 
 jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Every environment named by a job must be checked below.
+      - name: Check the workflow names no unchecked environment
+        run: |
+          set -euo pipefail
+          checked="pypi"
+          named="$(sed -n 's/^    environment: *//p' .github/workflows/release.yml | sort -u)"
+          for environment in $named; do
+              case " $checked " in
+                  *" $environment "*) ;;
+                  *)
+                      echo "::error::Job environment '$environment' has no preflight check."
+                      exit 1
+                      ;;
+              esac
+          done
+
+      - name: Check the pypi environment exists
+        if: vars.PUBLISH_PYPI == 'true'
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/environments/pypi" --jq '"environment " + .name + " exists"'
+
+      - name: Report PyPI publishing as skipped
+        if: vars.PUBLISH_PYPI != 'true'
+        run: |
+          message="PyPI publishing is skipped: the repository variable PUBLISH_PYPI is not 'true'. The pypi environment and the trusted publisher were not checked."
+          echo "::notice title=PyPI skipped::$message"
+          echo "$message" >> "$GITHUB_STEP_SUMMARY"
+
   build-sdist-wheels:
     name: Build sdist + wheels
     runs-on: ubuntu-latest
@@ -31,7 +76,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check the tag matches the package version
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
           tag_version="${GITHUB_REF_NAME#v}"
@@ -41,11 +86,12 @@ jobs:
               exit 1
           fi
 
-      - name: Check the release notes name the tag
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      # Without a tag, the manifest version stands in for the tag version.
+      - name: Check the release notes name the version
         run: |
           set -euo pipefail
-          expected="tsdhn ${GITHUB_REF_NAME#v} is out."
+          manifest_version="$(sed -n 's/^version = "\(.*\)"/\1/p' packages/tsdhn/pyproject.toml)"
+          expected="tsdhn ${manifest_version} is out."
           first_line="$(head -n 1 .github/release-notes.md)"
           if [ "$first_line" != "$expected" ]; then
               echo "The first line of .github/release-notes.md must be: $expected"
@@ -58,6 +104,10 @@ jobs:
           install_args: python uv
 
       - run: mise run build:py
+
+      # The tag run uploads with pypa/gh-action-pypi-publish, which has no dry-run mode.
+      - name: Check the PyPI upload (dry run)
+        run: mise exec -- uv publish --dry-run --trusted-publishing never dist/tsdhn/*
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -79,8 +129,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/model
-          version="${GITHUB_REF_NAME#v}"
-          archive="dist/model/tsdhn-model-v${version}.tar.gz"
+          VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' packages/tsdhn/pyproject.toml)"
+          export VERSION
+          archive="dist/model/tsdhn-model-v${VERSION}.tar.gz"
           tar -czf "$archive" -C model .
           sha256sum "$archive" > "${archive}.sha256"
           python - <<'PY'
@@ -88,7 +139,7 @@ jobs:
           import os
           from pathlib import Path
 
-          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          version = os.environ["VERSION"]
           files = sorted(str(path.relative_to("model")) for path in Path("model").rglob("*") if path.is_file())
           manifest = {
               "version": version,
@@ -108,9 +159,12 @@ jobs:
           name: model-assets
           path: dist/model/*
 
+  # Later jobs pull candidate images, so fork pull requests skip image jobs
+  # because their tokens cannot write packages.
   build-toolchain-image:
     name: Build candidate Docker (toolchain)
     needs: build-sdist-wheels
+    if: github.event.pull_request.head.repo.fork != true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -333,12 +387,13 @@ jobs:
   promote-images:
     name: Promote Docker images
     needs: compose-smoke
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
       id-token: write
+    env:
+      IMAGES: tsdhn-toolchain tsdhn-api tsdhn-web tsdhn-backup tsdhn-dev
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -355,13 +410,21 @@ jobs:
         with:
           cosign-release: "v2.4.3"
 
+      - name: Check the tested candidates exist
+        run: |
+          set -euo pipefail
+          for image in $IMAGES; do
+              docker buildx imagetools inspect "${IMAGE_REGISTRY}/${image}:${CANDIDATE_TAG}" > /dev/null
+              echo "found ${image}:${CANDIDATE_TAG}"
+          done
+
       - name: Promote tested candidates
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
           short_sha="${GITHUB_SHA::7}"
-          images=(tsdhn-toolchain tsdhn-api tsdhn-web tsdhn-backup tsdhn-dev)
 
-          for image in "${images[@]}"; do
+          for image in $IMAGES; do
               source_ref="${IMAGE_REGISTRY}/${image}:${CANDIDATE_TAG}"
               release_ref="${IMAGE_REGISTRY}/${image}:${GITHUB_REF_NAME}"
               branch_ref="${IMAGE_REGISTRY}/${image}:${RELEASE_BRANCH_TAG}"
@@ -376,12 +439,14 @@ jobs:
               cosign sign --yes "$release_ref" "$branch_ref" "$sha_ref"
           done
 
+  # Trusted publishing requires the pypi environment and a PyPI publisher.
+  # Only tag runs enter the environment. Dry runs check uploads earlier.
   publish-pypi:
     name: Publish to PyPI
     needs: [build-sdist-wheels, promote-images]
 
     # Only publish when PyPI trusted publishing is explicitly configured.
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && vars.PUBLISH_PYPI == 'true'
+    if: startsWith(github.ref, 'refs/tags/') && vars.PUBLISH_PYPI == 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -409,9 +474,8 @@ jobs:
           packages-dir: dist/tsdhn
 
   release-notes:
-    name: Generate release notes
+    name: Create GitHub release
     needs: [build-model-assets, promote-images]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -426,7 +490,15 @@ jobs:
           name: model-assets
           path: dist/model
 
-      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+      - name: Check the release files
+        run: |
+          set -euo pipefail
+          test -s .github/release-notes.md
+          ls -l dist/model
+
+      - name: Create the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           body_path: .github/release-notes.md
           generate_release_notes: true

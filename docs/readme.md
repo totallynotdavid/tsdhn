@@ -14,6 +14,8 @@
    compared with.
 9. [Design](design.md): the web app's fonts, colour, type, layout, motion and
    components.
+10. [Release](release.md): cut a release, what its dry run checks, and the PyPI
+    setup.
 
 The root [README](../readme.md) covers installation and a first run.
 [Contributing](../.github/contributing.md) covers the contributor workflow.
