@@ -1411,7 +1411,7 @@ wheels = [
 
 [[package]]
 name = "tsdhn"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/tsdhn" }
 dependencies = [
     { name = "numba" },
@@ -1440,7 +1440,7 @@ requires-dist = [
 
 [[package]]
 name = "tsdhn-api"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/api" }
 dependencies = [
     { name = "anyio" },
@@ -1469,7 +1469,7 @@ requires-dist = [
 
 [[package]]
 name = "tsdhn-parity"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/tsdhn-parity" }
 dependencies = [
     { name = "numpy" },
@@ -1486,7 +1486,7 @@ requires-dist = [
 
 [[package]]
 name = "tsdhn-ttt"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/tsdhn-ttt" }
 dependencies = [
     { name = "numba" },
@@ -1501,7 +1501,7 @@ requires-dist = [
 
 [[package]]
 name = "tsdhn-workspace"
-version = "0.2.0"
+version = "0.3.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]

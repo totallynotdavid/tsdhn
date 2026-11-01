@@ -65,10 +65,11 @@ description = "Compare Python checkpoints with the MATLAB and Fortran references
 run = "uv run pytest packages/tsdhn/tests/parity packages/tsdhn-parity/tests"
 
 [tasks."build:py"]
-description = "Build the tsdhn and tsdhn-api distributions"
+description = "Build the tsdhn, tsdhn-api and tsdhn-ttt distributions"
 run = [
   "uv build --package tsdhn --out-dir dist/tsdhn",
   "uv build --package tsdhn-api --out-dir dist/api",
+  "uv build --package tsdhn-ttt --out-dir dist/ttt",
 ]
 
 # The web build reads files that typecheck and test regenerate.
