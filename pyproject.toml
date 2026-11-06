@@ -25,21 +25,21 @@ tsdhn-ttt = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "ruff>=0.17.1",
-    "mypy>=2.4.0",
-    "types-PyYAML>=6.0.12.20260906",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.4",
+    "mypy>=2.4.1",
+    "types-PyYAML>=6.0.12.20261103",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
     "pytest-xdist>=3.8.0",
     "pytest-cov>=7.1.0",
     "httpx2>=2.16.0",
-    "coverage>=7.16.2",
-    "diff-cover>=10.6.0",
+    "coverage>=7.17.2",
+    "diff-cover>=11.0.1",
     "scipy-stubs>=1.18.1.1",
     "asyncpg-stubs>=0.32.0",
 ]
 build = [
-    "uv_build>=0.13.5,<0.14",
+    "uv_build>=0.13.7,<0.14",
 ]
 
 [tool.ruff]

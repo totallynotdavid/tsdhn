@@ -47,7 +47,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           install_args: bun
       - run: bun install --frozen-lockfile
@@ -79,7 +79,7 @@ jobs:
           fi
           sudo ln -sf "$SO" "$(dirname "$SO")/libgmt.so"
 
-      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       - run: mise run install
       - run: mise run check
 
@@ -137,7 +137,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       - run: mise run install
 
       - name: Run disposable database integration tests
@@ -176,7 +176,7 @@ jobs:
       - name: Fetch master for the diff base
         run: git fetch origin master:refs/remotes/origin/master
 
-      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       - run: mise run install
 
       - name: Download coverage data

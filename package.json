@@ -7,9 +7,9 @@
   "type": "module",
   "devDependencies": {
     "openapi-typescript": "^7.13.0",
-    "oxfmt": "^0.74.0",
-    "oxlint": "^1.89.0",
-    "typescript": "npm:typescript-native-bridge@6.0.3-bridge.18.tsgo.7.0.2"
+    "oxfmt": "^0.77.0",
+    "oxlint": "^1.92.0",
+    "typescript": "npm:typescript-native-bridge@6.0.3-bridge.19.tsgo.7.0.2"
   },
   "overrides": {
     "typescript": "$typescript"
