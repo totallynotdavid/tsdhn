@@ -12,7 +12,7 @@ async function connect(): Promise<SimulationDatabase> {
     return createPreviewDatabase();
   }
   if (!DATABASE_URL?.trim()) throw new Error("DATABASE_URL is not set");
-  return drizzle(postgres(DATABASE_URL, { max: 10 }), { schema });
+  return drizzle(postgres(DATABASE_URL, { max: 10, infer: true }), { schema });
 }
 
 export const db = await connect();
