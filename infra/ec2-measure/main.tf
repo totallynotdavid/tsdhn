@@ -34,7 +34,7 @@ locals {
   }
 
   cloud_init = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    compose_b64 = base64encode(file("${path.root}/../../deploy/compose.prod.yml"))
+    compose_b64 = base64gzip(file("${path.root}/../../deploy/compose.prod.yml"))
   })
 }
 

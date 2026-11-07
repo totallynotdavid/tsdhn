@@ -150,6 +150,12 @@ compute_api_token="$(secret)"
   write_env_value TSDHN_WEB_PORT "3000"
   write_env_value GHCR_USERNAME "$GHCR_USERNAME"
   write_env_value GHCR_TOKEN "$GHCR_TOKEN"
+  # compose.prod.yml requires these to parse; the backup service is not started.
+  write_env_value BACKUP_IMAGE "unused"
+  write_env_value BACKUP_REPOSITORY "unused"
+  write_env_value BACKUP_PASSWORD "unused"
+  write_env_value BACKUP_S3_ACCESS_KEY "unused"
+  write_env_value BACKUP_S3_SECRET_KEY "unused"
 } > "$compose_env"
 chmod 600 "$compose_env"
 
@@ -202,12 +208,13 @@ pricing_file="$report_dir/ec2-pricing-candidates-$run_id.json"
 curl -fsS "$pricing_url" -o "$pricing_file"
 on_demand_prices_file="$report_dir/on-demand-prices-$run_id.tsv"
 jq -r --argjson candidates "$candidate_types_json" '
-  [ .products[]
+  .terms.OnDemand as $terms
+  | [ .products[]
     | select(.productFamily == "Compute Instance")
     | .attributes.instanceType as $type
     | select($candidates | index($type))
     | select(.attributes.operatingSystem == "Linux" and .attributes.tenancy == "Shared" and .attributes.capacitystatus == "Used" and .attributes.preInstalledSw == "NA")
-    | .terms.OnDemand[]
+    | $terms[.sku][]
     | .priceDimensions[]
     | select(.unit == "Hrs")
     | {type: $type, price: (.pricePerUnit.USD | tonumber)}
@@ -309,7 +316,7 @@ instance_lifecycle="$(jq -r '.InstanceLifecycle // "on-demand"' "$instance_info_
 instance_launch_time="$(jq -r '.LaunchTime' "$instance_info_file")"
 instance_started_at="$(date -u -d "$instance_launch_time" +%s.%N)"
 echo "instance_id=$instance_id public_ip=$public_ip"
-ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -i "$EC2_SSH_PRIVATE_KEY")
+ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -i "$EC2_SSH_PRIVATE_KEY")
 for _ in $(seq 1 120); do
   if ssh "${ssh_opts[@]}" "$ssh_user@$public_ip" true 2>/dev/null; then
     break
@@ -341,14 +348,14 @@ done
 [[ "$bootstrap_ready" == true ]] || die "bootstrap did not become ready within ${bootstrap_timeout_seconds}s"
 
 measure_file="$report_dir/measurement-$run_id.json"
-ssh "${ssh_opts[@]}" "$ssh_user@$public_ip" env COMPUTE_API_TOKEN="$compute_api_token" bash -s > "$measure_file" <<'REMOTE_MEASURE'
+ssh "${ssh_opts[@]}" "$ssh_user@$public_ip" sudo env COMPUTE_API_TOKEN="$compute_api_token" bash -s > "$measure_file" <<'REMOTE_MEASURE'
 set -Eeuo pipefail
 cd /opt/tsdhn
 set -a
 source /opt/tsdhn/prod.env
 set +a
 compose=(docker compose -f /opt/tsdhn/compose.prod.yml)
-api() { "${compose[@]}" exec -T -e MEASURE_API_TOKEN="$COMPUTE_API_TOKEN" api sh -c 'curl -fsS -H "Authorization: Bearer $MEASURE_API_TOKEN" "$@"' sh "$@"; }
+api() { "${compose[@]}" exec -T -e MEASURE_API_TOKEN="$COMPUTE_API_TOKEN" api sh -c 'curl -fsS -H "Authorization: Bearer $MEASURE_API_TOKEN" "$@"' sh "$@" </dev/null; }
 simulation_id="$(cat /proc/sys/kernel/random/uuid)"
 payload="$(jq -cn --arg id "$simulation_id" '{simulation_id:$id,input:{Mw:8.0,h:10.0,lat0:-20.5,lon0:-70.5,hhmm:"0000",dia:"23"}}')"
 worker_id="$("${compose[@]}" ps -q worker)"
@@ -384,13 +391,14 @@ output_sizes='[]'
 while IFS=$'\t' read -r name; do
   [[ -n "$name" ]] || continue
   location="$(api -o /dev/null -w '%{redirect_url}' http://127.0.0.1:8000/api/v1/jobs/$simulation_id/outputs/$name)"
-  bytes="$("${compose[@]}" exec -T api sh -c 'curl -fsSL "$1" -o /tmp/measure-output && stat -c %s /tmp/measure-output' sh "$location")"
+  bytes="$("${compose[@]}" exec -T api sh -c 'curl -fsSL "$1" -o /tmp/measure-output && stat -c %s /tmp/measure-output' sh "$location" </dev/null)"
   output_sizes="$(jq -c --arg name "$name" --argjson bytes "$bytes" '. + [{name:$name,bytes:$bytes}]' <<<"$output_sizes")"
 done < <(jq -r '.outputs[].name' <<<"$outputs")
 cpu_seconds="$(awk -v a="$cpu_start" -v b="$cpu_end" 'BEGIN {printf "%.6f", (b-a)/1000000}')"
 queue_to_complete_seconds="$(awk -v a="$queued_at" -v b="$finished_at" 'BEGIN {printf "%.3f", b-a}')"
 jq -n --arg simulation_id "$simulation_id" --arg status "$status" --arg q "$queue_to_complete_seconds" --arg cpu "$cpu_seconds" --arg idle "$worker_cgroup_idle_bytes" --arg peak "$worker_cgroup_peak_bytes" --arg ds "$disk_start" --arg de "$disk_end" --argjson output_sizes "$output_sizes" --argjson final_status "$current" '{simulation_id,status,queue_to_complete_seconds:($q|tonumber),cpu_seconds:($cpu|tonumber),worker_cgroup_peak_bytes:($peak|tonumber),worker_cgroup_idle_bytes:($idle|tonumber),disk_used_start_bytes:($ds|tonumber),disk_used_end_bytes:($de|tonumber),output_sizes,final_status}'
 REMOTE_MEASURE
+[[ -s "$measure_file" ]] || die "remote measurement produced no output"
 cat "$measure_file"
 
 if [[ "$instance_lifecycle" == spot ]]; then

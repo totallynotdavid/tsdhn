@@ -9,7 +9,7 @@ write_files:
   - path: /opt/tsdhn/compose.prod.yml
     owner: root:root
     permissions: '0644'
-    encoding: b64
+    encoding: gz+b64
     content: ${compose_b64}
   - path: /opt/tsdhn/bootstrap
     owner: root:root
@@ -44,8 +44,9 @@ write_files:
       done
 
       docker compose -f "$compose_file" config --quiet
-      docker compose -f "$compose_file" pull
-      docker compose -f "$compose_file" up -d --wait --wait-timeout 1200
+      mapfile -t services < <(docker compose -f "$compose_file" config --services | grep -vx backup)
+      docker compose -f "$compose_file" pull "$${services[@]}"
+      docker compose -f "$compose_file" up -d --wait --wait-timeout 1200 "$${services[@]}"
       docker compose -f "$compose_file" ps
       touch /var/lib/tsdhn-ec2-measure.ready
     BOOTSTRAP
