@@ -8,10 +8,10 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.67.0",
-    "cf": "1.0.0-beta.28",
+    "@cloudflare/vite-plugin": "1.69.1",
+    "cf": "1.0.0-beta.30",
     "typescript": "npm:typescript-native-bridge@6.0.3-bridge.19.tsgo.7.0.2",
-    "vite": "8.3.6",
+    "vite": "8.3.8",
     "vitest": "5.1.0"
   }
 }

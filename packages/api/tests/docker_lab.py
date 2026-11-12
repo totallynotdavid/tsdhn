@@ -19,7 +19,7 @@ from minio import Minio
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 POSTGRES_IMAGE = "postgres:18-alpine"
-STORAGE_IMAGE = "docker.io/rustfs/rustfs:1.0.1"
+STORAGE_IMAGE = "docker.io/rustfs/rustfs:1.0.5"
 
 DB_PASSWORD = "backup-test-db-password"
 S3_KEY = "backup-test-key"

@@ -63,7 +63,7 @@ services:
 
   # compose.external-storage.yml removes this service for an external store.
   storage:
-    image: docker.io/rustfs/rustfs:1.0.3
+    image: docker.io/rustfs/rustfs:1.0.5
     restart: unless-stopped
     command: ["/data"]
     environment:
